@@ -1,6 +1,6 @@
 # BailingHub for DeepSeek Harness
 
-[English](README.md) | 简体中文
+[English](../README.md) | 简体中文
 
 在电脑上的 DeepSeek Harness 里，通过 BailingHub 向已经接入的业务 route 发起受控任务，
 并在同一会话中持续查看状态和可用结果，不必再进入每个业务后台里的嵌入聊天入口。
@@ -32,7 +32,7 @@ BailingHub 仍位于模型与业务系统之间。中枢地址、Client Token �
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.0-rc.7
-dsh plugin --profile web add dsh-bailinghub@0.1.0
+dsh plugin --profile web add dsh-bailinghub@0.1.1
 ```
 
 在启动 Harness 的终端或进程环境中配置：
@@ -67,7 +67,7 @@ dsh web
 ## 身份与权限边界
 
 使用本机 Harness 界面，省掉的是“必须打开业务后台聊天入口”这一步；它不代表 Harness
-登录态或本机用户自动成为可信业务身份。`0.1.0` 有意不接受模型传入行动主体。route 或
+登录态或本机用户自动成为可信业务身份。当前 `0.1.x` Bundle 有意不接受模型传入行动主体。route 或
 下游业务系统仍需解析可信主体并执行最终授权；如果目标动作必须具备业务身份，而当前接入
 路径无法建立该身份，该动作就应保持不可用或被拒绝。
 

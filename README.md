@@ -1,6 +1,6 @@
 # BailingHub for DeepSeek Harness
 
-[简体中文](README.zh-CN.md) | English
+[简体中文](docs/README.zh-CN.md) | English
 
 Run governed tasks from DeepSeek Harness against a business route already connected to
 BailingHub, then track the same job and read its available result. You can do this from the
@@ -36,7 +36,7 @@ Prerequisites:
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.0-rc.7
-dsh plugin --profile web add dsh-bailinghub@0.1.0
+dsh plugin --profile web add dsh-bailinghub@0.1.1
 ```
 
 Configure the process that starts Harness:
@@ -73,7 +73,7 @@ bounded wait times out.
 
 Using the local Harness UI removes the need to open a business backend's embedded chat UI;
 it does **not** turn the Harness login or local user into a trusted business identity.
-Version `0.1.0` deliberately does not accept an acting subject as tool input. A route or
+The current `0.1.x` bundle deliberately does not accept an acting subject as tool input. A route or
 downstream business system must still resolve trusted identity and perform final
 authorization. If the selected action requires identity that the configured path cannot
 establish, it should remain unavailable or be rejected.

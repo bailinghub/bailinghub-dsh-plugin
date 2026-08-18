@@ -1,6 +1,6 @@
 {
   "name": "dsh-bailinghub",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Use DeepSeek Harness to submit and follow governed business tasks through BailingHub.",
   "license": "MIT",
   "type": "module",
@@ -30,7 +30,7 @@
   ],
   "files": [
     "cordis.patch.yml",
-    "README.zh-CN.md",
+    "docs/README.zh-CN.md",
     "SECURITY.md",
     "PRIVACY.md",
     "CHANGELOG.md",
