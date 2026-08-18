@@ -1,0 +1,59 @@
+{
+  "name": "dsh-bailinghub",
+  "version": "0.1.0",
+  "description": "Use DeepSeek Harness to submit and follow governed business tasks through BailingHub.",
+  "license": "MIT",
+  "type": "module",
+  "author": {
+    "name": "BailingHub Contributors",
+    "email": "niejingchuan@live.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bailinghub/bailinghub-dsh-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bailinghub/bailinghub-dsh-plugin/issues"
+  },
+  "homepage": "https://github.com/bailinghub/bailinghub-dsh-plugin#readme",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "bailinghub",
+    "mcp",
+    "ai-agent-governance",
+    "business-system-automation",
+    "human-in-the-loop",
+    "audit-trail",
+    "self-hosted"
+  ],
+  "files": [
+    "cordis.patch.yml",
+    "README.zh-CN.md",
+    "SECURITY.md",
+    "PRIVACY.md",
+    "CHANGELOG.md",
+    "docs/COMPATIBILITY.md",
+    "docs/PROJECT_BOUNDARIES.md"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "check:project": "node scripts/check-project.mjs",
+    "check:release-tag": "node scripts/check-release-tag.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "verify": "npm run check:project && npm test",
+    "prepack": "npm run verify"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

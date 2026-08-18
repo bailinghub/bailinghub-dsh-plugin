@@ -1,0 +1,15 @@
+- insert:
+    - id: mcp-bailinghub
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: bailinghub
+        transport: stdio
+        command: npx
+        args: ['-y', '--package=bailinghub-mcp-server@0.1.1', 'bailinghub-mcp-server']
+        env:
+          BAILINGHUB_BASE_URL: !!js process.env.BAILINGHUB_BASE_URL ?? ''
+          BAILINGHUB_CLIENT_TOKEN: !!js process.env.BAILINGHUB_CLIENT_TOKEN ?? ''
+          BAILINGHUB_ROUTE: !!js process.env.BAILINGHUB_ROUTE ?? ''
+          BAILINGHUB_ALLOW_INSECURE_HTTP: !!js process.env.BAILINGHUB_ALLOW_INSECURE_HTTP ?? 'false'
+        toolCallTimeoutMs: 90000
+        failOnStartupError: true
