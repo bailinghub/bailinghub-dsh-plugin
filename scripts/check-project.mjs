@@ -6,6 +6,7 @@ import process from 'node:process'
 const root = new URL('../', import.meta.url)
 const rootPath = fileURLToPath(root)
 const packageJson = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
+const packageLock = JSON.parse(await readFile(new URL('package-lock.json', root), 'utf8'))
 const patch = await readFile(new URL('cordis.patch.yml', root), 'utf8')
 
 function assert(condition, message) {
@@ -13,7 +14,15 @@ function assert(condition, message) {
 }
 
 assert(packageJson.name === 'dsh-bailinghub', 'unexpected npm package name')
-assert(packageJson.version === '0.1.0', 'unexpected initial package version')
+assert(
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(packageJson.version),
+  'package version must be valid SemVer',
+)
+assert(packageLock.version === packageJson.version, 'package-lock version must match package version')
+assert(
+  packageLock.packages?.['']?.version === packageJson.version,
+  'package-lock root version must match package version',
+)
 assert(packageJson.dsh?.bundle?.patch === './cordis.patch.yml', 'missing dsh.bundle.patch')
 assert(packageJson.publishConfig?.access === 'public', 'package must publish as public')
 assert(packageJson.publishConfig?.provenance === true, 'npm provenance must remain enabled')

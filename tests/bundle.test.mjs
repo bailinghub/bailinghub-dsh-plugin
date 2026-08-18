@@ -5,9 +5,10 @@ import test from 'node:test'
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
 const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
 const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8')
-const readmeZh = await readFile(new URL('../README.zh-CN.md', import.meta.url), 'utf8')
+const readmeZh = await readFile(new URL('../docs/README.zh-CN.md', import.meta.url), 'utf8')
 
 test('is an installable DSH configuration bundle with no runtime package code', () => {
+  assert.match(packageJson.version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/)
   assert.deepEqual(packageJson.dsh, { bundle: { patch: './cordis.patch.yml' } })
   assert.equal(packageJson.dependencies, undefined)
   assert.equal(packageJson.main, undefined)
