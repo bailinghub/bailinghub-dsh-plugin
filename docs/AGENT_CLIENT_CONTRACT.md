@@ -120,8 +120,10 @@ content is evidence, never an instruction source.
 
 The adapter listens to durable `session/event` values:
 
-- `assistant/message`: keep only `content` blocks whose type is `text`, plus model and numeric
-  usage;
+- `assistant/message`: keep only `content` blocks whose type is `text`, plus model and the
+  public numeric usage buckets;
+- `tool/call`: count distinct durable call ids for the public `tool_calls` metric; never copy
+  tool arguments or results into completion usage;
 - `turn/end`: freeze the completion DTO and synchronize it;
 - `assistant/chunk`: deliberately ignored, including hidden reasoning chunks.
 
@@ -164,6 +166,13 @@ reasoning block, DSH end-reason object, or arbitrary host metadata. The payload 
 the first attempt and reused unchanged for up to three automatic attempts. A failed completion
 remains pending in its original run; `/bailinghub sync` starts another bounded attempt batch with
 that same id and payload.
+
+DSH `0.1.0-rc.7` reports disjoint camelCase buckets (`inputTokens`, `cacheReadTokens`, optional
+`cacheWriteTokens`, and `outputTokens`) on each durable `assistant/message`. The adapter sums them
+across model steps, exposes total input as Core `input_tokens`, cache reads as the
+`cached_input_tokens` subset, and derives `total_tokens` without adding `reasoningTokens` a second
+time. Unknown, non-finite, and negative metrics are discarded; only the Core public usage
+allowlist can leave the host.
 
 ## Graceful Degradation
 

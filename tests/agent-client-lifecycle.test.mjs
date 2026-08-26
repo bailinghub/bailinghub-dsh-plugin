@@ -215,6 +215,90 @@ test('syncs only the visible final assistant message and public usage at turn en
   assert.equal(local.size, 0)
 })
 
+test('normalizes real DSH rc.7 camelCase usage and counts durable tool calls', async () => {
+  const { host, mock } = createRuntime()
+  const { agent } = createMockAgent('dsh-usage')
+  await startOneTurn(host, agent)
+
+  host.emit('session/event', agent.session, {
+    type: 'assistant/message',
+    data: {
+      turn: 1,
+      step: 0,
+      message: {
+        id: 'assistant-step-0',
+        role: 'assistant',
+        source: { provider: 'deepseek', model: 'deepseek-chat' },
+        content: [
+          { type: 'reasoning', text: 'must remain local' },
+          { type: 'tool-call', id: 'tool-1', name: 'employee_update', arguments: {} },
+        ],
+      },
+      usage: {
+        inputTokens: 13000,
+        outputTokens: 120,
+        cacheReadTokens: 7000,
+        reasoningTokens: 80,
+        providerPrivateMetric: 999,
+      },
+    },
+  })
+  host.emit('session/event', agent.session, {
+    type: 'tool/call',
+    data: { turn: 1, step: 0, callId: 'tool-1', name: 'employee_update', arguments: {} },
+  })
+  // Replayed durable events must not inflate the public tool-call count.
+  host.emit('session/event', agent.session, {
+    type: 'tool/call',
+    data: { turn: 1, step: 0, callId: 'tool-1', name: 'employee_update', arguments: {} },
+  })
+  host.emit('session/event', agent.session, {
+    type: 'tool/call',
+    data: { turn: 1, step: 1, callId: 'tool-2', name: 'employee_read', arguments: {} },
+  })
+  host.emit('session/event', agent.session, {
+    type: 'assistant/message',
+    data: {
+      turn: 1,
+      step: 2,
+      message: {
+        id: 'assistant-step-2',
+        role: 'assistant',
+        source: { provider: 'deepseek', model: 'deepseek-chat' },
+        content: [
+          { type: 'reasoning', text: 'must remain local too' },
+          { type: 'text', text: 'The requested change is complete.' },
+        ],
+      },
+      usage: {
+        inputTokens: 14662,
+        outputTokens: 164,
+        cacheReadTokens: 7080,
+        cacheWriteTokens: -1,
+        costUsd: Number.NaN,
+      },
+    },
+  })
+  host.emit('session/event', agent.session, {
+    type: 'turn/end',
+    data: { turn: 1, reason: { kind: 'completed' } },
+  })
+  await settle()
+
+  const [complete] = callsFor(mock.calls, 'completeRun')
+  assert.deepEqual(complete.args[1].usage, {
+    input_tokens: 41742,
+    cached_input_tokens: 14080,
+    output_tokens: 284,
+    total_tokens: 42026,
+    tool_calls: 2,
+  })
+  assert.doesNotMatch(
+    JSON.stringify(complete.args[1]),
+    /must remain local|reasoningTokens|providerPrivateMetric|cacheWriteTokens|costUsd/,
+  )
+})
+
 test('normalizes schema aliases and rejects unsupported Core contracts', () => {
   const normalized = normalizeStartTurnResponse(turnResponse({ tools: [activeTool('_private_tool')] }))
   assert.equal(normalized.schema, 'bailing.agent-turn-context.v1')

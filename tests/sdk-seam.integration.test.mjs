@@ -165,16 +165,21 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', {
   )
 
   host.emit('session/event', agent.session, {
+    type: 'tool/call',
+    data: { turn: 1, step: 0, callId: 'sdk-call-1', name: 'employee_update', arguments: {} },
+  })
+  host.emit('session/event', agent.session, {
     type: 'assistant/message',
     data: {
       turn: 1,
+      step: 1,
       message: {
         id: 'sdk-visible-final',
         role: 'assistant',
         source: { provider: 'deepseek', model: 'deepseek-chat' },
         content: [{ type: 'text', text: 'Employee 42 was updated.' }],
       },
-      usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+      usage: { inputTokens: 8, cacheReadTokens: 2, outputTokens: 5, reasoningTokens: 1 },
     },
   })
   host.emit('session/event', agent.session, {
@@ -197,8 +202,10 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', {
   assert.equal(requests[3].body, undefined)
   assert.deepEqual(requests[4].body.usage, {
     input_tokens: 10,
+    cached_input_tokens: 2,
     output_tokens: 5,
     total_tokens: 15,
+    tool_calls: 1,
   })
   assert.equal(Object.hasOwn(requests[4].body, 'reasoning'), false)
 })
