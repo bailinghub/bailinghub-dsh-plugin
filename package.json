@@ -1,9 +1,11 @@
 {
   "name": "dsh-bailinghub",
-  "version": "0.1.1",
-  "description": "Use DeepSeek Harness to submit and follow governed business tasks through BailingHub.",
+  "version": "0.2.0",
+  "description": "Native DeepSeek Harness adapter for the BailingHub Agent Client Core.",
   "license": "MIT",
   "type": "module",
+  "main": "lib/index.js",
+  "exports": "./lib/index.js",
   "author": {
     "name": "BailingHub Contributors",
     "email": "niejingchuan@live.com"
@@ -16,6 +18,10 @@
     "url": "https://github.com/bailinghub/bailinghub-dsh-plugin/issues"
   },
   "homepage": "https://github.com/bailinghub/bailinghub-dsh-plugin#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "keywords": [
     "deepseek-harness",
     "dsh",
@@ -29,7 +35,11 @@
     "self-hosted"
   ],
   "files": [
+    "lib",
+    "cordis.agent-client.patch.yml",
     "cordis.patch.yml",
+    "docs/AGENT_CLIENT_CONTRACT.md",
+    "docs/MIGRATION_VNEXT.md",
     "docs/README.zh-CN.md",
     "SECURITY.md",
     "PRIVACY.md",
@@ -47,13 +57,13 @@
     "verify": "npm run check:project && npm test",
     "prepack": "npm run verify"
   },
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "bailinghub-mcp-server": "0.2.0"
   },
   "dsh": {
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "patch": "./cordis.agent-client.patch.yml"
     }
   }
 }

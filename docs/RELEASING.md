@@ -1,98 +1,198 @@
 # Releasing
 
-## Release model
+## Release units and order
 
-`dsh-bailinghub` is a small configuration bundle. Release confidence comes from keeping its
-pinned versions and documentation aligned, then running one focused compatibility smoke. A
-broad business-system E2E matrix is not required.
+The Agent Client spans three independently versioned release units. Publish and verify them in
+this dependency order:
 
-The `v0.1.0` package was the one-time manual npm bootstrap and therefore has no npm provenance.
-The Trusted Publisher is configured for repository `bailinghub/bailinghub-dsh-plugin`, workflow
-`publish.yml`, with no GitHub Environment. Every later version must be published by that tagged
-workflow through GitHub OIDC; do not publish a later version from a maintainer workstation.
+```text
+1. BailingHub Core
+   Agent Auth, Runtime Context, capability governance, invoke/resume, completion, and audit
+
+2. bailinghub-mcp-server
+   the host-neutral `./sdk` export, browser authorization, credential storage, and DTO mapping
+
+3. dsh-bailinghub
+   native DSH lifecycle, commands, prompt/context projection, dynamic tools, and completion sync
+```
+
+Do not publish the DSH package before the exact SDK version in its ordinary dependency is publicly
+installable. Do not publish the SDK before the matching Core contracts are released and available
+for compatibility tests. A deployment-specific business adapter is an acceptance fixture, not a
+fourth BailingHub package and not a dependency to publish from this repository.
+
+The public `0.1.1` static MCP bundle is a separate compatibility path. Never move its tag, rewrite
+its package, or silently reinterpret its Client Token and Hub-orchestrated semantics.
+
+## Public manifest gates
+
+The stable `0.2.0` manifest is publishable and must retain all of these properties:
+
+```text
+version: 0.2.0
+publishConfig.access: public
+publishConfig.provenance: true
+dependency: bailinghub-mcp-server@0.2.0 (exact ordinary dependency)
+```
+
+For every public prerelease or stable version:
+
+1. Keep npm public/provenance metadata enabled and do not add `private:true`.
+2. Place one exact compatible `bailinghub-mcp-server` version in ordinary `dependencies`.
+3. Keep the SDK out of `peerDependencies`, `peerDependenciesMeta`, and
+   `optionalDependencies`.
+4. Regenerate `package-lock.json`; both its root dependency and resolved package version must equal
+   the exact manifest value.
+5. Keep all install hooks absent. The package must not download code through `preinstall`,
+   `install`, `postinstall`, or `prepare`.
+6. Keep local paths, private deployment URLs, credentials, and business-specific identifiers out
+   of the manifest, lockfile, Cordis patches, docs, tests, and tarball.
+
+`scripts/check-project.mjs` enforces these properties. A stable plugin may depend only on an exact
+stable SDK version.
+
+For a public prerelease, publish both upstream SDK and DSH packages under an explicit prerelease
+version and non-`latest` dist-tag such as `next`. Verify that the workflow actually supplies that
+tag before pushing a public tag. Move `latest` only with an explicitly accepted stable release.
 
 ## Version update surface
 
-For every release:
+For every prerelease or stable release:
 
-1. Run `npm version <version> --no-git-tag-version` so `package.json`, `package-lock.json`, and
-   the lockfile root package stay aligned. Do not let this command create the Git tag.
-2. Add the release entry to `CHANGELOG.md`.
-3. Update the pinned plugin version in the install commands in `README.md` and
-   `docs/README.zh-CN.md`.
-4. Update `docs/COMPATIBILITY.md` only from compatibility evidence gathered for the release.
-5. Run the focused smoke and local verification below before merging the release pull request.
+1. Update `package.json`, `package-lock.json`, and the lockfile root version together.
+2. Update the exact SDK dependency and resolved lock entry together.
+3. Add the release entry to `CHANGELOG.md` without converting private evidence into an adoption
+   claim.
+4. Update the exact install version in `README.md` and `docs/README.zh-CN.md`.
+5. Update `docs/COMPATIBILITY.md` only from real compatibility evidence.
+6. Update `docs/AGENT_CLIENT_CONTRACT.md` and `docs/MIGRATION_VNEXT.md` when host fields, commands,
+   schemas, credential behavior, or migration semantics change.
+7. Update `SECURITY.md` and `PRIVACY.md` when data flow, storage, or supply-chain behavior changes.
+8. Run the project, package, clean-profile, live Agent Client, and legacy checks below.
 
-When the supported DeepSeek Harness version changes, also update both README prerequisites and
-install commands, then repeat the clean-profile smoke against that exact Harness version.
+The native host configuration remains exactly:
 
-When the `bailinghub-mcp-server` pin changes, update all of these together:
+| Field | Environment value | Owner |
+| --- | --- | --- |
+| `hubUrl` | `BAILINGHUB_HUB_URL` | deployer |
+| `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | Hub/business integrator |
+| `workspace` | `BAILINGHUB_WORKSPACE` | Hub/business integrator; Agent Client v1 route id |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | local end-user profile |
 
-- `cordis.patch.yml`;
-- the expected command in `scripts/check-project.mjs` and `tests/bundle.test.mjs`;
-- the supply-chain text in both READMEs and `SECURITY.md`;
-- `docs/COMPATIBILITY.md` and `CHANGELOG.md`.
+No Client Token, model key, business endpoint, authorization endpoint, signing secret, or business
+credential belongs in the DSH plugin configuration.
 
-When tool names, environment variables, or the Client API contract change, update the bundle,
-both READMEs, tests, compatibility table, and project-boundary documentation in the same pull
-request. Generic MCP or BailingHub behavior still belongs in its owning repository, not here.
+## Source and tarball verification
 
-Before editing pins, check current upstream versions without automatically adopting them:
-
-```bash
-npm view @deepseek-ai/dsh@latest version
-npm view bailinghub-mcp-server@latest version
-```
-
-An upstream release is a prompt to recheck compatibility, not evidence that this bundle already
-supports it.
-
-## Focused compatibility smoke
-
-Use a clean temporary DSH home and the tarball that will be published. Keep production tokens and
-payloads out of shell history, screenshots, logs, and compatibility reports.
+Run from a clean release checkout with no production credentials in the environment or shell
+history:
 
 ```bash
 npm ci
 npm run verify
-npm pack --dry-run --json
 npm audit --audit-level=low
+npm pack --dry-run --json
 npm pack --json
 ```
 
-With the exact target DSH version installed, create a temporary profile outside any normal DSH
-home and install the generated tarball into the `web` profile:
+Inspect the exact tarball inventory. It should contain the public native runtime, selected Cordis
+patch, user documentation, compatibility/security/privacy material, and package metadata. It must
+not contain tests, local profiles, credentials, real deployment values, business payloads, editor
+state, or a local tarball dependency.
+
+Re-run the repository secret and local-path guard, then inspect the tarball independently for:
+
+- private keys or bearer credentials;
+- access, refresh, client, model-provider, or business-system tokens;
+- private hosts, numeric server addresses, user home paths, or `file:` dependencies;
+- business-specific client ids, route ids, account ids, tenant ids, or payload examples.
+
+Only neutral placeholders such as `https://hub.example.com`, `example-agent-client`,
+`order_assistant`, and `default` belong in public setup examples.
+
+## Clean-profile package acceptance
+
+Use a truly isolated DSH home and the exact tarball or registry version that will be released.
+Some desktop command shims may set their own DSH home; prove that the invoked CLI honors the
+temporary value before installing anything. If it does not, use a standalone compatible DSH CLI
+or its underlying entrypoint. Never run a release smoke against the maintainer's normal profile.
 
 ```bash
 dsh_release_version="$(node --print "require('./package.json').version")"
 dsh_release_home="$(mktemp -d)"
-DSH_HOME="$dsh_release_home" dsh plugin --profile web add "./dsh-bailinghub-${dsh_release_version}.tgz"
+DSH_HOME="$dsh_release_home" dsh plugin --profile web add \
+  "./dsh-bailinghub-${dsh_release_version}.tgz"
 DSH_HOME="$dsh_release_home" dsh --profile web --dump-config
 ```
 
-Use only placeholder credentials while inspecting dumped configuration. Confirm that the composed
-profile contains the BailingHub bundle, the in-box DSH MCP Client, the exact pinned MCP Server, and
-the expected `serverName`, timeout, and fail-closed startup setting.
+Use placeholder host configuration for composition checks. Confirm all of the following before a
+live login:
 
-For the single live check, start that same temporary profile with a dedicated non-production
-BailingHub Client Token and route. Confirm all three `mcp__bailinghub__*` tools are discovered,
-submit one no-side-effect request with a stable `request_id`, and follow the returned `job_id` to a
-terminal result. A bounded-wait timeout is not a reason to submit again. Discard the temporary DSH
-home after recording redacted versions and the pass/fail result.
+1. The composed Web profile selects `cordis.agent-client.patch.yml` and native `dsh-bailinghub`.
+2. Installing only the DSH plugin also installs the exact declared `bailinghub-mcp-server`.
+3. `bailinghub-mcp-server/sdk` resolves from the installed plugin without ambient modules.
+4. The dump contains only `hubUrl`, `clientAppId`, `workspace`, and `connectionName` for this
+   plugin; it contains no credential value.
+5. Missing or invalid configuration degrades clearly and does not claim a business action ran.
 
-This one install, discovery, submit, and same-job follow-up is the release smoke. Do not expand it
-into an adapter or business-system test matrix unless a real regression requires that evidence.
+## Browser authorization and live acceptance
 
-## Normal OIDC release
+Use a dedicated non-production Hub client/workspace and a no-surprise business fixture. Never put
+its credentials, private URL, authorization code, personal data, or raw payload into logs,
+screenshots, release notes, or CI artifacts.
 
-1. Merge the clean release pull request after CI passes.
-2. Create an annotated `v<version>` tag on that exact merged commit and push only that tag.
-3. Confirm the `Publish` workflow passes `check:release-tag`, project verification, and npm
-   Trusted Publisher authentication.
-4. Verify the exact public version, its `gitHead`, integrity, and provenance on npm.
-5. Install the exact registry version into another clean DSH profile and repeat the composition
-   check.
-6. Create the GitHub Release from the existing tag and include the verified compatibility range.
+In the isolated DSH Web profile:
+
+1. Run `/bailinghub login` and confirm the system browser opens the business authorization page.
+2. Confirm the page shows the intended business identity, Hub client, requested workspace, and
+   requested capability boundary before approval.
+3. Complete the callback and verify `/bailinghub status` without exposing access or refresh tokens.
+4. Run `/bailinghub workspaces`; optionally switch to another already-authorized workspace using
+   `/bailinghub use <workspace>` before opening a new session.
+5. Start a new conversation and perform one read-only query.
+6. Perform one permitted mutation whose ACC governance does not require approval.
+7. Exercise one approval-required or pending invocation and prove DSH resumes the exact original
+   invocation id instead of repeating `invoke`.
+8. Confirm BailingHub contains the same conversation, run, user message, visible final assistant
+   response, legal completion status, public usage, and tool trajectory without hidden reasoning or
+   raw credential material.
+9. Exercise `/bailinghub sync` only for a deliberately pending completion and prove it reuses the
+   frozen completion payload.
+10. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
+
+Native Code Mode must degrade rather than expose stale or unsafe dynamic schemas. Run the live
+business checks in Native Tool Mode.
+
+## Legacy 0.1.1 compatibility acceptance
+
+Use a second isolated profile and install the immutable exact version:
+
+```bash
+DSH_HOME="$dsh_release_home" dsh plugin --profile web add dsh-bailinghub@0.1.1
+```
+
+Supply a dedicated route-scoped Client Token through the legacy environment names, verify the
+three `mcp__bailinghub__*` tools, submit one no-side-effect task exactly once with a stable
+`request_id`, and follow the returned `job_id` to its terminal state. A bounded wait timeout must
+not create a replacement task.
+
+This check proves that the newly released Core still supports the old public `/run` and
+`/jobs/{job_id}` Client API. It does not prove native Agent Client behavior, and the native check
+does not prove legacy compatibility.
+
+## OIDC publication and registry verification
+
+1. Merge only a clean release commit after CI and all acceptance evidence pass.
+2. Create an annotated immutable `v<version>` tag on that exact commit and push only the tag.
+3. Confirm the `Publish` workflow passes `check:release-tag`, project verification, package audit,
+   and npm Trusted Publisher authentication.
+4. For a prerelease, confirm npm uses the approved non-`latest` dist-tag. Stop if the workflow would
+   change `latest` unintentionally.
+5. Verify the exact npm version, `gitHead`, integrity, and provenance independently.
+6. Install that exact registry version into a second clean profile and repeat dependency
+   resolution plus composition checks.
+7. Create the GitHub Release from the existing tag and record only the verified compatibility
+   range and redacted acceptance result.
 
 Useful registry checks:
 
@@ -102,40 +202,26 @@ npm view "dsh-bailinghub@${dsh_release_version}" version gitHead dist.integrity 
 npm view "dsh-bailinghub@${dsh_release_version}" dist.attestations --json
 ```
 
-The first real OIDC publication after the manual bootstrap must explicitly verify the npm
-provenance record. A green workflow that only reports the version already exists does not prove
-OIDC publication.
+The Trusted Publisher is configured for repository `bailinghub/bailinghub-dsh-plugin`, workflow
+`publish.yml`, with no GitHub Environment. Versions after the historical `0.1.0` bootstrap must be
+published only by that tagged OIDC workflow, never from a maintainer workstation.
 
-## Immutable npm recovery
+## Stop and recovery conditions
 
-An npm package version and a public Git tag are immutable release evidence. Never move or reuse a
-published tag, and never expect an unpublished npm version to become reusable.
+Stop before tagging if the exact Core contract, SDK package, dependency lock, clean-profile
+resolution, browser authorization, native trajectory, secret scan, or legacy check is missing.
+Do not treat an already-running development profile as clean-install evidence.
 
-- If OIDC or registry access fails before npm accepts the package and no source change is needed,
-  fix the Trusted Publisher or workflow setting and rerun the same unchanged tag workflow.
-- If a source or package change is needed after the tag is public, prepare the next patch version
-  and create a new tag; do not rewrite the old tag.
-- If npm accepted the version but GitHub Release creation failed, create the GitHub Release from
-  the existing tag. Do not republish the package.
-- If an accepted npm version is defective or unsafe, deprecate that exact version with a concise
-  migration message, fix forward in the next patch release, and rotate any exposed credential
-  separately. Do not rely on unpublish as rollback.
+An npm version and public Git tag are immutable:
 
-After recovery, verify npm, the GitHub tag and Release, the workflow run, and a clean registry
-installation independently before recording the release as complete.
+- If authentication fails before npm accepts the unchanged package, fix the publisher and rerun
+  the same tag workflow.
+- If source or package content must change after a public tag, release the next version; never move
+  or reuse the tag.
+- If npm accepts the version but GitHub Release creation fails, create the Release from the
+  existing tag without republishing.
+- If an accepted package is unsafe, deprecate that exact version and fix forward. Rotate any
+  exposed credential separately; unpublish is not a credential rollback.
 
-## Historical initial npm bootstrap
-
-The npm package must already exist before npm can attach a GitHub Trusted Publisher. For the
-first release only, the completed `v0.1.0` bootstrap used this sequence:
-
-1. Push the exact clean release commit to the public repository and let CI pass.
-2. Authenticate an npm account that owns the package name and complete its 2FA challenge.
-3. From that exact clean commit, run `npm publish --access public --provenance=false`.
-4. Verify `dsh-bailinghub@0.1.0` from the public registry.
-5. Configure the Trusted Publisher for repository `bailinghub/bailinghub-dsh-plugin`, workflow
-   `publish.yml`, environment unset, and publishing access enabled.
-6. Tag the same commit as `v0.1.0`; the workflow should detect the existing version and finish
-   without republishing it.
-
-This historical exception must not be repeated for `v0.1.1` or later.
+After recovery, verify npm, the GitHub tag and Release, workflow provenance, exact dependency
+resolution, and a clean registry installation independently.
