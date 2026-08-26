@@ -83,7 +83,7 @@ test('starts the Core turn before prompt assembly and exposes scoped typed tools
   assert.ok(local.has('employee_update'))
 })
 
-test('invokes with the real SDK DTO and preserves accepted_unknown recovery identity', async () => {
+test('recovers accepted_unknown with the original invocation id instead of invoking again', async () => {
   let acceptedInvocationId
   const { host, mock } = createRuntime({
     invoke: async (input) => {
@@ -97,22 +97,14 @@ test('invokes with the real SDK DTO and preserves accepted_unknown recovery iden
   await startOneTurn(host, agent)
   const definition = local.get('employee_update')
 
-  await assert.rejects(
-    definition.execute(
-      { employee_id: '42' },
-      { agent, callId: 'model-call/one', signal: new AbortController().signal },
-    ),
-    (error) => {
-      assert.equal(error.code, 'BAILINGHUB_ACCEPTED_UNKNOWN')
-      assert.equal(error.disposition, 'accepted_unknown')
-      assert.equal(error.invocationId, acceptedInvocationId)
-      assert.match(error.message, new RegExp(acceptedInvocationId))
-      assert.doesNotMatch(error.message, /top-secret|Bearer/)
-      return true
-    },
+  const recovered = await definition.execute(
+    { employee_id: '42' },
+    { agent, callId: 'model-call/one', signal: new AbortController().signal },
   )
 
   assert.match(acceptedInvocationId, /^[0-9a-f]{64}$/)
+  assert.equal(recovered.invocation_id, acceptedInvocationId)
+  assert.equal(recovered.state, 'executed')
   const [invoke] = callsFor(mock.calls, 'invoke')
   assert.deepEqual(Object.keys(invoke.args[0]).sort(), [
     'agentRunId',
@@ -122,6 +114,9 @@ test('invokes with the real SDK DTO and preserves accepted_unknown recovery iden
     'tool',
   ])
   assert.equal(invoke.args[0].tool, 'employee_update')
+  const [resume] = callsFor(mock.calls, 'resume')
+  assert.equal(resume.args[0], acceptedInvocationId)
+  assert.equal(callsFor(mock.calls, 'invoke').length, 1)
 })
 
 test('search replaces only this session active set and resume uses the exact invocation id', async () => {

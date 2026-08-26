@@ -92,10 +92,11 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', {
         invocation_id: body.invocation_id,
         route: 'demo',
         tool: body.tool,
-        state: 'executed',
-        ok: true,
+        state: 'awaiting_approval',
+        ok: false,
         auto_retry_allowed: false,
-        text: 'Employee updated.',
+        text: 'Approval is pending.',
+        approval_id: 42,
       })
     }
     if (/^\/agent-api\/v1\/tool-invocations\/[0-9a-f]{64}\/resume$/u.test(path)) {
@@ -131,7 +132,10 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', {
     connectionName: profile.alias,
   }, { connectionStore, fetchImpl, now: () => now })
   const host = createMockHost()
-  createAgentClientPlugin({ transport }).apply(host.ctx, {
+  createAgentClientPlugin({
+    transport,
+    recovery: { pollIntervalMilliseconds: 1 },
+  }).apply(host.ctx, {
     hubUrl: profile.baseUrl,
     clientAppId: profile.clientAppId,
     workspace: profile.workspace,
@@ -192,20 +196,22 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', {
   assert.deepEqual(requests.map((request) => request.path), [
     '/agent-api/v1/workspaces/demo/turns',
     '/agent-api/v1/tool-invocations',
+    `/agent-api/v1/tool-invocations/${requests[1].body.invocation_id}/resume`,
     '/agent-api/v1/workspaces/demo/capabilities/search',
     `/agent-api/v1/tool-invocations/${resumeId}/resume`,
     '/agent-api/v1/runs/123e4567-e89b-42d3-a456-426614174000/complete',
   ])
   assert.match(requests[0].body.client_conversation_id, /^dsh\.conversation\.[0-9a-f]{32}$/u)
   assert.equal(requests[1].body.agent_run_id, '123e4567-e89b-42d3-a456-426614174000')
-  assert.equal(requests[2].body.run_id, '123e4567-e89b-42d3-a456-426614174000')
-  assert.equal(requests[3].body, undefined)
-  assert.deepEqual(requests[4].body.usage, {
+  assert.equal(requests[2].body, undefined)
+  assert.equal(requests[3].body.run_id, '123e4567-e89b-42d3-a456-426614174000')
+  assert.equal(requests[4].body, undefined)
+  assert.deepEqual(requests[5].body.usage, {
     input_tokens: 10,
     cached_input_tokens: 2,
     output_tokens: 5,
     total_tokens: 15,
     tool_calls: 1,
   })
-  assert.equal(Object.hasOwn(requests[4].body, 'reasoning'), false)
+  assert.equal(Object.hasOwn(requests[5].body, 'reasoning'), false)
 })

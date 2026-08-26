@@ -43,7 +43,8 @@ and puts reasoning/orchestration in the local Agent. BailingHub still owns gover
 2. Native DSH `0.1.0-rc.7` loads the temporary package, command login works, and two sessions prove
    isolated run/tool state.
 3. Search safely replaces the active definitions after a live ToolRuntime execution.
-4. `accepted_unknown` recovery proves that the original invocation id is resumed and never
+4. Approval, in-progress, retryable pre-dispatch, and `accepted_unknown` recovery prove that the
+   original invocation id is resumed, duplicate DSH calls are coalesced, and `invoke` is never
    repeated.
 5. Core shows the user message, visible final assistant message, legal completion status, usage,
    and invocation audit without any hidden reasoning.

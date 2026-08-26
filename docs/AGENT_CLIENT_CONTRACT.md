@@ -134,13 +134,28 @@ Every active Core tool becomes an agent-scoped DSH definition. Its invocation id
 calls the SDK `invoke` DTO without letting the model choose the run, capability revision, route,
 or identity.
 
-An SDK error with `disposition === 'accepted_unknown'` becomes a safe model-visible error that
-retains the exact invocation id and requires `resume_governed_tool_invocation`. It never includes
-the raw transport error and never suggests repeating the business call.
+An SDK error with `disposition === 'accepted_unknown'` starts recovery with the exact invocation
+id; it never repeats the business-tool `invoke`. Likewise, `awaiting_approval`, `in_progress`, and
+retryable `rejected_before_dispatch` results keep the original DSH tool call open while the
+adapter performs bounded `resume` polling. Approval therefore continues the same invocation and
+the same Core run before the local Agent writes its final answer.
+
+The default recovery window is at most 120 seconds and 60 resume attempts. `executed`,
+`business_rejected`, `denied`, non-retryable `rejected_before_dispatch`, and
+`reconciliation_required` are terminal and are never polled. If the bounded wait expires while a
+known result is still pending, the tool returns that result plus an `agent_client_wait` marker
+containing the same invocation id and the only legal recovery tool. If no trustworthy invocation
+result was ever received, the safe error still retains only that exact id. Raw transport errors
+are never exposed.
+
+Concurrent or replayed executions of the same DSH call share one in-flight operation. A terminal
+result is returned from the per-run cache, while an unfinished replay resumes the same invocation;
+neither path submits another `invoke`. A replay that changes the original tool or arguments fails
+closed.
 
 `search_business_capabilities` applies the returned revision/tool set only to the current
-session/run. `resume_governed_tool_invocation` accepts only the exact 64-character id and never
-creates a replacement invocation.
+session/run. `resume_governed_tool_invocation` accepts only the exact 64-character id, shares the
+same bounded recovery state when known locally, and never creates a replacement invocation.
 
 ## Session and Completion State
 
