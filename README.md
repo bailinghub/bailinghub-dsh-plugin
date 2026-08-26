@@ -2,115 +2,189 @@
 
 [简体中文](docs/README.zh-CN.md) | English
 
-Run governed tasks from DeepSeek Harness against a business route already connected to
-BailingHub, then track the same job and read its available result. You can do this from the
-Harness Web UI on your own computer without opening the embedded chat page in each business
-backend.
+Use a local DeepSeek Harness Agent to discover and invoke business capabilities governed by a
+self-hosted BailingHub. Reasoning and tool orchestration stay in DSH; BailingHub retains trusted
+identity, runtime context, capability trimming, approval, invocation recovery, and audit.
 
 This is an independent community integration. It is not developed, certified, endorsed, or
 recommended by DeepSeek.
 
-## Private vNext Candidate (Not Published)
+> **Current stable line:** `dsh-bailinghub@0.2.0` uses the native Agent Client flow documented
+> below. Public `0.1.1` remains available only as the explicit static MCP compatibility path.
 
-This branch also carries a private native Cordis Agent Client candidate. It keeps local reasoning
-and orchestration in DSH while BailingHub Core retains identity, authorization, candidate
-trimming, approval, governed invocation, and audit. The candidate is not the existing BailingHub
-executor and is not a public `0.1.x` upgrade.
+## How the 0.2 Agent Client fits together
 
-The public `0.1.x` static MCP instructions below remain unchanged. Candidate deployers configure
-only `hubUrl`, `clientAppId`, `workspace`, and a local `connectionName`; end users do not enter
-business endpoints or secrets. See [the frozen candidate contract](docs/AGENT_CLIENT_CONTRACT.md)
-and [migration boundary](docs/MIGRATION_VNEXT.md).
+```text
+DeepSeek Harness local Agent
+  -> dsh-bailinghub native Cordis adapter
+  -> bailinghub-mcp-server/sdk
+  -> BailingHub Agent Auth + Agent API
+  -> operator-selected business integration and final authorization
+```
 
-## What You Get
+The packages have separate responsibilities:
 
-After installation, DeepSeek Harness discovers three native tools:
+- **BailingHub Core** owns Agent Auth, trusted business identity, runtime context, knowledge and
+  memory projection, capability governance, approvals, invocation state, and audit records.
+- **`bailinghub-mcp-server/sdk`** owns browser login, PKCE, credential storage, refresh,
+  Hub/client/workspace connection isolation, and HTTP DTO mapping.
+- **`dsh-bailinghub`** owns only DSH session, prompt, command, and dynamic-tool lifecycle
+  integration. It does not store credentials or call a business API directly.
 
-| Harness tool | What it does |
-| --- | --- |
-| `mcp__bailinghub__submit_governed_job` | Submit task text with a stable request ID |
-| `mcp__bailinghub__get_governed_job` | Read the current state and public result of one job |
-| `mcp__bailinghub__wait_for_governed_job` | Wait briefly for the same job without resubmitting it |
+This Agent Client is not the BailingHub executor. The executor receives jobs from the Hub for
+work that must run near a machine; the Agent Client keeps the interactive reasoning loop on the
+user's local DSH Agent.
 
-BailingHub remains the control plane between the model and the business system. The URL,
-Client Token, and route are operator configuration, not model arguments. The model cannot
-switch to another route or supply administrator, executor, approval, or business-system
-credentials through these tools.
+## Before installing
 
-## Install
+The deployer and business integrator must prepare these public identifiers in BailingHub:
+
+1. A reachable HTTPS BailingHub deployment with the matching Agent Auth and Agent API contracts.
+2. A public Agent Client application id (`clientAppId`).
+3. At least one authorized workspace. In Agent Client v1, the workspace id is the BailingHub
+   route id.
+4. A business authorization page and governed ACC/Tool Provider integration behind that route.
+
+The end user does **not** enter a business API URL, business login credential, Tool Provider
+signing secret, BailingHub Client Token, or model-provider key into this plugin.
+
+## Install the 0.2 line
 
 Prerequisites:
 
 - Node.js `22.19.0+` or `24+`;
-- `pnpm` and `@deepseek-ai/dsh@0.1.0-rc.7`;
-- a reachable [BailingHub deployment](https://github.com/bailinghub/bailinghub#quick-start);
-- one BailingHub Client Token restricted to the route you want this Harness profile to use.
+- `pnpm` and DeepSeek Harness `0.1.0-rc.7`;
+- the BailingHub preparation above.
+
+Install the exact stable version into the DSH Web profile:
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.0-rc.7
-dsh plugin --profile web add dsh-bailinghub@0.1.1
+dsh plugin --profile web add dsh-bailinghub@0.2.0
 ```
 
-Configure the process that starts Harness:
+`dsh-bailinghub@0.2.0` installs its exact compatible `bailinghub-mcp-server@0.2.0` dependency
+automatically. DSH users should not separately guess or install an SDK version.
+
+## Configure one Hub connection
+
+The native plugin has exactly four host configuration fields:
+
+| Plugin field | Environment value | Meaning | Secret |
+| --- | --- | --- | --- |
+| `hubUrl` | `BAILINGHUB_HUB_URL` | Public HTTPS URL of the developer's own BailingHub | No |
+| `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | Public Agent Client application id registered in that Hub | No |
+| `workspace` | `BAILINGHUB_WORKSPACE` | Initial authorized workspace/route id | No |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | Local alias for this isolated SDK connection | No |
+
+Example placeholders:
 
 ```bash
-export BAILINGHUB_BASE_URL='https://hub.example.com'
-export BAILINGHUB_CLIENT_TOKEN='replace-with-a-route-scoped-client-token'
-export BAILINGHUB_ROUTE='order_assistant'
+export BAILINGHUB_HUB_URL='https://hub.example.com'
+export BAILINGHUB_CLIENT_APP_ID='example-agent-client'
+export BAILINGHUB_WORKSPACE='order_assistant'
+export BAILINGHUB_CONNECTION_NAME='default'
 ```
 
-Then verify the composed profile and start the local Web UI:
+The same four fields may be supplied through the DSH plugin settings surface. Do not add tokens,
+authorization URLs, business domains, or credentials to the Cordis patch.
+
+Inspect the composed profile before starting it:
 
 ```bash
 dsh --profile web --dump-config
 dsh web
 ```
 
-The default Web UI is local to your computer. Ask Harness to submit a task through
-BailingHub, preserve the returned `job_id`, and wait for or query that same job.
+## Authorize and use the local Agent
 
-For a first try, use a task supported by your configured route and say explicitly: submit it
-once with a stable `request_id`, preserve the returned `job_id`, and query that same job if a
-bounded wait times out.
+In DSH, run:
 
-## Correct Task Flow
+```text
+/bailinghub login
+/bailinghub status
+/bailinghub workspaces
+```
 
-1. Generate one stable `request_id` for one business request.
-2. Call `mcp__bailinghub__submit_governed_job` once.
-3. Preserve its `job_id`.
-4. Call `wait_for_governed_job`, or call `get_governed_job` later.
-5. A wait timeout is not a failed task. Do not submit a replacement request.
+`login` opens the system browser. The business-side authorization page confirms the signed-in
+business identity and requested workspace, then returns to a random loopback callback protected
+by `state` and PKCE S256. Access and refresh tokens remain in SDK-owned secure storage and are
+never written to the plugin configuration or printed by the command.
 
-## Identity and Permission Boundary
+Useful commands:
 
-Using the local Harness UI removes the need to open a business backend's embedded chat UI;
-it does **not** turn the Harness login or local user into a trusted business identity.
-The current `0.1.x` bundle deliberately does not accept an acting subject as tool input. A route or
-downstream business system must still resolve trusted identity and perform final
-authorization. If the selected action requires identity that the configured path cannot
-establish, it should remain unavailable or be rejected.
+| Command | Purpose |
+| --- | --- |
+| `/bailinghub login` | Authorize the configured Hub/client/workspace in the browser |
+| `/bailinghub status` | Inspect the selected connection without printing credentials |
+| `/bailinghub workspaces` | List workspaces allowed by the current business authorization |
+| `/bailinghub use <workspace>` | Select another already-authorized workspace for new sessions |
+| `/bailinghub sync` | Retry a pending visible completion record without repeating a tool call |
+| `/bailinghub logout` | Revoke and remove the selected Agent Session |
 
-This bundle governs only tasks submitted through its three BailingHub tools. It does not
-intercept or govern every other tool installed in DeepSeek Harness.
+The standard v1 login requests only the configured workspace. `use` succeeds only when the
+current Agent Session explicitly contains the target workspace; it is not permission to switch to
+an arbitrary Hub route. The current command set always operates on this plugin instance's four
+configured fields; it does not accept a connection selector. For another Hub or route, use a
+second DSH profile/plugin instance, or edit those fields and reload the profile, set a different
+`connectionName`, and complete browser authorization again.
 
-## Supply-Chain Note
+For the first acceptance check, start a new DSH conversation and perform one read-only request,
+then one permitted mutation. Confirm the same conversation, run, visible final answer, and tool
+invocation trajectory appear in BailingHub. An approval-required capability must resume the
+original invocation after approval; it must never create a replacement business call.
 
-This bundle contains no custom runtime JavaScript, no production dependencies, and no
-install scripts. When Harness starts the bundle, its built-in MCP Client runs the pinned
-command `npx -y --package=bailinghub-mcp-server@0.1.1 bailinghub-mcp-server` outside the
-agent sandbox. The first start may
-need npm network access. Review and pin the package before using it in a sensitive
-environment; production images may pre-cache the exact version.
+DSH Code Mode is deliberately degraded in this release because it cannot safely present the
+current-turn dynamic schemas. Use native tool mode for governed business actions.
 
-Non-loopback HTTP is rejected by the MCP server by default. Only set
-`BAILINGHUB_ALLOW_INSECURE_HTTP=true` on a controlled private network where TLS terminates at
-another trusted boundary.
+## Security and privacy boundary
 
-## Compatibility and Feedback
+- The model cannot choose a Hub URL, workspace, identity, credential, approval result, or
+  capability revision through tool arguments.
+- The SDK stores credentials in macOS Keychain. Linux and other POSIX systems require an explicit
+  secure file-store opt-in; Windows Agent Session storage is not supported in 0.2.0.
+- BailingHub revalidates identity, scope, approval, idempotency, and invocation state on every
+  governed call. The downstream business system still performs final authorization.
+- The adapter sends visible user input, governed tool arguments/results, and the visible final
+  answer required by the Agent Client contracts. It never uploads hidden reasoning chunks.
+- This plugin governs only the BailingHub tools it registers. It does not intercept unrelated DSH
+  tools or model-provider traffic.
 
-The first release is verified against DeepSeek Harness `0.1.0-rc.7`,
-`bailinghub-mcp-server@0.1.1`, and BailingHub Client API v1. Harness is still a developer
-preview, so each Harness release requires a compatibility smoke test.
+Review [Security](SECURITY.md), [Privacy](PRIVACY.md), the
+[Agent Client contract](docs/AGENT_CLIENT_CONTRACT.md), and
+[compatibility](docs/COMPATIBILITY.md) before production use.
+
+## Legacy public 0.1.x static mode
+
+Public `dsh-bailinghub@0.1.1` remains an immutable configuration-only bundle. It uses the in-box
+DSH MCP Client to start `bailinghub-mcp-server@0.1.1`, binds one operator-provisioned Client Token
+to one fixed route, and leaves orchestration in BailingHub.
+
+```bash
+dsh plugin --profile web add dsh-bailinghub@0.1.1
+
+export BAILINGHUB_BASE_URL='https://hub.example.com'
+export BAILINGHUB_CLIENT_TOKEN='replace-with-a-route-scoped-client-token'
+export BAILINGHUB_ROUTE='order_assistant'
+```
+
+It exposes exactly these three tools:
+
+```text
+mcp__bailinghub__submit_governed_job
+mcp__bailinghub__get_governed_job
+mcp__bailinghub__wait_for_governed_job
+```
+
+The 0.2 Agent Client does not automatically consume or migrate the 0.1 Client Token. Keep versions
+explicit and follow the [0.1-to-0.2 migration boundary](docs/MIGRATION_VNEXT.md) when testing or
+rolling back.
+
+## Compatibility and feedback
+
+Version 0.2.0 is verified only against the versions listed in
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md). DeepSeek Harness remains a developer preview, so
+every Harness release requires a new native lifecycle smoke test.
 
 Report problems through [GitHub Issues](https://github.com/bailinghub/bailinghub-dsh-plugin/issues).
 Never include tokens, private deployment URLs, personal information, or production business

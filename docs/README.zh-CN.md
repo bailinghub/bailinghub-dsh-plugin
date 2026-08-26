@@ -2,104 +2,178 @@
 
 [English](../README.md) | 简体中文
 
-在电脑上的 DeepSeek Harness 里，通过 BailingHub 向已经接入的业务 route 发起受控任务，
-并在同一会话中持续查看状态和可用结果，不必再进入每个业务后台里的嵌入聊天入口。
+让本地 DeepSeek Harness 智能体发现并调用由自托管 BailingHub 治理的业务能力。思考、工具
+选择与编排留在本地 DSH；可信身份、运行时上下文、候选能力裁剪、审批、调用恢复与审计仍由
+BailingHub 负责。
 
 这是独立社区集成，不是 DeepSeek 官方开发、认证、合作、背书或推荐的插件。
 
-## 私有 vNext 候选（未发布）
+> **当前稳定版本线：**`dsh-bailinghub@0.2.0` 使用下文说明的原生 Agent Client 流程。
+> 公开 `0.1.1` 仅作为明确的静态 MCP 兼容路径继续保留。
 
-当前分支还包含一套 DSH 原生 Cordis Agent Client 私有候选：思考、工具选择与编排留在本地
-DSH，可信身份、授权、候选能力裁剪、审批、受控调用与审计仍由 BailingHub Core 负责。它
-不是现有“执行器”，也不是对公开 `0.1.x` 的静默升级。
+## 0.2 Agent Client 的关系
 
-下文公开 `0.1.x` 静态 MCP 的安装与使用说明保持不变。候选部署者只配置 `hubUrl`、
-`clientAppId`、`workspace` 和本地 `connectionName`，最终用户不填写业务端点或任何
-Secret。候选契约与迁移边界见 [AGENT_CLIENT_CONTRACT.md](AGENT_CLIENT_CONTRACT.md) 和
-[MIGRATION_VNEXT.md](MIGRATION_VNEXT.md)。
+```text
+DeepSeek Harness 本地智能体
+  -> dsh-bailinghub 原生 Cordis 适配器
+  -> bailinghub-mcp-server/sdk
+  -> BailingHub Agent Auth + Agent API
+  -> 部署者选择的业务接入与最终业务授权
+```
 
-## 使用者得到什么
+各层职责保持独立：
 
-安装后，DeepSeek Harness 会发现三个原生工具：
+- **BailingHub Core** 负责 Agent Auth、可信业务身份、运行时上下文、知识库与记忆投影、
+  能力治理、审批、调用状态和审计记录。
+- **`bailinghub-mcp-server/sdk`** 负责浏览器登录、PKCE、凭据存储与刷新，以及按
+  Hub/client/workspace 隔离连接和映射 HTTP DTO。
+- **`dsh-bailinghub`** 只负责 DSH 会话、提示词、命令和动态工具生命周期，不保存凭据，
+  也不直接调用业务 API。
 
-| Harness 工具 | 能力 |
-| --- | --- |
-| `mcp__bailinghub__submit_governed_job` | 使用稳定请求 ID 提交一项业务任务 |
-| `mcp__bailinghub__get_governed_job` | 查询同一个任务的当前状态和公开结果 |
-| `mcp__bailinghub__wait_for_governed_job` | 有界等待同一个任务，不重复提交 |
+Agent Client 不是 BailingHub 现有的“执行器”。执行器接收中枢任务并处理必须靠近某台机器
+完成的工作；Agent Client 则把交互式思考与编排循环放在用户本地 DSH 智能体中。
 
-BailingHub 仍位于模型与业务系统之间。中枢地址、Client Token 和 route 都由运营者预先
-配置，不是模型参数；模型不能借工具参数切换 route，也不能提交管理员凭据、执行器凭据、
-审批结论或业务系统密钥。
+## 安装前准备
 
-## 安装
+部署者和业务接入开发者需要先在自己的 BailingHub 中准备这些公开标识：
+
+1. 一套可访问的 HTTPS BailingHub，并部署匹配版本的 Agent Auth 与 Agent API；
+2. 一个公开 Agent Client 应用标识 `clientAppId`；
+3. 至少一个允许授权的 workspace；在 Agent Client v1 中，workspace id 就是
+   BailingHub route id；
+4. 该 route 后方已经接通业务授权页面，以及受治理的 ACC/Tool Provider 能力。
+
+最终用户**不需要**在插件中填写业务 API 地址、业务账号密码、Tool Provider 签名密钥、
+BailingHub Client Token 或模型提供方 Key。
+
+## 安装 0.2 版本线
 
 前置条件：
 
 - Node.js `22.19.0+` 或 `24+`；
-- 已安装 `pnpm` 与 `@deepseek-ai/dsh@0.1.0-rc.7`；
-- 一套可访问的 [BailingHub](https://github.com/bailinghub/bailinghub#快速上手)；
-- 一个只允许目标 route 的 BailingHub Client Token。
+- `pnpm` 与 DeepSeek Harness `0.1.0-rc.7`；
+- 已完成上面的 BailingHub 接入准备。
+
+将精确稳定版本安装到 DSH Web Profile：
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.0-rc.7
-dsh plugin --profile web add dsh-bailinghub@0.1.1
+dsh plugin --profile web add dsh-bailinghub@0.2.0
 ```
 
-在启动 Harness 的终端或进程环境中配置：
+`dsh-bailinghub@0.2.0` 会自动安装精确兼容的 `bailinghub-mcp-server@0.2.0` 依赖。
+DSH 用户不应该再自行猜测或单独安装某个 SDK 版本。
+
+## 配置一个中枢连接
+
+原生插件只有四个宿主配置字段：
+
+| 插件字段 | 环境变量 | 含义 | 是否 Secret |
+| --- | --- | --- | --- |
+| `hubUrl` | `BAILINGHUB_HUB_URL` | 开发者自己部署的 BailingHub 公共 HTTPS 地址 | 否 |
+| `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | 在该中枢注册的公共 Agent Client 应用标识 | 否 |
+| `workspace` | `BAILINGHUB_WORKSPACE` | 初始已授权 workspace/route id | 否 |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | 当前 SDK 隔离连接的本地别名 | 否 |
+
+使用中性占位值的示例：
 
 ```bash
-export BAILINGHUB_BASE_URL='https://hub.example.com'
-export BAILINGHUB_CLIENT_TOKEN='替换为仅允许指定-route-的-client-token'
-export BAILINGHUB_ROUTE='order_assistant'
+export BAILINGHUB_HUB_URL='https://hub.example.com'
+export BAILINGHUB_CLIENT_APP_ID='example-agent-client'
+export BAILINGHUB_WORKSPACE='order_assistant'
+export BAILINGHUB_CONNECTION_NAME='default'
 ```
 
-检查最终配置，然后启动本机 Web 界面：
+也可以通过 DSH 的插件设置界面填写同样四个字段。不要在 Cordis Patch 中增加 Token、授权
+页面地址、业务域名或任何凭据。
+
+启动前检查最终合成配置：
 
 ```bash
 dsh --profile web --dump-config
 dsh web
 ```
 
-接下来可以直接要求 Harness 通过 BailingHub 提交任务、保存返回的 `job_id`，并等待或
-查询同一个任务。
+## 浏览器授权与使用
 
-第一次尝试时，请选择当前 route 已支持的任务，并明确要求：使用稳定 `request_id` 只提交
-一次，保存返回的 `job_id`；有界等待超时后，只查询同一个任务，不要重新提交。
+在 DSH 中依次执行：
 
-## 正确任务流程
+```text
+/bailinghub login
+/bailinghub status
+/bailinghub workspaces
+```
 
-1. 为一项业务请求生成一个稳定的 `request_id`；
-2. 只调用一次 `mcp__bailinghub__submit_governed_job`；
-3. 保存返回的 `job_id`；
-4. 短时调用 `wait_for_governed_job`，或者稍后调用 `get_governed_job`；
-5. 等待超时不等于任务失败，不能因此重新提交一份替代任务。
+`login` 会打开系统浏览器。业务侧授权页面负责确认当前已登录的业务身份和申请的
+workspace，然后返回受 `state` 与 PKCE S256 保护的随机回环回调。Access Token 与 Refresh
+Token 只进入 SDK 所有的安全存储，不会写入插件配置，也不会由命令输出。
 
-## 身份与权限边界
+常用命令：
 
-使用本机 Harness 界面，省掉的是“必须打开业务后台聊天入口”这一步；它不代表 Harness
-登录态或本机用户自动成为可信业务身份。当前 `0.1.x` Bundle 有意不接受模型传入行动主体。route 或
-下游业务系统仍需解析可信主体并执行最终授权；如果目标动作必须具备业务身份，而当前接入
-路径无法建立该身份，该动作就应保持不可用或被拒绝。
+| 命令 | 用途 |
+| --- | --- |
+| `/bailinghub login` | 在浏览器授权当前 Hub/client/workspace |
+| `/bailinghub status` | 查看当前连接状态，但不输出凭据 |
+| `/bailinghub workspaces` | 查看当前业务授权允许使用的 workspace |
+| `/bailinghub use <workspace>` | 为新会话切换到另一个已授权 workspace |
+| `/bailinghub sync` | 重试同步待处理的可见回复，不重复业务工具调用 |
+| `/bailinghub logout` | 撤销并删除当前 Agent Session |
 
-本 Bundle 只治理通过这三个 BailingHub 工具提交的任务，不会自动拦截 Harness 中安装的
-其他工具。
+标准 v1 登录只申请当前配置的 workspace。`use` 只有在当前 Agent Session 明确包含目标
+workspace 时才会成功，不能借此任意切换中枢 route。当前命令始终使用这个插件实例配置的四个
+字段，不接受连接别名选择器。连接另一套 Hub 或 route 时，应使用第二个 DSH Profile/插件实例，
+或修改四字段并重新加载当前 Profile；设置新的 `connectionName` 后再完成浏览器授权。
 
-## 供应链说明
+首次验收时，新建一个 DSH 会话，先做一次只读查询，再做一次允许的修改。确认 BailingHub
+后台能看到同一个会话、run、可见最终回复和工具调用轨迹。需要审批的能力必须在审批后恢复
+原 invocation，不能生成替代业务调用。
 
-这个 Bundle 没有自定义运行时代码、生产依赖和安装脚本。Harness 启动时，会由内置 MCP
-Client 在 Agent 沙箱之外执行固定命令
-`npx -y --package=bailinghub-mcp-server@0.1.1 bailinghub-mcp-server`。首次启动可能需要
-访问 npm；敏感环境应审查并固定版本，生产镜像可提前缓存该精确版本。
+本版本在 DSH Code Mode 下会明确降级，因为当前 Code Mode 无法安全呈现本轮动态 Schema。
+需要执行受治理业务操作时应使用 Native Tool Mode。
 
-MCP Server 默认拒绝非回环明文 HTTP。只有在受控私网中已经由其他可信边界终止 TLS 时，
-才可设置 `BAILINGHUB_ALLOW_INSECURE_HTTP=true`。
+## 安全与隐私边界
+
+- 模型不能通过工具参数选择 Hub URL、workspace、身份、凭据、审批结论或能力版本；
+- SDK 在 macOS 使用 Keychain；Linux 与其他 POSIX 系统必须显式启用安全文件回退；0.2.0
+  暂不支持 Windows Agent Session 凭据存储；
+- BailingHub 对每次治理调用重新校验身份、scope、审批、幂等与调用状态，业务系统仍执行
+  最终权限判断；
+- 适配器会发送 Agent Client 契约所需的可见用户输入、受治理工具参数/结果和可见最终回复，
+  但不会上传隐藏思考片段；
+- 本插件只治理它注册的 BailingHub 工具，不会拦截 DSH 其他工具或模型提供方流量。
+
+生产使用前请阅读[安全策略](../SECURITY.md)、[隐私说明](../PRIVACY.md)、
+[Agent Client 契约](AGENT_CLIENT_CONTRACT.md)和[兼容范围](COMPATIBILITY.md)。
+
+## 公开 0.1.x 静态兼容模式
+
+公开 `dsh-bailinghub@0.1.1` 仍是不可变的纯配置 Bundle。它通过 DSH 内置 MCP Client 启动
+`bailinghub-mcp-server@0.1.1`，把运营者提供的一个 Client Token 固定绑定到一个 route，
+并由 BailingHub 完成编排。
+
+```bash
+dsh plugin --profile web add dsh-bailinghub@0.1.1
+
+export BAILINGHUB_BASE_URL='https://hub.example.com'
+export BAILINGHUB_CLIENT_TOKEN='replace-with-a-route-scoped-client-token'
+export BAILINGHUB_ROUTE='order_assistant'
+```
+
+它只暴露三个固定工具：
+
+```text
+mcp__bailinghub__submit_governed_job
+mcp__bailinghub__get_governed_job
+mcp__bailinghub__wait_for_governed_job
+```
+
+0.2 Agent Client 不会自动读取或迁移 0.1 Client Token。测试升级或回滚时必须显式固定版本，
+并遵循 [0.1 到 0.2 的迁移边界](MIGRATION_VNEXT.md)。
 
 ## 兼容范围与反馈
 
-首版验证范围为 DeepSeek Harness `0.1.0-rc.7`、`bailinghub-mcp-server@0.1.1` 与
-BailingHub Client API v1。Harness 当前仍是 Developer Preview，升级 Harness 后应重新
-执行兼容性 Smoke。
+0.2.0 只对 [COMPATIBILITY.md](COMPATIBILITY.md) 中列出的版本完成了验证。DeepSeek
+Harness 仍是 Developer Preview，每次 Harness 升级都必须重新执行 Native Lifecycle Smoke。
 
 问题请提交到 [GitHub Issues](https://github.com/bailinghub/bailinghub-dsh-plugin/issues)。
 请勿附带 Token、私有部署地址、个人信息或生产业务数据。

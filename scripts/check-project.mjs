@@ -7,24 +7,76 @@ const root = new URL('../', import.meta.url)
 const rootPath = fileURLToPath(root)
 const packageJson = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
 const packageLock = JSON.parse(await readFile(new URL('package-lock.json', root), 'utf8'))
-const candidatePatch = await readFile(new URL('cordis.agent-client.patch.yml', root), 'utf8')
+const nativePatch = await readFile(new URL('cordis.agent-client.patch.yml', root), 'utf8')
 const legacyPatch = await readFile(new URL('cordis.patch.yml', root), 'utf8')
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
 }
 
+const exactSemver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/
+const exactStableSemver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
+
+/**
+ * Private source candidates may keep an optional peer while the sibling SDK is
+ * tested from source. A package that can be published must instead install one
+ * exact SDK version itself so a clean DSH profile never depends on ambient
+ * node_modules state or package-manager-specific peer resolution.
+ */
+export function validateReleaseDependencyContract(manifest, lock = {}) {
+  if (manifest.private === true) return
+
+  const sdkPackage = 'bailinghub-mcp-server'
+  const sdkVersion = manifest.dependencies?.[sdkPackage]
+  assert(
+    typeof sdkVersion === 'string' && exactSemver.test(sdkVersion),
+    `public packages must declare ${sdkPackage} as an exact ordinary dependency`,
+  )
+  if (exactStableSemver.test(manifest.version)) {
+    assert(
+      exactStableSemver.test(sdkVersion),
+      `stable packages must depend on an exact stable ${sdkPackage} version`,
+    )
+  }
+  assert(
+    manifest.peerDependencies?.[sdkPackage] === undefined,
+    `public packages must not declare ${sdkPackage} as a peer dependency`,
+  )
+  assert(
+    manifest.peerDependenciesMeta?.[sdkPackage] === undefined,
+    `public packages must not mark ${sdkPackage} as an optional peer`,
+  )
+  assert(
+    manifest.optionalDependencies?.[sdkPackage] === undefined,
+    `public packages must not declare ${sdkPackage} as an optional dependency`,
+  )
+  assert(
+    lock.packages?.['']?.dependencies?.[sdkPackage] === sdkVersion,
+    `package-lock root must pin ${sdkPackage} to the manifest version`,
+  )
+  assert(
+    lock.packages?.[`node_modules/${sdkPackage}`]?.version === sdkVersion,
+    `package-lock must resolve the exact ${sdkPackage} version`,
+  )
+}
+
 assert(packageJson.name === 'dsh-bailinghub', 'unexpected npm package name')
-assert(packageJson.private === true, 'vNext candidate must remain private')
-assert(packageJson.version === '0.2.0-agent-client.0', 'unexpected private candidate version')
+assert(exactSemver.test(packageJson.version), 'package version must be exact semantic version')
+if (packageJson.private === true) {
+  assert(packageJson.version === '0.2.0-agent-client.0', 'unexpected private candidate version')
+  assert(packageJson.publishConfig === undefined, 'private candidate must not carry publish config')
+  assert(packageJson.peerDependencies?.['bailinghub-mcp-server'] === '>=0.2.0', 'wrong SDK peer floor')
+} else {
+  assert(packageJson.publishConfig?.access === 'public', 'public package must publish as public')
+  assert(packageJson.publishConfig?.provenance === true, 'public package must retain npm provenance')
+}
 assert(packageJson.main === 'lib/index.js', 'missing native Cordis entrypoint')
 assert(packageJson.exports === './lib/index.js', 'missing native Cordis export')
 assert(packageJson.dsh?.bundle?.patch === './cordis.agent-client.patch.yml', 'missing vNext bundle patch')
-assert(packageJson.publishConfig === undefined, 'private candidate must not carry publish config')
 assert(packageJson.dependencies?.['@deepseek-ai/schemastery'], 'missing Config schema dependency')
-assert(packageJson.peerDependencies?.['bailinghub-mcp-server'] === '>=0.2.0', 'wrong SDK peer floor')
 assert(packageLock.version === packageJson.version, 'package-lock version must match package version')
 assert(packageLock.packages?.['']?.version === packageJson.version, 'package-lock root version must match')
+validateReleaseDependencyContract(packageJson, packageLock)
 for (const hook of ['preinstall', 'install', 'postinstall', 'prepare']) {
   assert(packageJson.scripts?.[hook] === undefined, `forbidden install hook: ${hook}`)
 }
@@ -36,10 +88,10 @@ for (const expected of [
   'workspace: !!js process.env.BAILINGHUB_WORKSPACE',
   'connectionName: !!js process.env.BAILINGHUB_CONNECTION_NAME',
 ]) {
-  assert(candidatePatch.includes(expected), `candidate patch missing: ${expected}`)
+  assert(nativePatch.includes(expected), `native patch missing: ${expected}`)
 }
 for (const forbidden of ['TOKEN', 'SECRET', 'PASSWORD', 'BUSINESS_URL', 'AUTH_URL']) {
-  assert(!candidatePatch.includes(forbidden), `candidate settings leaked forbidden field: ${forbidden}`)
+  assert(!nativePatch.includes(forbidden), `native settings leaked forbidden field: ${forbidden}`)
 }
 
 for (const expected of [

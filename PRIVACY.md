@@ -10,9 +10,9 @@ using personal, confidential, or regulated data.
 Do not include tokens, private URLs, personal information, or production payloads in public
 issues, screenshots, or compatibility reports.
 
-## Private vNext Candidate
+## Native Agent Client 0.2.0
 
-The private native candidate sends each direct human user turn to BailingHub Core and receives
+The native 0.2.0 plugin sends each direct human user turn to BailingHub Core and receives
 model-visible instructions, memory, reference-only knowledge, governance, and active tool schemas.
 Business tool arguments and governed results cross the same boundary. At completion it sends only
 the hash-aliased assistant message id, visible final text, legal status, optional model/runtime
@@ -20,4 +20,4 @@ labels, and numeric public usage. It ignores `assistant/chunk` and never uploads
 
 Browser authorization, refresh, and credential storage remain SDK-owned; this adapter stores no
 BailingHub credential. Review DSH, model-provider, BailingHub, and business-system retention
-boundaries before enabling the candidate.
+boundaries before enabling the plugin.

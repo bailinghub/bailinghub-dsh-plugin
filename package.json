@@ -1,8 +1,7 @@
 {
   "name": "dsh-bailinghub",
-  "version": "0.2.0-agent-client.0",
-  "private": true,
-  "description": "Private vNext native DeepSeek Harness adapter for the BailingHub Agent Client Core.",
+  "version": "0.2.0",
+  "description": "Native DeepSeek Harness adapter for the BailingHub Agent Client Core.",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
@@ -19,6 +18,10 @@
     "url": "https://github.com/bailinghub/bailinghub-dsh-plugin/issues"
   },
   "homepage": "https://github.com/bailinghub/bailinghub-dsh-plugin#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "keywords": [
     "deepseek-harness",
     "dsh",
@@ -55,15 +58,8 @@
     "prepack": "npm run verify"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.1"
-  },
-  "peerDependencies": {
-    "bailinghub-mcp-server": ">=0.2.0"
-  },
-  "peerDependenciesMeta": {
-    "bailinghub-mcp-server": {
-      "optional": true
-    }
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "bailinghub-mcp-server": "0.2.0"
   },
   "dsh": {
     "bundle": {

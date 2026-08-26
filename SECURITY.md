@@ -4,7 +4,7 @@ Report vulnerabilities through a private GitHub Security Advisory in this reposi
 Do not put tokens, private deployment URLs, personal information, or raw business payloads
 in a public issue.
 
-## Boundary
+## Public legacy 0.1.x boundary
 
 This bundle contributes configuration only. It has no custom runtime JavaScript, production
 dependencies, or install-time scripts. On Harness startup, the built-in DSH MCP Client runs
@@ -19,14 +19,15 @@ configuration and are never model tool arguments.
 
 Non-loopback HTTP is denied by default. Do not enable insecure HTTP on an untrusted network.
 
-## Private vNext Candidate
+## Native 0.2.0 boundary
 
-The private native candidate accepts only `hubUrl`, `clientAppId`, `workspace`, and
+The native 0.2.0 plugin accepts only `hubUrl`, `clientAppId`, `workspace`, and
 `connectionName`. The generic SDK owns browser authorization, refresh, and secure credential
 storage; business endpoints and final authorization remain Core/business-system concerns.
 
 Tools are Agent/run scoped. Message ids are replaced by Core-safe hash aliases, invocation ids are
 stable 64-character digests, and an `accepted_unknown` outcome must resume that exact invocation
 instead of creating a replacement. Completion retries are bounded and reuse one frozen,
-visible-only payload. The candidate lazily requires `bailinghub-mcp-server/sdk >= 0.2.0`; public
-`0.1.1` does not provide that facade.
+visible-only payload. Version 0.2.0 installs `bailinghub-mcp-server@0.2.0` as an exact ordinary
+dependency and resolves its `./sdk` export. It does not depend on ambient modules, an optional
+peer, a range, a dist-tag, or a local path. Public `0.1.1` does not provide that facade.

@@ -1,6 +1,7 @@
 # Agent Client Host Adapter Contract
 
-Status: private vNext acceptance candidate. This contract is not part of public `0.1.x`.
+Status: public native Agent Client contract for `dsh-bailinghub@0.2.0`. This contract is not part
+of the legacy public `0.1.x` line.
 
 ## Host Configuration
 
