@@ -18,3 +18,15 @@ or acting-subject credential. Route, URL, and token stay in operator-controlled 
 configuration and are never model tool arguments.
 
 Non-loopback HTTP is denied by default. Do not enable insecure HTTP on an untrusted network.
+
+## Private vNext Candidate
+
+The private native candidate accepts only `hubUrl`, `clientAppId`, `workspace`, and
+`connectionName`. The generic SDK owns browser authorization, refresh, and secure credential
+storage; business endpoints and final authorization remain Core/business-system concerns.
+
+Tools are Agent/run scoped. Message ids are replaced by Core-safe hash aliases, invocation ids are
+stable 64-character digests, and an `accepted_unknown` outcome must resume that exact invocation
+instead of creating a replacement. Completion retries are bounded and reuse one frozen,
+visible-only payload. The candidate lazily requires `bailinghub-mcp-server/sdk >= 0.2.0`; public
+`0.1.1` does not provide that facade.

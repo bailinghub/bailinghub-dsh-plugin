@@ -7,6 +7,17 @@
 
 这是独立社区集成，不是 DeepSeek 官方开发、认证、合作、背书或推荐的插件。
 
+## 私有 vNext 候选（未发布）
+
+当前分支还包含一套 DSH 原生 Cordis Agent Client 私有候选：思考、工具选择与编排留在本地
+DSH，可信身份、授权、候选能力裁剪、审批、受控调用与审计仍由 BailingHub Core 负责。它
+不是现有“执行器”，也不是对公开 `0.1.x` 的静默升级。
+
+下文公开 `0.1.x` 静态 MCP 的安装与使用说明保持不变。候选部署者只配置 `hubUrl`、
+`clientAppId`、`workspace` 和本地 `connectionName`，最终用户不填写业务端点或任何
+Secret。候选契约与迁移边界见 [AGENT_CLIENT_CONTRACT.md](AGENT_CLIENT_CONTRACT.md) 和
+[MIGRATION_VNEXT.md](MIGRATION_VNEXT.md)。
+
 ## 使用者得到什么
 
 安装后，DeepSeek Harness 会发现三个原生工具：

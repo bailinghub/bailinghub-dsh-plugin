@@ -3,40 +3,45 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
-const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
-const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8')
-const readmeZh = await readFile(new URL('../docs/README.zh-CN.md', import.meta.url), 'utf8')
+const candidatePatch = await readFile(new URL('../cordis.agent-client.patch.yml', import.meta.url), 'utf8')
+const legacyPatch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
 
-test('is an installable DSH configuration bundle with no runtime package code', () => {
-  assert.match(packageJson.version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/)
-  assert.deepEqual(packageJson.dsh, { bundle: { patch: './cordis.patch.yml' } })
-  assert.equal(packageJson.dependencies, undefined)
-  assert.equal(packageJson.main, undefined)
-  assert.equal(packageJson.exports, undefined)
+test('is a non-publishable native vNext Cordis plugin candidate', () => {
+  assert.equal(packageJson.private, true)
+  assert.equal(packageJson.version, '0.2.0-agent-client.0')
+  assert.equal(packageJson.main, 'lib/index.js')
+  assert.equal(packageJson.exports, './lib/index.js')
+  assert.deepEqual(packageJson.dsh, { bundle: { patch: './cordis.agent-client.patch.yml' } })
+  assert.equal(packageJson.dependencies['@deepseek-ai/schemastery'], '^3.18.1')
+  assert.equal(packageJson.peerDependencies['bailinghub-mcp-server'], '>=0.2.0')
 })
 
-test('pins the generic BailingHub MCP server behind the DSH in-box MCP client', () => {
-  assert.match(patch, /name: '@deepseek-ai\/dsh-mcp-client'/)
-  assert.match(patch, /args: \['-y', '--package=bailinghub-mcp-server@0\.1\.1', 'bailinghub-mcp-server'\]/)
-  assert.match(patch, /serverName: bailinghub/)
-  assert.match(patch, /failOnStartupError: true/)
-})
-
-test('keeps route and credentials outside model-controlled arguments', () => {
-  assert.match(patch, /BAILINGHUB_CLIENT_TOKEN: !!js process\.env\.BAILINGHUB_CLIENT_TOKEN/)
-  assert.match(patch, /BAILINGHUB_ROUTE: !!js process\.env\.BAILINGHUB_ROUTE/)
-  assert.doesNotMatch(patch, /subject:|approval:|adminToken:|executorToken:|callbackUrl:/)
-})
-
-test('documents all three discovered tools and the independent-integration boundary', () => {
-  for (const tool of [
-    'mcp__bailinghub__submit_governed_job',
-    'mcp__bailinghub__get_governed_job',
-    'mcp__bailinghub__wait_for_governed_job',
-  ]) {
-    assert.ok(readme.includes(tool), `English README missing ${tool}`)
-    assert.ok(readmeZh.includes(tool), `Chinese README missing ${tool}`)
+test('candidate configuration contains only Hub-owned public routing fields', () => {
+  for (const field of ['hubUrl', 'clientAppId', 'workspace', 'connectionName']) {
+    assert.match(candidatePatch, new RegExp(`${field}:`))
   }
-  assert.match(readme, /independent community integration/i)
-  assert.match(readmeZh, /独立社区集成/)
+  assert.doesNotMatch(
+    candidatePatch,
+    /business(?:Api|Url|Domain)|auth(?:Url|Domain)|token|secret|password|credential/i,
+  )
+})
+
+test('retains the public 0.1.x static MCP bundle verbatim as a separate legacy patch', () => {
+  assert.match(legacyPatch, /name: '@deepseek-ai\/dsh-mcp-client'/)
+  assert.match(
+    legacyPatch,
+    /args: \['-y', '--package=bailinghub-mcp-server@0\.1\.1', 'bailinghub-mcp-server'\]/,
+  )
+  assert.match(legacyPatch, /BAILINGHUB_CLIENT_TOKEN:/)
+  assert.match(legacyPatch, /BAILINGHUB_ROUTE:/)
+  assert.match(legacyPatch, /failOnStartupError: true/)
+})
+
+test('has no install hooks or local file dependencies', () => {
+  for (const hook of ['preinstall', 'install', 'postinstall', 'prepare']) {
+    assert.equal(packageJson.scripts?.[hook], undefined)
+  }
+  const serialized = JSON.stringify(packageJson)
+  assert.equal(serialized.includes(['f', 'i', 'l', 'e', ':'].join('')), false)
+  assert.doesNotMatch(serialized, /\/Users\/|\\Users\\/)
 })

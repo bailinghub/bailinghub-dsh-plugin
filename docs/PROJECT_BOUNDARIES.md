@@ -20,3 +20,21 @@ govern DSH tools that are unrelated to the three BailingHub MCP tools.
 
 DeepSeek and DeepSeek Harness are names of their respective owners. This is an independent
 community integration, not an official DeepSeek plugin or partnership.
+
+## Private vNext Candidate
+
+The candidate adds a separate dependency path without reinterpreting the public static MCP path:
+
+```text
+DeepSeek Harness local Agent
+  -> dsh-bailinghub native Cordis host adapter
+  -> bailinghub-mcp-server/sdk
+  -> BailingHub Agent Client Core
+  -> Core-selected business adapter and final business authorization
+```
+
+This repository owns only the DSH host adaptation and compatibility evidence. DSH owns local
+reasoning and tool orchestration; the SDK owns authorization/credentials and HTTP DTO mapping;
+Core owns trusted identity, authorization, candidate trimming, approval, invoke/resume, knowledge
+retrieval, and audit. The adapter does not copy Core governance or knowledge bases, establish a
+business identity, govern unrelated DSH tools, or upload hidden reasoning.

@@ -1,0 +1,8 @@
+- insert:
+    - id: bailinghub-agent-client-vnext
+      name: dsh-bailinghub
+      config:
+        hubUrl: !!js process.env.BAILINGHUB_HUB_URL ?? ''
+        clientAppId: !!js process.env.BAILINGHUB_CLIENT_APP_ID ?? ''
+        workspace: !!js process.env.BAILINGHUB_WORKSPACE ?? ''
+        connectionName: !!js process.env.BAILINGHUB_CONNECTION_NAME ?? 'default'

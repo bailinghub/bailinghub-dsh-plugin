@@ -1,0 +1,173 @@
+# Agent Client Host Adapter Contract
+
+Status: private vNext acceptance candidate. This contract is not part of public `0.1.x`.
+
+## Host Configuration
+
+The Cordis Config schema contains only:
+
+```text
+hubUrl
+clientAppId
+workspace
+connectionName
+```
+
+`hubUrl`, `clientAppId`, and `workspace` identify a public Hub-side application/workspace.
+`connectionName` is a local SDK alias. No business endpoint, authorization endpoint, token, secret,
+or business credential belongs in this config.
+
+## Injectable Transport Seam
+
+The default transport is lazily created from `bailinghub-mcp-server/sdk`. Tests and future host
+adapters may inject an object with all methods below:
+
+```js
+login({ hubUrl, clientAppId, workspace, route, connectionName })
+status({ connectionName })
+logout({ connectionName })
+workspaces({ connectionName })
+use({ workspace, route, connectionName })
+
+startTurn({
+  clientConversationId,
+  clientTurnId,
+  userMessageId,
+  userInput,
+  pageContext?,
+  renderers?,
+})
+
+searchCapabilities({ query, limit?, runId? })
+invoke({ invocationId, capabilityRevision, agentRunId, tool, arguments })
+resume(invocationId, {}, { workspace, connectionName, signal? })
+completeRun(runId, {
+  assistantMessageId,
+  content,
+  status,
+  model?,
+  runtime?,
+  usage?,
+})
+```
+
+The adapter may pass a second host metadata argument (`workspace`, `connectionName`, and an
+`AbortSignal`) to turn/tool methods. The framework-neutral SDK DTO is always the first argument;
+an SDK implementation that does not consume host metadata may ignore it.
+
+## Core HTTP Mapping
+
+The SDK, not this adapter, maps those DTOs to:
+
+```text
+POST /agent-api/v1/workspaces/:route/turns
+POST /agent-api/v1/workspaces/:route/capabilities/search
+POST /agent-api/v1/tool-invocations
+POST /agent-api/v1/tool-invocations/:invocation_id/resume
+POST /agent-api/v1/runs/:run_id/complete
+```
+
+`startTurn` accepts the Core `schema` or `schema_version` alias, but the resolved value must be
+exactly `bailing.agent-turn-context.v1`. Its runtime result is:
+
+```json
+{
+  "schema_version": "bailing.agent-turn-context.v1",
+  "run_id": "UUID",
+  "profile_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "context": {
+    "instructions": "...",
+    "page_context": {},
+    "renderers": [],
+    "memory": null,
+    "memory_refs": [],
+    "knowledge": [],
+    "knowledge_refs": [],
+    "governance": {}
+  },
+  "active_tools": []
+}
+```
+
+At most 12 active tools are accepted. Each tool must use the Core tool-name grammar, an
+object-rooted input schema, and complete governance metadata (`scope`, `risk`,
+`approval_required`, `readonly`, and `idempotent`).
+Both revision fields are required lowercase 64-character SHA-256 values; shorter labels or
+uppercase digests fail closed.
+
+## Verified DSH rc.7 Lifecycle
+
+DSH `0.1.0-rc.7` claims inbox messages before assembling the current step:
+
+```text
+agent/inbox/claimed
+  -> systemPrompt.assemble()
+  -> system-prompt/assemble async waterfall
+  -> agent/pre-step
+  -> model request
+```
+
+The adapter captures only a claimed message whose `source.kind` is `user`. On the authoritative
+`system-prompt/assemble` waterfall, it calls `startTurn`, registers the returned definitions
+through `agent.ctx.tools.register()`, and also adds their schemas to the already-sampled current
+assembly. Later steps receive the same agent-scoped definitions from the ordinary ToolRuntime
+registry.
+
+Stable profile/instructions/governance are system-prompt sections. Memory, reference-only
+knowledge body/refs, page context, and renderers are named runtime-context entries. Knowledge
+content is evidence, never an instruction source.
+
+The adapter listens to durable `session/event` values:
+
+- `assistant/message`: keep only `content` blocks whose type is `text`, plus model and numeric
+  usage;
+- `turn/end`: freeze the completion DTO and synchronize it;
+- `assistant/chunk`: deliberately ignored, including hidden reasoning chunks.
+
+## Tool Invocation and Recovery
+
+Every active Core tool becomes an agent-scoped DSH definition. Its invocation id is a stable
+64-character lowercase SHA-256 digest of the session, run, DSH call id, and Core tool name. It
+calls the SDK `invoke` DTO without letting the model choose the run, capability revision, route,
+or identity.
+
+An SDK error with `disposition === 'accepted_unknown'` becomes a safe model-visible error that
+retains the exact invocation id and requires `resume_governed_tool_invocation`. It never includes
+the raw transport error and never suggests repeating the business call.
+
+`search_business_capabilities` applies the returned revision/tool set only to the current
+session/run. `resume_governed_tool_invocation` accepts only the exact 64-character id and never
+creates a replacement invocation.
+
+## Session and Completion State
+
+Connection name, workspace, conversation alias, Core run, active definitions, and completion
+state are isolated per DSH Agent/session. A workspace switch affects future sessions and is
+rejected while any Core run is active/completing or has an unsynchronized completion payload.
+
+The completion request is restricted to:
+
+```json
+{
+  "assistant_message_id": "stable alias",
+  "content": "visible final text",
+  "status": "completed | failed | cancelled",
+  "model": "optional",
+  "runtime": "optional",
+  "usage": {}
+}
+```
+
+The adapter supplies the camelCase SDK equivalent. It never passes an event, message object,
+reasoning block, DSH end-reason object, or arbitrary host metadata. The payload is frozen before
+the first attempt and reused unchanged for up to three automatic attempts. A failed completion
+remains pending in its original run; `/bailinghub sync` starts another bounded attempt batch with
+that same id and payload.
+
+## Graceful Degradation
+
+Missing/invalid configuration, missing SDK, failed authorization, failed Core context, a tool-name
+collision, or unsupported DSH Code Mode removes the Core business tools and inserts a concise
+status section. The local Agent may continue using unrelated local tools, but it is explicitly
+told not to claim a BailingHub business action was executed.

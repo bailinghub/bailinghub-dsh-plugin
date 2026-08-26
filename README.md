@@ -10,6 +10,18 @@ backend.
 This is an independent community integration. It is not developed, certified, endorsed, or
 recommended by DeepSeek.
 
+## Private vNext Candidate (Not Published)
+
+This branch also carries a private native Cordis Agent Client candidate. It keeps local reasoning
+and orchestration in DSH while BailingHub Core retains identity, authorization, candidate
+trimming, approval, governed invocation, and audit. The candidate is not the existing BailingHub
+executor and is not a public `0.1.x` upgrade.
+
+The public `0.1.x` static MCP instructions below remain unchanged. Candidate deployers configure
+only `hubUrl`, `clientAppId`, `workspace`, and a local `connectionName`; end users do not enter
+business endpoints or secrets. See [the frozen candidate contract](docs/AGENT_CLIENT_CONTRACT.md)
+and [migration boundary](docs/MIGRATION_VNEXT.md).
+
 ## What You Get
 
 After installation, DeepSeek Harness discovers three native tools:
