@@ -1,7 +1,7 @@
 {
   "name": "dsh-bailinghub",
   "version": "0.2.0",
-  "description": "Native DeepSeek Harness adapter for the BailingHub Agent Client Core.",
+  "description": "Let a local DeepSeek Harness Agent use BailingHub to look up information, make changes, and carry out permitted tasks in connected business systems.",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",

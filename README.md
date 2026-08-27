@@ -2,9 +2,22 @@
 
 [简体中文](docs/README.zh-CN.md) | English
 
-Use a local DeepSeek Harness Agent to discover and invoke business capabilities governed by a
-self-hosted BailingHub. Reasoning and tool orchestration stay in DSH; BailingHub retains trusted
-identity, runtime context, capability trimming, approval, invocation recovery, and audit.
+Tell your local DeepSeek Harness Agent what you want done in a connected business system. Through
+BailingHub, it can look up information, make permitted changes, and use other capabilities already
+exposed by that system. Your existing business identity and permissions still apply, and
+BailingHub keeps the authorization, approval, and action trail.
+
+For example, depending on what the connected business system has exposed, you can ask the local
+Agent to:
+
+- find an order, customer, product, or employee record;
+- update an allowed field or business status;
+- carry out another permitted back-office task;
+- return the result while BailingHub records the corresponding tool steps.
+
+Reasoning and tool orchestration stay in DSH. BailingHub supplies the authorized business context,
+available capabilities, approval state, invocation recovery, and audit records required for the
+local Agent to act safely.
 
 This is an independent community integration. It is not developed, certified, endorsed, or
 recommended by DeepSeek.
