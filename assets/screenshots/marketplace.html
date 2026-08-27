@@ -58,18 +58,17 @@
     .brand { display: flex; align-items: center; gap: 15px; font-size: 23px; font-weight: 850; }
     .brand-mark {
       display: grid;
-      grid-template-columns: 11px 15px 11px;
-      align-items: center;
-      gap: 4px;
+      place-items: center;
       width: 58px;
       height: 58px;
-      padding: 10px;
+      padding: 4px;
       border-radius: 17px;
       background: var(--navy);
       box-shadow: 0 12px 25px rgba(13, 23, 40, .18);
     }
-    .brand-mark i { display: block; height: 32px; border-radius: 4px; background: #3fb950; }
-    .brand-mark i:nth-child(2) { height: 20px; background: #56d364; }
+    .brand-mark svg { display: block; width: 48px; height: 48px; }
+    .brand-mark__main { fill: #3fb950; }
+    .brand-mark__accent { fill: #56d364; }
     .tag {
       padding: 10px 16px;
       border: 1px solid rgba(36, 87, 237, .13);
@@ -156,7 +155,7 @@
 </head>
 <body>
   <section class="shot" id="shot-01">
-    <div class="topbar"><div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span>BailingHub for DeepSeek Harness</div><div class="tag">独立社区插件 · 示例数据</div></div>
+    <div class="topbar"><div class="brand"><span class="brand-mark"><svg viewBox="0 0 240 240" role="img" aria-label="BailingHub"><path class="brand-mark__main" fill-rule="evenodd" d="M42 44h34v152H54l-12-12zM76 44h58v34H76zM76 103h22v34H76zM76 162h58v34H76zM150 44h22l12 12v8h-34zM150 86h34v110h-34z"/><path class="brand-mark__accent" fill-rule="evenodd" d="M116 103h68v34h-68zM76 162h58v34H76z"/></svg></span>BailingHub for DeepSeek Harness</div><div class="tag">独立社区插件 · 示例数据</div></div>
     <div class="content">
       <div>
         <h1><span>一句话，让本地</span><span>智能体直接帮你办业务</span></h1>
@@ -179,7 +178,7 @@
   </section>
 
   <section class="shot" id="shot-02">
-    <div class="topbar"><div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span>BailingHub for DeepSeek Harness</div><div class="tag">安装后连接自己的 BailingHub</div></div>
+    <div class="topbar"><div class="brand"><span class="brand-mark"><svg viewBox="0 0 240 240" role="img" aria-label="BailingHub"><path class="brand-mark__main" fill-rule="evenodd" d="M42 44h34v152H54l-12-12zM76 44h58v34H76zM76 103h22v34H76zM76 162h58v34H76zM150 44h22l12 12v8h-34zM150 86h34v110h-34z"/><path class="brand-mark__accent" fill-rule="evenodd" d="M116 103h68v34h-68zM76 162h58v34H76z"/></svg></span>BailingHub for DeepSeek Harness</div><div class="tag">安装后连接自己的 BailingHub</div></div>
     <div class="content">
       <div>
         <h1>只配置四项，浏览器完成授权</h1>
@@ -204,7 +203,7 @@
   </section>
 
   <section class="shot" id="shot-03">
-    <div class="topbar"><div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span>BailingHub for DeepSeek Harness</div><div class="tag">沿用现有业务权限</div></div>
+    <div class="topbar"><div class="brand"><span class="brand-mark"><svg viewBox="0 0 240 240" role="img" aria-label="BailingHub"><path class="brand-mark__main" fill-rule="evenodd" d="M42 44h34v152H54l-12-12zM76 44h58v34H76zM76 103h22v34H76zM76 162h58v34H76zM150 44h22l12 12v8h-34zM150 86h34v110h-34z"/><path class="brand-mark__accent" fill-rule="evenodd" d="M116 103h68v34h-68zM76 162h58v34H76z"/></svg></span>BailingHub for DeepSeek Harness</div><div class="tag">沿用现有业务权限</div></div>
     <div class="content">
       <div>
         <h1>能做什么，仍由你的业务账号权限决定</h1>
@@ -223,7 +222,7 @@
   </section>
 
   <section class="shot" id="shot-04">
-    <div class="topbar"><div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span>BailingHub for DeepSeek Harness</div><div class="tag">本地编排 · 中枢留痕</div></div>
+    <div class="topbar"><div class="brand"><span class="brand-mark"><svg viewBox="0 0 240 240" role="img" aria-label="BailingHub"><path class="brand-mark__main" fill-rule="evenodd" d="M42 44h34v152H54l-12-12zM76 44h58v34H76zM76 103h22v34H76zM76 162h58v34H76zM150 44h22l12 12v8h-34zM150 86h34v110h-34z"/><path class="brand-mark__accent" fill-rule="evenodd" d="M116 103h68v34h-68zM76 162h58v34H76z"/></svg></span>BailingHub for DeepSeek Harness</div><div class="tag">本地编排 · 中枢留痕</div></div>
     <div class="content">
       <div>
         <h1><span>本地智能体执行，</span><span>中枢仍能看到每一步</span></h1>
