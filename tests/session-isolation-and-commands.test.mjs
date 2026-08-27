@@ -71,13 +71,20 @@ test('keeps connection, conversation, run, and active definitions isolated per A
   assert.notEqual(invokes[0].args[0].agentRunId, invokes[1].args[0].agentRunId)
 })
 
-test('registers a real DSH command entrypoint for login/status/logout/workspaces/use', async () => {
+test('registers a real DSH command entrypoint including a credential-safe doctor', async () => {
   const host = createMockHost()
   const mock = createMockTransport()
   createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
 
   const command = host.commands.get('bailinghub')
   assert.ok(command)
+  const doctor = await command.handler({ rawInput: 'doctor' })
+  assert.equal(doctor.kind, 'success')
+  assert.match(doctor.text, /Overall: PASS/)
+  assert.match(doctor.text, /DSH host contract: PASS/)
+  assert.match(doctor.text, /connectionName is an alias/)
+  assert.doesNotMatch(doctor.text, /access_token|not-exposed|hub\.example\.com|personal/)
+
   for (const rawInput of ['login', 'status', 'logout', 'workspaces', 'sync']) {
     const result = await command.handler({ rawInput })
     assert.equal(result.kind, 'success')
@@ -93,6 +100,47 @@ test('registers a real DSH command entrypoint for login/status/logout/workspaces
   assert.equal(use.args[0].workspace, 'second_workspace')
   assert.equal(use.args[0].route, 'second_workspace')
   assert.ok(host.services.has('bailingHubAgentClient'))
+})
+
+test('doctor stops before SDK load when configuration is invalid', async () => {
+  const host = createMockHost()
+  let transportRequested = false
+  createAgentClientPlugin({
+    transportFactory: () => {
+      transportRequested = true
+      throw new Error('private transport failure')
+    },
+  }).apply(host.ctx, {
+    hubUrl: '',
+    clientAppId: '',
+    workspace: '',
+    connectionName: 'default',
+  })
+
+  const result = await host.commands.get('bailinghub').handler({ rawInput: 'doctor' })
+  assert.equal(result.kind, 'error')
+  assert.match(result.text, /Overall: FAIL/)
+  assert.match(result.text, /hubUrl, clientAppId, workspace/)
+  assert.doesNotMatch(result.text, /private transport failure/)
+  assert.equal(transportRequested, false)
+})
+
+test('doctor reports logged-out isolation without probing authorized workspaces', async () => {
+  const host = createMockHost()
+  const mock = createMockTransport({
+    status: async () => ({ state: 'logged_out', refresh_token: 'must-not-leak' }),
+    workspaces: async () => {
+      throw new Error('must not probe workspaces before authorization')
+    },
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const result = await host.commands.get('bailinghub').handler({ rawInput: 'doctor' })
+  assert.equal(result.kind, 'error')
+  assert.match(result.text, /Authorization: FAIL \(logged_out\)/)
+  assert.match(result.text, /Run \/bailinghub login/)
+  assert.doesNotMatch(result.text, /refresh_token|must-not-leak/)
+  assert.equal(callsFor(mock.calls, 'workspaces').length, 0)
 })
 
 test('keeps an immutable pending completion and lets the sync command replay it', async () => {

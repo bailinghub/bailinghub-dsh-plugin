@@ -17,7 +17,7 @@ async function importFromDsh(specifier) {
   return import(pathToFileURL(join(dshNodeModules, specifier)).href)
 }
 
-test('loads in DSH rc.7 and safely replaces the currently executing search tool', {
+test('loads in the installed real DSH lifecycle and safely replaces the executing search tool', {
   skip: dshNodeModules ? false : 'set DSH_NODE_MODULES to the installed DSH node_modules directory',
 }, async () => {
   const [{ Context }, { default: SystemPrompt }, { default: ToolRuntime },
@@ -51,7 +51,7 @@ test('loads in DSH rc.7 and safely replaces the currently executing search tool'
 
     const runtime = ctx.get('bailingHubAgentClient')
     assert.ok(runtime)
-    const agent = { id: 'rc7-agent', session: { id: 'rc7-session' } }
+    const agent = { id: 'real-dsh-agent', session: { id: 'real-dsh-session' } }
     // Real DSH creates an Agent scope from a context that has declared the
     // tools dependency. The plugin context has exactly that dependency set.
     agentScope = createScope(runtime.ctx, agent)
@@ -64,6 +64,13 @@ test('loads in DSH rc.7 and safely replaces the currently executing search tool'
       signal: new AbortController().signal,
     })
     assert.equal(status.kind, 'success')
+    const doctor = await command.handler({
+      agent,
+      rawInput: 'doctor',
+      signal: new AbortController().signal,
+    })
+    assert.equal(doctor.kind, 'success')
+    assert.match(doctor.text, /DSH host contract: PASS/)
     runtime.onInboxClaimed({
       agent,
       turn: 1,

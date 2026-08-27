@@ -38,7 +38,7 @@ DeepSeek Harness 本地智能体
 - **BailingHub Core** 负责 Agent Auth、可信业务身份、运行时上下文、知识库与记忆投影、
   能力治理、审批、调用状态和审计记录。
 - **`bailinghub-mcp-server/sdk`** 负责浏览器登录、PKCE、凭据存储与刷新，以及按
-  Hub/client/workspace 隔离连接和映射 HTTP DTO。
+  Hub/client/workspace 选择连接和映射 HTTP DTO。
 - **`dsh-bailinghub`** 只负责 DSH 会话、提示词、命令和动态工具生命周期，不保存凭据，
   也不直接调用业务 API。
 
@@ -63,13 +63,13 @@ BailingHub Client Token 或模型提供方 Key。
 前置条件：
 
 - Node.js `22.19.0+` 或 `24+`；
-- `pnpm` 与 DeepSeek Harness `0.1.0-rc.7`；
+- `pnpm` 与兼容矩阵中列出的 DeepSeek Harness 版本；
 - 已完成上面的 BailingHub 接入准备。
 
 将精确稳定版本安装到 DSH Web Profile：
 
 ```bash
-npm install --global pnpm @deepseek-ai/dsh@0.1.0-rc.7
+npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
 dsh plugin --profile web add dsh-bailinghub@0.2.0
 ```
 
@@ -85,7 +85,7 @@ DSH 用户不应该再自行猜测或单独安装某个 SDK 版本。
 | `hubUrl` | `BAILINGHUB_HUB_URL` | 开发者自己部署的 BailingHub 公共 HTTPS 地址 | 否 |
 | `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | 在该中枢注册的公共 Agent Client 应用标识 | 否 |
 | `workspace` | `BAILINGHUB_WORKSPACE` | 初始已授权 workspace/route id | 否 |
-| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | 当前 SDK 隔离连接的本地别名 | 否 |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | 选择 SDK 连接的本地别名 | 否 |
 
 使用中性占位值的示例：
 
@@ -97,7 +97,8 @@ export BAILINGHUB_CONNECTION_NAME='default'
 ```
 
 也可以通过 DSH 的插件设置界面填写同样四个字段。不要在 Cordis Patch 中增加 Token、授权
-页面地址、业务域名或任何凭据。
+页面地址、业务域名或任何凭据。SDK 凭据按 Hub URL、client app id 与 workspace 的组合归属；
+同一组合仅更换 `connectionName` 只是给同一凭据增加别名，并不会产生可独立撤销的 Agent Session。
 
 启动前检查最终合成配置：
 
@@ -112,6 +113,7 @@ dsh web
 
 ```text
 /bailinghub login
+/bailinghub doctor
 /bailinghub status
 /bailinghub workspaces
 ```
@@ -124,6 +126,7 @@ Token 只进入 SDK 所有的安全存储，不会写入插件配置，也不会
 
 | 命令 | 用途 |
 | --- | --- |
+| `/bailinghub doctor` | 在不输出凭据的前提下检查宿主 API、公开配置、SDK、授权状态和 workspace 连通性 |
 | `/bailinghub login` | 在浏览器授权当前 Hub/client/workspace |
 | `/bailinghub status` | 查看当前连接状态，但不输出凭据 |
 | `/bailinghub workspaces` | 查看当前业务授权允许使用的 workspace |
@@ -134,7 +137,8 @@ Token 只进入 SDK 所有的安全存储，不会写入插件配置，也不会
 标准 v1 登录只申请当前配置的 workspace。`use` 只有在当前 Agent Session 明确包含目标
 workspace 时才会成功，不能借此任意切换中枢 route。当前命令始终使用这个插件实例配置的四个
 字段，不接受连接别名选择器。连接另一套 Hub 或 route 时，应使用第二个 DSH Profile/插件实例，
-或修改四字段并重新加载当前 Profile；设置新的 `connectionName` 后再完成浏览器授权。
+或修改四字段并重新加载当前 Profile。若要独立验收登录、登出和撤销，必须使用专用 client app id
+或 workspace；只修改 `connectionName` 不能隔离凭据。
 
 首次验收时，新建一个 DSH 会话，先做一次只读查询，再做一次允许的修改。确认 BailingHub
 后台能看到同一个会话、run、可见最终回复和工具调用轨迹。需要审批的能力必须在审批后恢复

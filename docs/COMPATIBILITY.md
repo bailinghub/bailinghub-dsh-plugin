@@ -4,7 +4,7 @@
 
 | Component | Verified version |
 | --- | --- |
-| DeepSeek Harness / Cordis lifecycle | `0.1.0-rc.7` |
+| DeepSeek Harness / Cordis lifecycle | `0.1.0-rc.7`; `0.1.1-rc.2` candidate verification in progress |
 | Node.js | `22.19.0+` or `24+` |
 | DSH tool presentation | Native Tool Mode |
 | Generic Agent Client SDK | `bailinghub-mcp-server@0.2.0` via `./sdk` |
@@ -23,6 +23,10 @@ contracts from that release.
 DeepSeek Harness remains a developer preview. Every Harness version change requires a new smoke
 against its real Cordis lifecycle, prompt waterfall, ToolRuntime, commands, durable session events,
 and Web profile installation before this table can change.
+
+`/bailinghub doctor` validates the required host API shape at runtime and reports the releases for
+which that shape has been exercised. This is a diagnostic check, not a substitute for the live
+browser authorization, read/write, approval/recovery, trajectory, and revocation gates below.
 
 ### Tool-mode and operating-system boundaries
 
@@ -49,6 +53,11 @@ connectionName
 In Agent Client v1, `workspace` is the BailingHub route id. Business endpoints, authorization page
 URLs, Client Tokens, Tool Provider signing secrets, business credentials, and model-provider keys
 are not DSH plugin configuration.
+
+The SDK credential scope is the normalized Hub URL, client app id, and workspace tuple.
+`connectionName` is a local alias for selecting that connection, not an extra isolation dimension.
+Use a dedicated client app id or workspace when login/logout/revocation must not affect an existing
+profile.
 
 ## Public legacy 0.1.x
 

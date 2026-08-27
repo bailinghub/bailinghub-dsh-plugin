@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Add `/bailinghub doctor` for credential-safe host-contract, configuration, SDK, authorization,
+  and workspace diagnostics before a business turn starts.
+- Add real lifecycle coverage for DeepSeek Harness `0.1.1-rc.2`; live Agent Client acceptance is
+  still required before publishing a compatibility claim.
+- Clarify that `connectionName` is an alias and that independently revocable acceptance credentials
+  require a distinct Hub/client/workspace tuple.
+
 ## 0.2.0 - 2026-08-26
 
 - Add the native Cordis Agent Client adapter that keeps reasoning and orchestration in local DSH

@@ -141,24 +141,32 @@ Use a dedicated non-production Hub client/workspace and a no-surprise business f
 its credentials, private URL, authorization code, personal data, or raw payload into logs,
 screenshots, release notes, or CI artifacts.
 
+A separate `DSH_HOME` keeps DSH configuration, sessions, and logs apart, but macOS Keychain
+credentials for the same Hub/client/workspace tuple are still shared. A different
+`connectionName` is only an alias. Use a dedicated client app id or workspace before testing
+logout or revocation.
+
 In the isolated DSH Web profile:
 
-1. Run `/bailinghub login` and confirm the system browser opens the business authorization page.
-2. Confirm the page shows the intended business identity, Hub client, requested workspace, and
+1. Run `/bailinghub doctor`; before login it must identify the isolated connection as logged out
+   without printing any credential, private endpoint, or model-provider key.
+2. Run `/bailinghub login` and confirm the system browser opens the business authorization page.
+3. Confirm the page shows the intended business identity, Hub client, requested workspace, and
    requested capability boundary before approval.
-3. Complete the callback and verify `/bailinghub status` without exposing access or refresh tokens.
-4. Run `/bailinghub workspaces`; optionally switch to another already-authorized workspace using
+4. Complete the callback and verify `/bailinghub doctor` plus `/bailinghub status` without exposing
+   access or refresh tokens.
+5. Run `/bailinghub workspaces`; optionally switch to another already-authorized workspace using
    `/bailinghub use <workspace>` before opening a new session.
-5. Start a new conversation and perform one read-only query.
-6. Perform one permitted mutation whose ACC governance does not require approval.
-7. Exercise one approval-required or pending invocation and prove DSH resumes the exact original
+6. Start a new conversation and perform one read-only query.
+7. Perform one permitted mutation whose ACC governance does not require approval.
+8. Exercise one approval-required or pending invocation and prove DSH resumes the exact original
    invocation id instead of repeating `invoke`.
-8. Confirm BailingHub contains the same conversation, run, user message, visible final assistant
+9. Confirm BailingHub contains the same conversation, run, user message, visible final assistant
    response, legal completion status, public usage, and tool trajectory without hidden reasoning or
    raw credential material.
-9. Exercise `/bailinghub sync` only for a deliberately pending completion and prove it reuses the
+10. Exercise `/bailinghub sync` only for a deliberately pending completion and prove it reuses the
    frozen completion payload.
-10. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
+11. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
 
 Native Code Mode must degrade rather than expose stale or unsafe dynamic schemas. Run the live
 business checks in Native Tool Mode.

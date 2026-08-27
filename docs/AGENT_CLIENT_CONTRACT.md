@@ -14,9 +14,11 @@ workspace
 connectionName
 ```
 
-`hubUrl`, `clientAppId`, and `workspace` identify a public Hub-side application/workspace.
-`connectionName` is a local SDK alias. No business endpoint, authorization endpoint, token, secret,
-or business credential belongs in this config.
+`hubUrl`, `clientAppId`, and `workspace` identify a public Hub-side application/workspace and the
+SDK credential scope. `connectionName` is a local SDK alias for that tuple. Multiple aliases for
+the same tuple reuse the same SDK registry entry and credential; they are not independently
+revocable Agent Sessions. No business endpoint, authorization endpoint, token, secret, or business
+credential belongs in this config.
 
 ## Injectable Transport Seam
 
@@ -160,9 +162,11 @@ same bounded recovery state when known locally, and never creates a replacement 
 
 ## Session and Completion State
 
-Connection name, workspace, conversation alias, Core run, active definitions, and completion
-state are isolated per DSH Agent/session. A workspace switch affects future sessions and is
-rejected while any Core run is active/completing or has an unsynchronized completion payload.
+Connection selector, workspace, conversation alias, Core run, active definitions, and completion
+state are isolated per DSH Agent/session. This is runtime-state isolation, not a promise that two
+aliases for the same Hub/client/workspace tuple own separate SDK credentials. A workspace switch
+affects future sessions and is rejected while any Core run is active/completing or has an
+unsynchronized completion payload.
 
 The completion request is restricted to:
 

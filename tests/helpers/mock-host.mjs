@@ -150,7 +150,11 @@ export function createMockTransport(overrides = {}) {
   }
   const transport = {
     login: record('login', async () => ({ state: 'authorized' })),
-    status: record('status', async () => ({ state: 'authorized', access_token: 'not-exposed' })),
+    status: record('status', async () => ({
+      state: 'authorized',
+      workspace: 'demo',
+      access_token: 'not-exposed',
+    })),
     logout: record('logout', async () => ({ state: 'logged_out' })),
     workspaces: record('workspaces', async () => ({ workspaces: [{ route: 'demo', name: 'Demo' }] })),
     use: record('use', async (input) => ({ state: 'selected', workspace: input.workspace })),

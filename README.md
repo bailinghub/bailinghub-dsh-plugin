@@ -42,7 +42,7 @@ The packages have separate responsibilities:
 - **BailingHub Core** owns Agent Auth, trusted business identity, runtime context, knowledge and
   memory projection, capability governance, approvals, invocation state, and audit records.
 - **`bailinghub-mcp-server/sdk`** owns browser login, PKCE, credential storage, refresh,
-  Hub/client/workspace connection isolation, and HTTP DTO mapping.
+  Hub/client/workspace connection selection, and HTTP DTO mapping.
 - **`dsh-bailinghub`** owns only DSH session, prompt, command, and dynamic-tool lifecycle
   integration. It does not store credentials or call a business API directly.
 
@@ -68,13 +68,13 @@ signing secret, BailingHub Client Token, or model-provider key into this plugin.
 Prerequisites:
 
 - Node.js `22.19.0+` or `24+`;
-- `pnpm` and DeepSeek Harness `0.1.0-rc.7`;
+- `pnpm` and a DeepSeek Harness release listed in the compatibility matrix;
 - the BailingHub preparation above.
 
 Install the exact stable version into the DSH Web profile:
 
 ```bash
-npm install --global pnpm @deepseek-ai/dsh@0.1.0-rc.7
+npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
 dsh plugin --profile web add dsh-bailinghub@0.2.0
 ```
 
@@ -90,7 +90,7 @@ The native plugin has exactly four host configuration fields:
 | `hubUrl` | `BAILINGHUB_HUB_URL` | Public HTTPS URL of the developer's own BailingHub | No |
 | `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | Public Agent Client application id registered in that Hub | No |
 | `workspace` | `BAILINGHUB_WORKSPACE` | Initial authorized workspace/route id | No |
-| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | Local alias for this isolated SDK connection | No |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | Local alias selecting the SDK connection | No |
 
 Example placeholders:
 
@@ -102,7 +102,9 @@ export BAILINGHUB_CONNECTION_NAME='default'
 ```
 
 The same four fields may be supplied through the DSH plugin settings surface. Do not add tokens,
-authorization URLs, business domains, or credentials to the Cordis patch.
+authorization URLs, business domains, or credentials to the Cordis patch. SDK credentials are
+scoped by Hub URL, client app id, and workspace. A second `connectionName` for the same tuple is
+another alias for that credential, not an independently revocable Agent Session.
 
 Inspect the composed profile before starting it:
 
@@ -117,6 +119,7 @@ In DSH, run:
 
 ```text
 /bailinghub login
+/bailinghub doctor
 /bailinghub status
 /bailinghub workspaces
 ```
@@ -130,6 +133,7 @@ Useful commands:
 
 | Command | Purpose |
 | --- | --- |
+| `/bailinghub doctor` | Check host APIs, public configuration, SDK resolution, authorization, and workspace reachability without printing credentials |
 | `/bailinghub login` | Authorize the configured Hub/client/workspace in the browser |
 | `/bailinghub status` | Inspect the selected connection without printing credentials |
 | `/bailinghub workspaces` | List workspaces allowed by the current business authorization |
@@ -141,8 +145,9 @@ The standard v1 login requests only the configured workspace. `use` succeeds onl
 current Agent Session explicitly contains the target workspace; it is not permission to switch to
 an arbitrary Hub route. The current command set always operates on this plugin instance's four
 configured fields; it does not accept a connection selector. For another Hub or route, use a
-second DSH profile/plugin instance, or edit those fields and reload the profile, set a different
-`connectionName`, and complete browser authorization again.
+second DSH profile/plugin instance or edit those fields and reload the profile. For a truly
+independent login/logout/revocation test, use a dedicated client app id or workspace; changing only
+`connectionName` is not credential isolation.
 
 For the first acceptance check, start a new DSH conversation and perform one read-only request,
 then one permitted mutation. Confirm the same conversation, run, visible final answer, and tool

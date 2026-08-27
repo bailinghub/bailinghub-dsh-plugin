@@ -40,12 +40,15 @@ secure storage.
 ## Safe evaluation before migration
 
 Do not replace a working production profile merely to evaluate 0.2.0. Use a separate DSH home or
-another isolated Web profile and verify that the CLI really honors that location.
+another isolated Web profile and verify that the CLI really honors that location. On macOS, a
+separate DSH home does not create a separate Keychain credential for the same Hub/client/workspace
+tuple. Use a dedicated client app id or workspace for logout/revocation acceptance.
 
 1. Keep the existing `0.1.1` profile and its legacy environment unchanged.
 2. Install the exact released 0.2 package into an isolated profile.
 3. Configure only the four public native fields using neutral values for dry composition.
-4. Run `/bailinghub login` and approve a dedicated non-production business identity/workspace.
+4. Run `/bailinghub login` and approve a dedicated non-production client app/workspace whose
+   credential can be revoked without affecting a maintainer's existing profile.
 5. Verify status, workspace discovery, one read, one permitted mutation, approval/resume, and Hub
    trajectory.
 6. Separately re-run the `0.1.1` submit and same-job follow-up against the newly released Core.
