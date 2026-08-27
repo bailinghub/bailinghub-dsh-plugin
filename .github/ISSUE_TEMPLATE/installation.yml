@@ -1,0 +1,76 @@
+name: Installation or connection problem
+description: Report a reproducible plugin installation, configuration, or browser authorization problem.
+title: "[Install]: "
+labels:
+  - installation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the first-run path. Do not include tokens, authorization codes,
+        private deployment URLs, personal information, browser cookies, or production payloads.
+        Use GitHub private vulnerability reporting for security-sensitive findings.
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DeepSeek Harness version
+      placeholder: 0.1.0-rc.7
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: dsh-bailinghub version
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux or another POSIX system
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: install-source
+    attributes:
+      label: Installation source
+      options:
+        - DSH plugin market
+        - dsh plugin add from npm
+        - Local tarball or source checkout
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use public placeholders instead of real Hub, client, workspace, or identity values.
+      placeholder: |
+        1. Installed ...
+        2. Entered four public connection fields ...
+        3. Ran /bailinghub login ...
+        4. Observed ...
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual result
+      description: Include only redacted output. Screenshots must use demonstration data.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed tokens, authorization codes, private URLs, personal information, cookies, and production payloads.
+          required: true
+        - label: I checked the compatibility matrix for this DSH and operating-system combination.
+          required: true

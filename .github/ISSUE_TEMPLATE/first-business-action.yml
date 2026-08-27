@@ -1,0 +1,69 @@
+name: First business action feedback
+description: Share a redacted independent result after the plugin performs a business action through BailingHub.
+title: "[First action]: "
+labels:
+  - independent-validation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form records whether the public path worked outside the maintainer's development setup.
+        A market installation or download alone is not a completed business-action result. Never
+        attach credentials, private URLs, personal information, or production business payloads.
+  - type: input
+    id: versions
+    attributes:
+      label: Versions used
+      description: Include DeepSeek Harness, dsh-bailinghub, and BailingHub Core versions.
+      placeholder: DSH 0.1.0-rc.7, dsh-bailinghub 0.2.0, BailingHub 0.5.0
+    validations:
+      required: true
+  - type: input
+    id: system-kind
+    attributes:
+      label: Business system category
+      description: A generic category such as CRM, ERP, commerce, or internal admin is enough.
+      placeholder: Internal admin system
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Read-only action completed
+        - Permitted change completed
+        - Approval flow completed
+        - Partially completed
+        - Failed
+    validations:
+      required: true
+  - type: textarea
+    id: action
+    attributes:
+      label: Redacted action and result
+      description: Describe the intent, capability category, and visible result without business data.
+      placeholder: Queried one demonstration employee and updated an allowed note field.
+    validations:
+      required: true
+  - type: checkboxes
+    id: evidence
+    attributes:
+      label: Evidence observed
+      options:
+        - label: The browser authorization page showed the intended signed-in business identity and workspace.
+        - label: The local Agent received the visible business result.
+        - label: BailingHub showed the same visible conversation and Agent Run.
+        - label: BailingHub showed the governed tool trajectory or approval state.
+  - type: textarea
+    id: friction
+    attributes:
+      label: What was confusing or difficult?
+      description: Tell us where the install, authorization, first request, or result verification could be clearer.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed tokens, authorization codes, private URLs, personal information, cookies, and production payloads.
+          required: true
