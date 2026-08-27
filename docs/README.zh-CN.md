@@ -21,6 +21,8 @@
 > **当前稳定版本线：**`dsh-bailinghub@0.2.0` 使用下文说明的原生 Agent Client 流程。
 > 公开 `0.1.1` 仅作为明确的静态 MCP 兼容路径继续保留。
 
+希望用最短路径完成首次使用，可以直接阅读[三分钟开始使用](GETTING_STARTED.zh-CN.md)。
+
 ## 0.2 Agent Client 的关系
 
 ```text

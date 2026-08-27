@@ -39,6 +39,8 @@
     "cordis.agent-client.patch.yml",
     "cordis.patch.yml",
     "docs/AGENT_CLIENT_CONTRACT.md",
+    "docs/GETTING_STARTED.md",
+    "docs/GETTING_STARTED.zh-CN.md",
     "docs/MIGRATION_VNEXT.md",
     "docs/README.zh-CN.md",
     "SECURITY.md",

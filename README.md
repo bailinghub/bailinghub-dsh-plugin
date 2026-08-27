@@ -25,6 +25,8 @@ recommended by DeepSeek.
 > **Current stable line:** `dsh-bailinghub@0.2.0` uses the native Agent Client flow documented
 > below. Public `0.1.1` remains available only as the explicit static MCP compatibility path.
 
+For the shortest end-user path, follow the [three-minute getting started guide](docs/GETTING_STARTED.md).
+
 ## How the 0.2 Agent Client fits together
 
 ```text
