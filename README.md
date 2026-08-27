@@ -2,17 +2,17 @@
 
 [简体中文](docs/README.zh-CN.md) | English
 
-Tell your local DeepSeek Harness Agent what you want done in a connected business system. Through
-BailingHub, it can look up information, make permitted changes, and use other capabilities already
-exposed by that system. Your existing business identity and permissions still apply, and
-BailingHub keeps the authorization, approval, and action trail.
+Use your local DeepSeek Harness Agent to operate the admin side of an online store, SaaS product,
+or other business system through BailingHub. Ask it to look up data, update records, or run other
+actions available to the connected account. The existing business identity, permissions, and
+approval rules still apply, and BailingHub keeps the authorization and action trail.
 
 For example, depending on what the connected business system has exposed, you can ask the local
 Agent to:
 
 - find an order, customer, product, or employee record;
 - update an allowed field or business status;
-- carry out another permitted back-office task;
+- run another permitted admin action;
 - return the result while BailingHub records the corresponding tool steps.
 
 Reasoning and tool orchestration stay in DSH. BailingHub supplies the authorized business context,
