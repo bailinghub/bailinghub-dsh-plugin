@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BailingHub for DeepSeek Harness marketplace screenshots</title>
+  <style>
+    :root {
+      --ink: #101828;
+      --muted: #58667d;
+      --paper: #ffffff;
+      --line: rgba(24, 41, 72, .11);
+      --navy: #0d1728;
+      --blue: #2457ed;
+      --cyan: #0aa6c2;
+      --green: #25a866;
+      --green-soft: #e8f8ef;
+      --amber: #e89c26;
+      --amber-soft: #fff4d9;
+      --red: #d95056;
+      --red-soft: #ffebec;
+      --shadow: 0 22px 60px rgba(38, 57, 94, .13);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 1440px;
+      background: #e9eef7;
+      color: var(--ink);
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Inter, Arial, sans-serif;
+    }
+    body { display: grid; gap: 32px; }
+    .shot {
+      position: relative;
+      width: 1440px;
+      height: 900px;
+      overflow: hidden;
+      padding: 54px 66px;
+      background:
+        radial-gradient(circle at 91% 9%, rgba(10, 166, 194, .14), transparent 29%),
+        radial-gradient(circle at 4% 94%, rgba(36, 87, 237, .11), transparent 28%),
+        #f7f9fd;
+    }
+    .shot::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(24, 41, 72, .025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(24, 41, 72, .025) 1px, transparent 1px);
+      background-size: 36px 36px;
+      pointer-events: none;
+    }
+    .topbar, .content, .footer { position: relative; z-index: 2; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 15px; font-size: 23px; font-weight: 850; }
+    .brand-mark {
+      display: grid;
+      grid-template-columns: 11px 15px 11px;
+      align-items: center;
+      gap: 4px;
+      width: 58px;
+      height: 58px;
+      padding: 10px;
+      border-radius: 17px;
+      background: var(--navy);
+      box-shadow: 0 12px 25px rgba(13, 23, 40, .18);
+    }
+    .brand-mark i { display: block; height: 32px; border-radius: 4px; background: #3fb950; }
+    .brand-mark i:nth-child(2) { height: 20px; background: #56d364; }
+    .tag {
+      padding: 10px 16px;
+      border: 1px solid rgba(36, 87, 237, .13);
+      border-radius: 999px;
+      color: #39508a;
+      background: rgba(255, 255, 255, .85);
+      font-size: 17px;
+      font-weight: 760;
+    }
+    .content { display: grid; grid-template-columns: 48% 52%; align-items: center; height: 700px; }
+    h1 { margin: 0; font-size: 61px; line-height: 1.12; letter-spacing: -.052em; }
+    h1 span { display: block; }
+    .en { margin-top: 19px; color: #35435a; font-size: 25px; line-height: 1.45; font-weight: 680; }
+    .lead { width: 88%; margin: 24px 0 0; color: var(--muted); font-size: 22px; line-height: 1.62; }
+    .pills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .pill { padding: 9px 14px; border-radius: 999px; color: #334c84; background: #e9efff; font-size: 17px; font-weight: 760; }
+    .footer { position: absolute; left: 66px; right: 66px; bottom: 35px; display: flex; justify-content: space-between; color: #68758a; font-size: 16px; font-weight: 700; }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 25px;
+      background: rgba(255, 255, 255, .96);
+      box-shadow: var(--shadow);
+    }
+    .window { overflow: hidden; }
+    .window-bar { display: flex; align-items: center; gap: 7px; height: 44px; padding: 0 17px; border-bottom: 1px solid var(--line); background: #f8fafc; }
+    .window-bar i { width: 10px; height: 10px; border-radius: 50%; background: #c9d1dd; }
+    .window-title { margin-left: 9px; color: #5c687a; font-size: 14px; font-weight: 760; }
+
+    /* 01 */
+    #shot-01 .content { grid-template-columns: 43% 57%; gap: 38px; }
+    #shot-01 h1 { font-size: 55px; }
+    .chat { height: 585px; }
+    .chat-body { display: grid; gap: 14px; padding: 24px; }
+    .bubble { max-width: 83%; padding: 15px 18px; border-radius: 18px; font-size: 18px; line-height: 1.5; }
+    .bubble.user { justify-self: end; color: #fff; background: linear-gradient(135deg, #3d65ee, #2457ed); border-bottom-right-radius: 6px; }
+    .bubble.agent { background: #f0f4fa; border-bottom-left-radius: 6px; }
+    .tool-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; padding: 13px 16px; border: 1px solid #dbe4f0; border-radius: 16px; background: #fff; }
+    .tool-name { font-size: 16px; font-weight: 800; }
+    .tool-note { margin-top: 4px; color: #6b778a; font-size: 13px; }
+    .ok { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; background: var(--green); font-weight: 900; }
+    .result { display: flex; align-items: center; gap: 11px; padding: 14px 16px; border-radius: 15px; color: #177446; background: var(--green-soft); font-size: 16px; font-weight: 760; }
+
+    /* 02 */
+    #shot-02 .content { grid-template-columns: 42% 58%; gap: 42px; }
+    .settings { padding: 25px; }
+    .settings h3 { margin: 0 0 18px; font-size: 22px; }
+    .field { margin-top: 13px; }
+    .field label { display: block; margin-bottom: 6px; color: #566479; font-size: 13px; font-weight: 800; }
+    .input { padding: 12px 14px; border: 1px solid #d6deea; border-radius: 11px; color: #2e3e57; background: #fbfcfe; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+    .safe-note { margin-top: 17px; padding: 13px 15px; border-radius: 13px; color: #296f4e; background: var(--green-soft); font-size: 14px; line-height: 1.45; font-weight: 700; }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 26px; }
+    .step { min-height: 150px; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
+    .step-no { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: #fff; background: var(--blue); font-weight: 900; }
+    .step b { display: block; margin-top: 16px; font-size: 17px; }
+    .step span { display: block; margin-top: 7px; color: #66748a; font-size: 14px; line-height: 1.45; }
+
+    /* 03 */
+    #shot-03 .content { grid-template-columns: 43% 57%; gap: 46px; }
+    .permission-list { display: grid; gap: 13px; padding: 25px; }
+    .permission { display: grid; grid-template-columns: 42px 1fr auto; align-items: center; gap: 13px; padding: 14px; border: 1px solid var(--line); border-radius: 15px; }
+    .permission-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; color: #fff; background: var(--green); font-weight: 900; }
+    .permission:nth-child(3) .permission-icon { background: var(--amber); }
+    .permission:nth-child(4) .permission-icon { background: #8994a6; }
+    .permission b { font-size: 16px; }
+    .permission small { display: block; margin-top: 3px; color: #718096; font-size: 13px; }
+    .status { padding: 7px 10px; border-radius: 999px; color: #26754f; background: var(--green-soft); font-size: 12px; font-weight: 850; }
+    .permission:nth-child(3) .status { color: #946018; background: var(--amber-soft); }
+    .permission:nth-child(4) .status { color: #556275; background: #eef1f5; }
+
+    /* 04 */
+    #shot-04 .content { grid-template-columns: 40% 60%; gap: 45px; }
+    .trace { padding: 22px 25px 24px; }
+    .trace-head { display: flex; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+    .trace-head b { font-size: 18px; }
+    .trace-head span { color: #268358; font-size: 13px; font-weight: 850; }
+    .timeline { position: relative; display: grid; gap: 8px; margin-top: 17px; }
+    .timeline::before { content: ""; position: absolute; left: 15px; top: 15px; bottom: 15px; width: 2px; background: #d9e2ee; }
+    .event { position: relative; display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 11px; min-height: 66px; padding: 8px 0; }
+    .dot { z-index: 2; display: grid; place-items: center; width: 32px; height: 32px; border: 4px solid #fff; border-radius: 50%; color: #fff; background: var(--green); box-shadow: 0 0 0 1px #d9e2ee; font-size: 11px; font-weight: 900; }
+    .event b { font-size: 15px; }
+    .event small { display: block; margin-top: 4px; color: #718096; font-size: 12px; }
+    .time { color: #748197; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+</head>
+<body>
+  <section class="shot" id="shot-01">
+    <div class="topbar"><div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span>BailingHub for DeepSeek Harness</div><div class="tag">独立社区插件 · 示例数据</div></div>
+    <div class="content">
+      <div>
+        <h1><span>一句话，让本地</span><span>智能体直接帮你办业务</span></h1>
+        <div class="en">Tell your local Agent what to do in your business system.</div>
+        <p class="lead">查询资料、修改信息，或者完成业务系统已经开放的其他操作。</p>
+        <div class="pills"><span class="pill">查询</span><span class="pill">修改</span><span class="pill">审批</span><span class="pill">留痕</span></div>
+      </div>
+      <div class="panel window chat">
+        <div class="window-bar"><i></i><i></i><i></i><span class="window-title">DeepSeek Harness · Local Agent</span></div>
+        <div class="chat-body">
+          <div class="bubble user">查询演示员工 EMP-001，并把备注改成“已完成培训”。</div>
+          <div class="tool-row"><div><div class="tool-name">查询员工资料</div><div class="tool-note">employee_get · 已授权</div></div><span class="ok">✓</span></div>
+          <div class="tool-row"><div><div class="tool-name">修改员工备注</div><div class="tool-note">employee_update · 业务权限允许</div></div><span class="ok">✓</span></div>
+          <div class="bubble agent">已完成。员工 EMP-001 的备注已更新。</div>
+          <div class="result"><span class="ok">✓</span>执行结果已返回，并记录到 BailingHub。</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer"><span>能力示意，不含真实业务数据</span><span>01 / 04</span></div>
+  </section>
+
+  <section class="shot" id="shot-02">
+    <div class="topbar"><div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span>BailingHub for DeepSeek Harness</div><div class="tag">安装后连接自己的 BailingHub</div></div>
+    <div class="content">
+      <div>
+        <h1>只配置四项，浏览器完成授权</h1>
+        <div class="en">Connect once, then authorize with your existing business login.</div>
+        <p class="lead">插件不要求填写业务账号密码、模型 Key 或 Tool Provider 密钥。</p>
+        <div class="steps">
+          <div class="step"><span class="step-no">1</span><b>安装插件</b><span>市场一键安装或使用 DSH 命令。</span></div>
+          <div class="step"><span class="step-no">2</span><b>连接中枢</b><span>填写四个公开连接字段。</span></div>
+          <div class="step"><span class="step-no">3</span><b>浏览器授权</b><span>沿用业务系统现有登录态。</span></div>
+        </div>
+      </div>
+      <div class="panel settings">
+        <h3>dsh-bailinghub 连接设置</h3>
+        <div class="field"><label>Hub URL</label><div class="input">https://hub.example.com</div></div>
+        <div class="field"><label>Client App ID</label><div class="input">example-agent-client</div></div>
+        <div class="field"><label>Workspace</label><div class="input">employee_assistant</div></div>
+        <div class="field"><label>Connection Name</label><div class="input">default</div></div>
+        <div class="safe-note">✓ 四项均为公开连接信息。身份凭据由浏览器授权后进入 SDK 安全存储。</div>
+      </div>
+    </div>
+    <div class="footer"><span>示例地址与标识，不对应任何真实部署</span><span>02 / 04</span></div>
+  </section>
+
+  <section class="shot" id="shot-03">
+    <div class="topbar"><div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span>BailingHub for DeepSeek Harness</div><div class="tag">沿用现有业务权限</div></div>
+    <div class="content">
+      <div>
+        <h1>能做什么，仍由你的业务账号权限决定</h1>
+        <div class="en">Your existing permissions and approval rules still apply.</div>
+        <p class="lead">换成本地智能体，不代表权限变大。允许的操作可以执行，需要审批的继续审批，没有权限的仍会被拒绝。</p>
+        <div class="pills"><span class="pill">不绕过登录</span><span class="pill">不绕过审批</span><span class="pill">业务系统最终校验</span></div>
+      </div>
+      <div class="panel permission-list">
+        <div class="permission"><span class="permission-icon">✓</span><div><b>查看员工资料</b><small>当前账号已有查看权限</small></div><span class="status">可执行</span></div>
+        <div class="permission"><span class="permission-icon">✓</span><div><b>修改员工备注</b><small>当前账号允许编辑该字段</small></div><span class="status">可执行</span></div>
+        <div class="permission"><span class="permission-icon">!</span><div><b>批量调整库存</b><small>业务规则要求人工确认</small></div><span class="status">需审批</span></div>
+        <div class="permission"><span class="permission-icon">×</span><div><b>删除员工账号</b><small>当前账号没有该能力</small></div><span class="status">不可用</span></div>
+      </div>
+    </div>
+    <div class="footer"><span>权限状态为能力示意</span><span>03 / 04</span></div>
+  </section>
+
+  <section class="shot" id="shot-04">
+    <div class="topbar"><div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span>BailingHub for DeepSeek Harness</div><div class="tag">本地编排 · 中枢留痕</div></div>
+    <div class="content">
+      <div>
+        <h1><span>本地智能体执行，</span><span>中枢仍能看到每一步</span></h1>
+        <div class="en">Local orchestration with a visible BailingHub action trail.</div>
+        <p class="lead">BailingHub 保留可见会话、工具调用、审批状态和最终结果，方便排查与审计。</p>
+        <div class="pills"><span class="pill">会话记录</span><span class="pill">工具轨迹</span><span class="pill">审批状态</span><span class="pill">最终结果</span></div>
+      </div>
+      <div class="panel trace">
+        <div class="trace-head"><b>Agent Run · run_demo_001</b><span>COMPLETED</span></div>
+        <div class="timeline">
+          <div class="event"><span class="dot">1</span><div><b>收到用户请求</b><small>查询演示员工并更新备注</small></div><span class="time">10:18:03</span></div>
+          <div class="event"><span class="dot">2</span><div><b>调用 employee_get</b><small>读取 EMP-001 的可见资料</small></div><span class="time">10:18:05</span></div>
+          <div class="event"><span class="dot">3</span><div><b>调用 employee_update</b><small>修改允许编辑的备注字段</small></div><span class="time">10:18:08</span></div>
+          <div class="event"><span class="dot">4</span><div><b>记录可见回复</b><small>把执行结果返回本地智能体</small></div><span class="time">10:18:10</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="footer"><span>演示轨迹，不含隐藏思考或真实业务载荷</span><span>04 / 04</span></div>
+  </section>
+</body>
+</html>
