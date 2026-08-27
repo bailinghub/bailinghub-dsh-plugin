@@ -25,6 +25,11 @@ The native 0.2.0 plugin accepts only `hubUrl`, `clientAppId`, `workspace`, and
 `connectionName`. The generic SDK owns browser authorization, refresh, and secure credential
 storage; business endpoints and final authorization remain Core/business-system concerns.
 
+The unreleased multi-connection candidate stores only public Hub/client/workspace metadata in its
+registry and keeps credentials isolated per binding. Connection add/use/remove are user slash
+commands, not model tools. Removing an authorized connection is remote-revoke-first and keeps the
+local credential if revocation fails, so it cannot falsely report a complete logout.
+
 Tools are Agent/run scoped. Message ids are replaced by Core-safe hash aliases, invocation ids are
 stable 64-character digests, and an `accepted_unknown` outcome must resume that exact invocation
 instead of creating a replacement. Completion retries are bounded and reuse one frozen,

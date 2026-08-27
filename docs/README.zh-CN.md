@@ -20,6 +20,9 @@
 
 > **当前稳定版本线：**`dsh-bailinghub@0.2.0` 使用下文说明的原生 Agent Client 流程。
 > 公开 `0.1.1` 仅作为明确的静态 MCP 兼容路径继续保留。
+>
+> **未发布候选能力：**下文的 `connections list|add|use|remove` 命令目前只存在于本开发分支，
+> 需要配套 SDK 候选版本；公开 `0.2.0` 暂不包含这些命令。
 
 希望用最短路径完成首次使用，可以直接阅读[三分钟开始使用](GETTING_STARTED.zh-CN.md)。
 
@@ -127,6 +130,10 @@ Token 只进入 SDK 所有的安全存储，不会写入插件配置，也不会
 | 命令 | 用途 |
 | --- | --- |
 | `/bailinghub doctor` | 在不输出凭据的前提下检查宿主 API、公开配置、SDK、授权状态和 workspace 连通性 |
+| `/bailinghub connections list` | 查看本机公开连接元数据与授权状态，不输出 Token |
+| `/bailinghub connections add <名称> <中枢地址> <clientAppId> <workspace>` | 登记另一套开发者自有中枢连接，并设为新会话默认项 |
+| `/bailinghub connections use <名称>` | 只为之后新建的会话选择一个已登记连接 |
+| `/bailinghub connections remove <名称>` | 先远程撤销 Agent Session，再删除本机凭据和公开元数据 |
 | `/bailinghub login` | 在浏览器授权当前 Hub/client/workspace |
 | `/bailinghub status` | 查看当前连接状态，但不输出凭据 |
 | `/bailinghub workspaces` | 查看当前业务授权允许使用的 workspace |
@@ -134,11 +141,14 @@ Token 只进入 SDK 所有的安全存储，不会写入插件配置，也不会
 | `/bailinghub sync` | 重试同步待处理的可见回复，不重复业务工具调用 |
 | `/bailinghub logout` | 撤销并删除当前 Agent Session |
 
-标准 v1 登录只申请当前配置的 workspace。`use` 只有在当前 Agent Session 明确包含目标
-workspace 时才会成功，不能借此任意切换中枢 route。当前命令始终使用这个插件实例配置的四个
-字段，不接受连接别名选择器。连接另一套 Hub 或 route 时，应使用第二个 DSH Profile/插件实例，
-或修改四字段并重新加载当前 Profile。若要独立验收登录、登出和撤销，必须使用专用 client app id
-或 workspace；只修改 `connectionName` 不能隔离凭据。
+插件四字段是启动连接。其他连接可用 `connections add` 登记；BailingHub 控制台“智能体客户端”
+页面也能生成同样的不含秘密命令。连接名含空格时需要加引号。执行 `connections use` 后，如果该
+绑定尚未授权，再执行 `/bailinghub login`。
+
+连接选择只能由用户斜杠命令发起，不会作为模型工具暴露。切换只影响之后创建的 Agent 会话，已有
+会话继续固定在原连接与 workspace。`/bailinghub use <workspace>` 是另一件事：只有当前 Agent
+Session 已经允许目标 workspace 时才成功。凭据按 `Hub + clientAppId + workspace` 隔离，只修改
+`connectionName` 不会产生另一套可独立撤销的凭据。
 
 首次验收时，新建一个 DSH 会话，先做一次只读查询，再做一次允许的修改。确认 BailingHub
 后台能看到同一个会话、run、可见最终回复和工具调用轨迹。需要审批的能力必须在审批后恢复

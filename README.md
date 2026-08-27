@@ -24,6 +24,10 @@ recommended by DeepSeek.
 
 > **Current stable line:** `dsh-bailinghub@0.2.0` uses the native Agent Client flow documented
 > below. Public `0.1.1` remains available only as the explicit static MCP compatibility path.
+>
+> **Unreleased candidate:** the `connections list|add|use|remove` commands documented below exist
+> only on this development branch and require the matching SDK candidate. Public `0.2.0` does not
+> provide them yet.
 
 For the shortest end-user path, follow the [three-minute getting started guide](docs/GETTING_STARTED.md).
 
@@ -134,6 +138,10 @@ Useful commands:
 | Command | Purpose |
 | --- | --- |
 | `/bailinghub doctor` | Check host APIs, public configuration, SDK resolution, authorization, and workspace reachability without printing credentials |
+| `/bailinghub connections list` | List local public connection metadata and authorization state without tokens |
+| `/bailinghub connections add <name> <hub-url> <client-app-id> <workspace>` | Register and select another developer-owned Hub connection for new sessions |
+| `/bailinghub connections use <name>` | Select a registered connection for new sessions only |
+| `/bailinghub connections remove <name>` | Remotely revoke its Agent Session, then remove its local credential and metadata |
 | `/bailinghub login` | Authorize the configured Hub/client/workspace in the browser |
 | `/bailinghub status` | Inspect the selected connection without printing credentials |
 | `/bailinghub workspaces` | List workspaces allowed by the current business authorization |
@@ -141,13 +149,17 @@ Useful commands:
 | `/bailinghub sync` | Retry a pending visible completion record without repeating a tool call |
 | `/bailinghub logout` | Revoke and remove the selected Agent Session |
 
-The standard v1 login requests only the configured workspace. `use` succeeds only when the
-current Agent Session explicitly contains the target workspace; it is not permission to switch to
-an arbitrary Hub route. The current command set always operates on this plugin instance's four
-configured fields; it does not accept a connection selector. For another Hub or route, use a
-second DSH profile/plugin instance or edit those fields and reload the profile. For a truly
-independent login/logout/revocation test, use a dedicated client app id or workspace; changing only
-`connectionName` is not credential isolation.
+The four plugin fields are the bootstrap connection. Additional connections can be registered with
+`connections add`; the BailingHub console's Agent Client page can generate the same secret-free
+command. Quote a connection name when it contains spaces. After `connections use`, run
+`/bailinghub login` if that binding is not authorized yet.
+
+Connection selection is a user-only slash command and is never exposed as a model tool. It affects
+only Agent sessions created afterward; existing sessions remain pinned to their original
+connection and workspace. `/bailinghub use <workspace>` remains a different operation: it succeeds
+only when the current Agent Session already authorizes that workspace. A connection is isolated by
+`Hub + clientAppId + workspace`; changing only `connectionName` does not create another revocable
+credential.
 
 For the first acceptance check, start a new DSH conversation and perform one read-only request,
 then one permitted mutation. Confirm the same conversation, run, visible final answer, and tool

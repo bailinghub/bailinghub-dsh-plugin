@@ -1,7 +1,8 @@
 # Agent Client Host Adapter Contract
 
 Status: public native Agent Client contract for `dsh-bailinghub@0.2.0`. This contract is not part
-of the legacy public `0.1.x` line.
+of the legacy public `0.1.x` line. The main-branch P1 multi-connection lifecycle described below
+is an additive, unreleased candidate until its matching Core, SDK, and DSH versions are accepted.
 
 ## Host Configuration
 
@@ -26,6 +27,11 @@ The default transport is lazily created from `bailinghub-mcp-server/sdk`. Tests 
 adapters may inject an object with all methods below:
 
 ```js
+connectionsList({})
+connectionsAdd({ connectionName, hubUrl, clientAppId, workspace })
+connectionsUse(connectionName)
+connectionsRemove(connectionName)
+
 login({ hubUrl, clientAppId, workspace, route, connectionName })
 status({ connectionName })
 logout({ connectionName })
@@ -167,6 +173,13 @@ state are isolated per DSH Agent/session. This is runtime-state isolation, not a
 aliases for the same Hub/client/workspace tuple own separate SDK credentials. A workspace switch
 affects future sessions and is rejected while any Core run is active/completing or has an
 unsynchronized completion payload.
+
+Multi-connection add/use/remove is exposed only through the `/bailinghub connections` user
+command. It is never registered as a model tool. Selecting a connection changes defaults for new
+Agent sessions only; existing states keep their captured connection and workspace. Removing a
+connection is rejected while any run is active or has an unsynchronized completion. The SDK then
+revokes the remote Agent Session before removing local credentials and registry metadata; a revoke
+failure preserves both.
 
 The completion request is restricted to:
 

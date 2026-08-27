@@ -8,6 +8,8 @@
   still required before publishing a compatibility claim.
 - Clarify that `connectionName` is an alias and that independently revocable acceptance credentials
   require a distinct Hub/client/workspace tuple.
+- Add user-only `/bailinghub connections list|add|use|remove` lifecycle commands with quoted-name
+  parsing, new-session-only selection, existing-session pinning, and revoke-before-remove safety.
 
 ## 0.2.0 - 2026-08-26
 

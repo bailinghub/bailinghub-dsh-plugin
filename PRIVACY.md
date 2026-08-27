@@ -21,3 +21,7 @@ labels, and numeric public usage. It ignores `assistant/chunk` and never uploads
 Browser authorization, refresh, and credential storage remain SDK-owned; this adapter stores no
 BailingHub credential. Review DSH, model-provider, BailingHub, and business-system retention
 boundaries before enabling the plugin.
+
+The multi-connection registry contains public connection name, Hub URL, client app id, workspace,
+timestamps, and current-selection state. It does not contain access tokens, refresh tokens, model
+keys, business cookies, prompts, tool arguments, or business results.

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { createAgentClientPlugin } from '../lib/index.js'
+import { parseCommandArguments } from '../lib/runtime.js'
 import {
   baseAssembly,
   callsFor,
@@ -100,6 +101,59 @@ test('registers a real DSH command entrypoint including a credential-safe doctor
   assert.equal(use.args[0].workspace, 'second_workspace')
   assert.equal(use.args[0].route, 'second_workspace')
   assert.ok(host.services.has('bailingHubAgentClient'))
+})
+
+test('parses quoted connection names and exposes user-only connection lifecycle commands', async () => {
+  assert.deepEqual(
+    parseCommandArguments('connections add "second hub" https://two.example.com second_client staff'),
+    ['connections', 'add', 'second hub', 'https://two.example.com', 'second_client', 'staff'],
+  )
+  assert.throws(() => parseCommandArguments('connections use "unfinished'), /unfinished quote/)
+
+  const host = createMockHost()
+  const mock = createMockTransport()
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  const command = host.commands.get('bailinghub')
+
+  for (const rawInput of [
+    'connections list',
+    'connections add "second hub" https://two.example.com second_client staff',
+    'connections use second',
+    'connections remove second',
+  ]) {
+    const result = await command.handler({ rawInput })
+    assert.equal(result.kind, 'success')
+  }
+  assert.deepEqual(callsFor(mock.calls, 'connectionsAdd')[0].args[0], {
+    connectionName: 'second hub',
+    hubUrl: 'https://two.example.com',
+    clientAppId: 'second_client',
+    workspace: 'staff',
+  })
+  assert.equal(callsFor(mock.calls, 'connectionsUse')[0].args[0], 'second')
+  assert.equal(callsFor(mock.calls, 'connectionsRemove')[0].args[0], 'second')
+})
+
+test('connection switching affects only new Agent sessions while existing sessions stay pinned', async () => {
+  const host = createMockHost()
+  const mock = createMockTransport()
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  const first = createMockAgent('connection-first')
+  await assemble(host, first.agent, 1, 'First request')
+
+  const switched = await host.commands.get('bailinghub').handler({ rawInput: 'connections use second' })
+  assert.equal(switched.kind, 'success')
+  const second = createMockAgent('connection-second')
+  await assemble(host, second.agent, 1, 'Second request')
+  await assemble(host, first.agent, 2, 'First connection again')
+
+  const starts = callsFor(mock.calls, 'startTurn')
+  assert.equal(starts[0].args[1].connectionName, 'personal')
+  assert.equal(starts[0].args[1].workspace, 'demo')
+  assert.equal(starts[1].args[1].connectionName, 'second')
+  assert.equal(starts[1].args[1].workspace, 'staff')
+  assert.equal(starts[2].args[1].connectionName, 'personal')
+  assert.equal(starts[2].args[1].workspace, 'demo')
 })
 
 test('doctor stops before SDK load when configuration is invalid', async () => {
