@@ -40,9 +40,10 @@ secure storage.
 ## Safe evaluation before migration
 
 Do not replace a working production profile merely to evaluate 0.2.0. Use a separate DSH home or
-another isolated Web profile and verify that the CLI really honors that location. On macOS, a
-separate DSH home does not create a separate Keychain credential for the same Hub/client/workspace
-tuple. Use a dedicated client app id or workspace for logout/revocation acceptance.
+another isolated Web profile and verify that the CLI really honors that location. Stable public
+`0.2.0` still scopes a Keychain credential to the Hub/client/workspace tuple. The unreleased
+multi-connection candidate instead creates a separate credential for each name registered through
+`connections add`; use only a matching SDK/DSH candidate when evaluating that behavior.
 
 1. Keep the existing `0.1.1` profile and its legacy environment unchanged.
 2. Install the exact released 0.2 package into an isolated profile.
@@ -78,6 +79,12 @@ key to this plugin.
 ## Rollback
 
 Rollback is explicit; it does not convert the Agent Session back into a Client Token.
+
+If an unreleased multi-connection candidate wrote schema-v2 registry metadata, first use that same
+candidate to finish active runs and remove every candidate-only named instance through
+`/bailinghub connections remove <name>`. The SDK returns the registry to schema v1 after the last
+such instance is removed. Stable `0.2.0` fails closed on schema v2; do not manually delete the
+registry or Keychain credentials as a downgrade shortcut.
 
 1. Finish active native runs and use `/bailinghub sync` for any known pending completion.
 2. Run `/bailinghub logout` if the new Agent Session should be revoked.

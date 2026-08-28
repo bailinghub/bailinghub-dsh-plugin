@@ -94,7 +94,7 @@ The native plugin has exactly four host configuration fields:
 | `hubUrl` | `BAILINGHUB_HUB_URL` | Public HTTPS URL of the developer's own BailingHub | No |
 | `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | Public Agent Client application id registered in that Hub | No |
 | `workspace` | `BAILINGHUB_WORKSPACE` | Initial authorized workspace/route id | No |
-| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | Local alias selecting the SDK connection | No |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | Local name selecting one SDK connection instance | No |
 
 Example placeholders:
 
@@ -106,9 +106,10 @@ export BAILINGHUB_CONNECTION_NAME='default'
 ```
 
 The same four fields may be supplied through the DSH plugin settings surface. Do not add tokens,
-authorization URLs, business domains, or credentials to the Cordis patch. SDK credentials are
-scoped by Hub URL, client app id, and workspace. A second `connectionName` for the same tuple is
-another alias for that credential, not an independently revocable Agent Session.
+authorization URLs, business domains, or credentials to the Cordis patch. In the unreleased
+candidate, a new `connectionName` creates a separate local instance even when Hub URL, client app
+id, and workspace are identical. Every instance requires its own browser authorization and owns
+an independently revocable Agent Session.
 
 Inspect the composed profile before starting it:
 
@@ -139,7 +140,7 @@ Useful commands:
 | --- | --- |
 | `/bailinghub doctor` | Check host APIs, public configuration, SDK resolution, authorization, and workspace reachability without printing credentials |
 | `/bailinghub connections list` | List local public connection metadata and authorization state without tokens |
-| `/bailinghub connections add <name> <hub-url> <client-app-id> <workspace>` | Register and select another developer-owned Hub connection for new sessions |
+| `/bailinghub connections add <name> <hub-url> <client-app-id> <workspace>` | Create and select another local connection instance for new sessions; the public binding may match an existing instance |
 | `/bailinghub connections use <name>` | Select a registered connection for new sessions only |
 | `/bailinghub connections remove <name>` | Remotely revoke its Agent Session, then remove its local credential and metadata |
 | `/bailinghub login` | Authorize the configured Hub/client/workspace in the browser |
@@ -157,9 +158,10 @@ command. Quote a connection name when it contains spaces. After `connections use
 Connection selection is a user-only slash command and is never exposed as a model tool. It affects
 only Agent sessions created afterward; existing sessions remain pinned to their original
 connection and workspace. `/bailinghub use <workspace>` remains a different operation: it succeeds
-only when the current Agent Session already authorizes that workspace. A connection is isolated by
-`Hub + clientAppId + workspace`; changing only `connectionName` does not create another revocable
-credential.
+only when the current Agent Session already authorizes that workspace. Each new `connectionName`
+created with `connections add` is an isolation boundary for credentials and remote revocation,
+even when its `Hub + clientAppId + workspace` public binding matches another instance. It still
+does not let the model choose or invent an identity.
 
 For the first acceptance check, start a new DSH conversation and perform one read-only request,
 then one permitted mutation. Confirm the same conversation, run, visible final answer, and tool

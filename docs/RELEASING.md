@@ -77,7 +77,7 @@ The native host configuration remains exactly:
 | `hubUrl` | `BAILINGHUB_HUB_URL` | deployer |
 | `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | Hub/business integrator |
 | `workspace` | `BAILINGHUB_WORKSPACE` | Hub/business integrator; Agent Client v1 route id |
-| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | local end-user profile |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | local end-user connection instance |
 
 No Client Token, model key, business endpoint, authorization endpoint, signing secret, or business
 credential belongs in the DSH plugin configuration.
@@ -141,10 +141,11 @@ Use a dedicated non-production Hub client/workspace and a no-surprise business f
 its credentials, private URL, authorization code, personal data, or raw payload into logs,
 screenshots, release notes, or CI artifacts.
 
-A separate `DSH_HOME` keeps DSH configuration, sessions, and logs apart, but macOS Keychain
-credentials for the same Hub/client/workspace tuple are still shared. A different
-`connectionName` is only an alias. Use a dedicated client app id or workspace before testing
-logout or revocation.
+A separate `DSH_HOME` keeps DSH configuration, sessions, and logs apart. The unreleased
+multi-connection candidate must additionally prove that two names created through
+`connections add` on the same Hub/client/workspace binding receive separate Keychain credentials
+and Agent Sessions, and that removing one does not log out the other. Do not infer this from
+separate DSH homes or config aliases alone.
 
 In the isolated DSH Web profile:
 

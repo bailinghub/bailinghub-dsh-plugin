@@ -83,7 +83,7 @@ test('registers a real DSH command entrypoint including a credential-safe doctor
   assert.equal(doctor.kind, 'success')
   assert.match(doctor.text, /Overall: PASS/)
   assert.match(doctor.text, /DSH host contract: PASS/)
-  assert.match(doctor.text, /connectionName is an alias/)
+  assert.match(doctor.text, /connectionName selects one isolated browser authorization/)
   assert.doesNotMatch(doctor.text, /access_token|not-exposed|hub\.example\.com|personal/)
 
   for (const rawInput of ['login', 'status', 'logout', 'workspaces', 'sync']) {

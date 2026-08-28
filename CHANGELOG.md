@@ -6,10 +6,11 @@
   and workspace diagnostics before a business turn starts.
 - Add real lifecycle coverage for DeepSeek Harness `0.1.1-rc.2`; live Agent Client acceptance is
   still required before publishing a compatibility claim.
-- Clarify that `connectionName` is an alias and that independently revocable acceptance credentials
-  require a distinct Hub/client/workspace tuple.
+- Make `connectionName` select an independently authorized local instance, allowing multiple
+  credentials and Agent Sessions on the same Hub/client/workspace public binding.
 - Add user-only `/bailinghub connections list|add|use|remove` lifecycle commands with quoted-name
-  parsing, new-session-only selection, existing-session pinning, and revoke-before-remove safety.
+  parsing, new-session-only selection, existing-session pinning, same-binding isolation, and
+  revoke-before-remove safety.
 
 ## 0.2.0 - 2026-08-26
 

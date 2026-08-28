@@ -15,11 +15,12 @@ workspace
 connectionName
 ```
 
-`hubUrl`, `clientAppId`, and `workspace` identify a public Hub-side application/workspace and the
-SDK credential scope. `connectionName` is a local SDK alias for that tuple. Multiple aliases for
-the same tuple reuse the same SDK registry entry and credential; they are not independently
-revocable Agent Sessions. No business endpoint, authorization endpoint, token, secret, or business
-credential belongs in this config.
+`hubUrl`, `clientAppId`, and `workspace` identify a public Hub-side application/workspace binding.
+`connectionName` selects one local SDK connection instance. The same public binding may have
+multiple named instances; each has a separate browser authorization, credential store, Agent
+Session, and revocation lifecycle. The local opaque instance id is not a trusted identity claim
+sent to Core. No business endpoint, authorization endpoint, token, secret, or business credential
+belongs in this config.
 
 ## Injectable Transport Seam
 
@@ -169,17 +170,18 @@ same bounded recovery state when known locally, and never creates a replacement 
 ## Session and Completion State
 
 Connection selector, workspace, conversation alias, Core run, active definitions, and completion
-state are isolated per DSH Agent/session. This is runtime-state isolation, not a promise that two
-aliases for the same Hub/client/workspace tuple own separate SDK credentials. A workspace switch
-affects future sessions and is rejected while any Core run is active/completing or has an
-unsynchronized completion payload.
+state are isolated per DSH Agent/session. Independently created connection names for the same
+Hub/client/workspace binding also own separate SDK credentials and Agent Sessions. A workspace
+switch preserves the selected connection instance and affects future sessions; it is rejected
+while any Core run is active/completing or has an unsynchronized completion payload.
 
 Multi-connection add/use/remove is exposed only through the `/bailinghub connections` user
 command. It is never registered as a model tool. Selecting a connection changes defaults for new
 Agent sessions only; existing states keep their captured connection and workspace. Removing a
 connection is rejected while any run is active or has an unsynchronized completion. The SDK then
-revokes the remote Agent Session before removing local credentials and registry metadata; a revoke
-failure preserves both.
+revokes only that instance's remote Agent Session before removing its local credentials and
+registry metadata; a revoke failure preserves both. Repeating add with the same name and public
+binding selects the existing instance; reusing a name for different public metadata fails.
 
 The completion request is restricted to:
 

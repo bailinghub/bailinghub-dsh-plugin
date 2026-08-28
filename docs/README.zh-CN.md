@@ -88,7 +88,7 @@ DSH 用户不应该再自行猜测或单独安装某个 SDK 版本。
 | `hubUrl` | `BAILINGHUB_HUB_URL` | 开发者自己部署的 BailingHub 公共 HTTPS 地址 | 否 |
 | `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | 在该中枢注册的公共 Agent Client 应用标识 | 否 |
 | `workspace` | `BAILINGHUB_WORKSPACE` | 初始已授权 workspace/route id | 否 |
-| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | 选择 SDK 连接的本地别名 | 否 |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | 选择一个 SDK 连接实例的本机名称 | 否 |
 
 使用中性占位值的示例：
 
@@ -100,8 +100,9 @@ export BAILINGHUB_CONNECTION_NAME='default'
 ```
 
 也可以通过 DSH 的插件设置界面填写同样四个字段。不要在 Cordis Patch 中增加 Token、授权
-页面地址、业务域名或任何凭据。SDK 凭据按 Hub URL、client app id 与 workspace 的组合归属；
-同一组合仅更换 `connectionName` 只是给同一凭据增加别名，并不会产生可独立撤销的 Agent Session。
+页面地址、业务域名或任何凭据。在未发布候选版中，即使 Hub URL、client app id 与 workspace
+完全相同，只要用新的 `connectionName` 执行 `connections add`，也会创建独立本机实例；每个实例
+都要单独完成浏览器授权，并持有可独立撤销的 Agent Session。
 
 启动前检查最终合成配置：
 
@@ -131,7 +132,7 @@ Token 只进入 SDK 所有的安全存储，不会写入插件配置，也不会
 | --- | --- |
 | `/bailinghub doctor` | 在不输出凭据的前提下检查宿主 API、公开配置、SDK、授权状态和 workspace 连通性 |
 | `/bailinghub connections list` | 查看本机公开连接元数据与授权状态，不输出 Token |
-| `/bailinghub connections add <名称> <中枢地址> <clientAppId> <workspace>` | 登记另一套开发者自有中枢连接，并设为新会话默认项 |
+| `/bailinghub connections add <名称> <中枢地址> <clientAppId> <workspace>` | 创建并选择另一个本机连接实例；公开绑定可以与已有实例相同 |
 | `/bailinghub connections use <名称>` | 只为之后新建的会话选择一个已登记连接 |
 | `/bailinghub connections remove <名称>` | 先远程撤销 Agent Session，再删除本机凭据和公开元数据 |
 | `/bailinghub login` | 在浏览器授权当前 Hub/client/workspace |
@@ -147,8 +148,9 @@ Token 只进入 SDK 所有的安全存储，不会写入插件配置，也不会
 
 连接选择只能由用户斜杠命令发起，不会作为模型工具暴露。切换只影响之后创建的 Agent 会话，已有
 会话继续固定在原连接与 workspace。`/bailinghub use <workspace>` 是另一件事：只有当前 Agent
-Session 已经允许目标 workspace 时才成功。凭据按 `Hub + clientAppId + workspace` 隔离，只修改
-`connectionName` 不会产生另一套可独立撤销的凭据。
+Session 已经允许目标 workspace 时才成功。每个通过 `connections add` 新建的
+`connectionName` 都是独立凭据与远端撤销边界，即使它与另一实例使用相同的
+`Hub + clientAppId + workspace` 公开绑定。模型仍不能选择或伪造身份。
 
 首次验收时，新建一个 DSH 会话，先做一次只读查询，再做一次允许的修改。确认 BailingHub
 后台能看到同一个会话、run、可见最终回复和工具调用轨迹。需要审批的能力必须在审批后恢复

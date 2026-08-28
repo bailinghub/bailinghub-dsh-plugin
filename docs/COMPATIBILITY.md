@@ -54,10 +54,11 @@ In Agent Client v1, `workspace` is the BailingHub route id. Business endpoints, 
 URLs, Client Tokens, Tool Provider signing secrets, business credentials, and model-provider keys
 are not DSH plugin configuration.
 
-The SDK credential scope is the normalized Hub URL, client app id, and workspace tuple.
-`connectionName` is a local alias for selecting that connection, not an extra isolation dimension.
-Use a dedicated client app id or workspace when login/logout/revocation must not affect an existing
-profile.
+The public binding is the normalized Hub URL, client app id, and workspace tuple. In the unreleased
+multi-connection candidate, `connectionName` selects an independent local connection instance;
+different names may share that public binding while keeping separate browser authorization,
+credentials, Agent Sessions, and revocation. Stable public `0.2.0` must not be described as having
+this candidate behavior until the matching SDK and DSH versions are released.
 
 ## Public legacy 0.1.x
 
