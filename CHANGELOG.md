@@ -11,6 +11,8 @@
 - Reconcile same-binding connections by trusted `on_behalf_of`: replace an older same-identity
   connection, keep different identities independent, and surface cleanup-required authorization
   as a successful login with an explicit no-reauthorize warning.
+- Preserve an existing alias and Session when same-alias authorization returns a different trusted
+  identity; allocate and select a non-conflicting local alias for the new identity.
 - Add user-only `/bailinghub connections list|add|use|remove` lifecycle commands with quoted-name
   parsing, new-session-only selection, existing-session pinning, and revoke-before-remove safety.
 

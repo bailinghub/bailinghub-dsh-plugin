@@ -59,8 +59,10 @@ multi-connection candidate, `connectionName` is a user-controlled local selector
 claim. The Hub Client App supplies one stable business authorization entry, and the business page
 handles login, account switching, and tenant selection. After authorization, the SDK compares the
 trusted `on_behalf_of` within the same public binding: the same identity replaces the older local
-connection, while different identities remain independent. A cleanup-required result keeps the
-new connection authorized and must be resolved explicitly without another authorization attempt.
+connection, while different identities remain independent. When a same-alias login returns a
+different identity, the old alias and Session remain intact and the new identity receives a
+non-conflicting alias that becomes current. A cleanup-required result keeps the new connection
+authorized and must be resolved explicitly without another authorization attempt.
 Stable public `0.2.0` must not be described as having this candidate behavior until the matching
 SDK and DSH versions are released.
 

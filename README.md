@@ -167,6 +167,10 @@ For the same `Hub + clientAppId + workspace` public binding, browser authorizati
 identity from the business page and its trusted `on_behalf_of` result. If that identity is already
 authorized under another local connection name, the SDK replaces the older local connection and
 revokes its old Agent Session. A different trusted identity remains an independent connection.
+If login starts from a `connectionName` that already belongs to another identity, the SDK keeps
+that original alias and Session, gives the newly authorized identity an available local alias such
+as `default-2`, and selects the new alias for future sessions. Use `connections list` to see both
+and `connections use <name-or-key>` to switch explicitly.
 If login returns `cleanupRequired: true`, the newly selected connection is still authorized, but
 one or more existing same-binding connections need explicit cleanup. Their identity may still be
 unconfirmed when inspection was deferred. Do not authorize again; inspect

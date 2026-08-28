@@ -129,6 +129,62 @@ test('reports cleanup-required login as authorized with an explicit no-reauthori
   assert.match(result.text, /\/bailinghub connections remove <name-or-key>/)
 })
 
+test('keeps different-identity aliases visible and user-selectable after same-alias login', async () => {
+  const host = createMockHost()
+  const connection = (connectionName, connectionKey, current) => ({
+    connectionName,
+    connectionKey,
+    hubUrl: 'https://hub.example.com',
+    clientAppId: 'dsh_client',
+    workspace: 'demo',
+    current,
+    state: 'authorized',
+  })
+  const mock = createMockTransport({
+    login: async () => ({
+      state: 'authorized',
+      connectionName: 'personal-2',
+      connectionKey: 'conn_identity_2',
+      identityReconciliation: 'distinct',
+      cleanupRequired: false,
+    }),
+    connectionsList: async () => ({
+      currentConnectionKey: 'conn_identity_2',
+      connections: [
+        connection('personal', 'conn_identity_1', false),
+        connection('personal-2', 'conn_identity_2', true),
+      ],
+    }),
+    connectionsUse: async (selector) => ({
+      state: 'selected',
+      connection: selector === 'personal'
+        ? connection('personal', 'conn_identity_1', true)
+        : connection('personal-2', 'conn_identity_2', true),
+    }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  const command = host.commands.get('bailinghub')
+
+  const login = await command.handler({ rawInput: 'login' })
+  const newIdentity = createMockAgent('different-identity-current')
+  await assemble(host, newIdentity.agent, 1, 'Use the newly authorized identity')
+  const listed = await command.handler({ rawInput: 'connections list' })
+  const selected = await command.handler({ rawInput: 'connections use personal' })
+  const originalIdentity = createMockAgent('different-identity-original')
+  await assemble(host, originalIdentity.agent, 1, 'Switch back to the original identity')
+
+  assert.equal(login.kind, 'success')
+  assert.match(login.text, /"identityReconciliation":"distinct"/)
+  assert.match(login.text, /"connectionName":"personal-2"/)
+  assert.match(listed.text, /"connectionName":"personal"/)
+  assert.match(listed.text, /"connectionName":"personal-2"/)
+  assert.equal(selected.kind, 'success')
+  assert.equal(callsFor(mock.calls, 'connectionsUse')[0].args[0], 'personal')
+  const starts = callsFor(mock.calls, 'startTurn')
+  assert.equal(starts[0].args[1].connectionName, 'personal-2')
+  assert.equal(starts[1].args[1].connectionName, 'personal')
+})
+
 test('parses quoted connection names and exposes user-only connection lifecycle commands', async () => {
   assert.deepEqual(
     parseCommandArguments('connections add "second hub" https://two.example.com second_client staff'),

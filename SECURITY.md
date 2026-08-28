@@ -30,8 +30,10 @@ handles login, account switching, tenant selection, and the trusted `on_behalf_o
 The unreleased multi-connection candidate stores only public Hub/client/workspace metadata in its
 registry. `connectionName` is a user-only local selector, not an identity claim. After browser
 authorization, the SDK replaces an older same-binding connection only when the trusted
-`on_behalf_of` matches; different trusted identities remain isolated. If inspection or old-Session
-revocation is uncertain, the new connection stays authorized and explicit cleanup is required.
+`on_behalf_of` matches; different trusted identities remain isolated. A same-alias authorization
+for a different identity preserves the original alias and Session and assigns the new identity a
+non-conflicting local alias. If inspection or old-Session revocation is uncertain, the new
+connection stays authorized and explicit cleanup is required.
 Connection add/use/remove are user slash commands, not model tools. Removing an authorized
 connection is remote-revoke-first and keeps the local credential if revocation fails, so it cannot
 falsely report a complete logout.

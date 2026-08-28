@@ -78,7 +78,9 @@ authorization is in progress. After authorization it compares the trusted Sessio
 `on_behalf_of`, never the local `connectionName`:
 
 - the same identity replaces the older local connection and revokes its old Agent Session;
-- a different identity remains a separate named connection;
+- a different identity remains a separate named connection; when login was launched from an alias
+  already owned by the old identity, the SDK preserves that alias and Session, allocates an
+  available alias such as `default-2` to the new identity, and makes the new connection current;
 - an uncertain identity inspection or failed old-Session revoke keeps the new Session authorized
   and returns `cleanupRequired: true` with cleanup metadata.
 
@@ -197,6 +199,11 @@ separate SDK credentials and Agent Sessions. Same-binding connections that resol
 trusted identity are reconciled to one local survivor after authorization. A workspace switch
 preserves the selected connection instance and affects future sessions; it is rejected while any
 Core run is active/completing or has an unsynchronized completion payload.
+
+After a same-alias login resolves to a different trusted identity, the SDK-returned replacement
+alias becomes the adapter default for new sessions. The retained old alias and the new alias both
+remain visible through `connections list` and user-selectable through `connections use`; existing
+DSH sessions remain pinned as described below.
 
 Multi-connection add/use/remove is exposed only through the `/bailinghub connections` user
 command. It is never registered as a model tool. Selecting a connection changes defaults for new

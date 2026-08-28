@@ -153,7 +153,10 @@ Session 已经允许目标 workspace 时才成功。
 
 对于同一个 `Hub + clientAppId + workspace` 公开绑定，最终身份由业务授权页及其可信
 `on_behalf_of` 结果决定。如果另一个本机连接名已经授权同一身份，SDK 会用本次连接覆盖旧连接，
-并撤销旧 Agent Session；不同可信身份则继续作为相互独立的连接。如果登录结果返回
+并撤销旧 Agent Session；不同可信身份则继续作为相互独立的连接。如果从一个已经属于其他身份的
+`connectionName` 发起登录，SDK 会保留原连接名及其 Session，为新身份分配一个不冲突的本机名称
+（例如 `default-2`），并把新连接设为后续会话的当前选择。用户可以用 `connections list` 查看
+两者，再用 `connections use <名称或连接键>` 显式切换。如果登录结果返回
 `cleanupRequired: true`，说明新连接仍然授权成功，但一个或多个同绑定旧连接还需要显式清理；
 如果身份检查被推迟，此时还不能断言它们是同一身份。不要重复授权；先查看 `connections list`，
 再对提示的旧连接执行

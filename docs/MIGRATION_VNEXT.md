@@ -47,7 +47,9 @@ another isolated Web profile and verify that the CLI really honors that location
 multi-connection candidate instead creates a separate credential for each name registered through
 `connections add` while authorization is pending. After authorization, the SDK replaces an older
 same-binding connection when its trusted `on_behalf_of` is the same; different trusted identities
-remain independent. Use only a matching SDK/DSH candidate when evaluating that behavior.
+remain independent. A different identity returned from a same-alias login keeps the original
+alias and Session and receives a non-conflicting alias that becomes current. Use only a matching
+SDK/DSH candidate when evaluating that behavior.
 
 1. Keep the existing `0.1.1` profile and its legacy environment unchanged.
 2. Install the exact released 0.2 package into an isolated profile.

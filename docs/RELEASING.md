@@ -175,7 +175,10 @@ In the isolated DSH Web profile:
    frozen completion payload.
 11. Add a new connection name on the same public binding, authorize the same trusted identity, and
     confirm the older local connection is replaced. Add another name and authorize a different
-    trusted identity; confirm both identities remain independently selectable and revocable.
+    trusted identity; confirm both identities remain independently selectable and revocable. Then
+    start login from an existing alias and return a different trusted identity: confirm the old
+    alias and Session remain, the new identity receives a non-conflicting alias that becomes
+    current, and `connections list|use` can select either one.
 12. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
 
 Native Code Mode must degrade rather than expose stale or unsafe dynamic schemas. Run the live

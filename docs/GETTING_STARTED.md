@@ -60,9 +60,12 @@ system's own login; it does not send the business password or business URL to th
 
 `Connection Name` is only a local selector. If the same trusted business identity authorizes the
 same Hub/client/workspace binding again, the SDK replaces the older local connection. A different
-trusted identity remains separate. If login says cleanup is required, the new connection is
-already authorized, but an existing connection may still need inspection or removal: do not
-authorize again; list connections and remove the reported old entry.
+trusted identity remains separate. When the selected name already belongs to the old identity,
+the SDK preserves it and assigns the new identity an available alias such as `default-2`; the new
+alias becomes current. Run `/bailinghub connections list` to see both and
+`/bailinghub connections use <name-or-key>` to switch. If login says cleanup is required, the new
+connection is already authorized, but an existing connection may still need inspection or
+removal: do not authorize again; list connections and remove the reported old entry.
 
 ## 4. Try one safe business request
 
