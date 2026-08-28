@@ -155,8 +155,10 @@ Useful commands:
 
 The four plugin fields are the bootstrap connection. Additional connections can be registered with
 `connections add`; the BailingHub console's Agent Client page can generate the same secret-free
-command. Quote a connection name when it contains spaces. After `connections use`, run
-`/bailinghub login` if that binding is not authorized yet.
+command. On restart, the adapter reads the SDK registry before the first new Agent session or user
+command and adopts its current connection's public metadata; a missing or unavailable registry
+safely falls back to the four bootstrap fields. Quote a connection name when it contains spaces.
+After `connections use`, run `/bailinghub login` if that binding is not authorized yet.
 
 Connection selection is a user-only slash command and is never exposed as a model tool. It affects
 only Agent sessions created afterward; existing sessions remain pinned to their original

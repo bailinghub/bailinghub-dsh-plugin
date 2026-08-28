@@ -150,8 +150,16 @@ export function createMockTransport(overrides = {}) {
   }
   const transport = {
     connectionsList: record('connectionsList', async () => ({
-      currentConnectionKey: 'conn_current',
-      connections: [{ connectionName: 'personal', workspace: 'demo', current: true }],
+      currentConnectionKey: `conn_${'1'.repeat(32)}`,
+      connections: [{
+        connectionKey: `conn_${'1'.repeat(32)}`,
+        connectionName: 'personal',
+        hubUrl: 'https://hub.example.com',
+        clientAppId: 'dsh_client',
+        workspace: 'demo',
+        current: true,
+        state: 'authorized',
+      }],
     })),
     connectionsAdd: record('connectionsAdd', async (input) => ({
       state: 'registered',

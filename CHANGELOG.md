@@ -15,6 +15,8 @@
   identity; allocate and select a non-conflicting local alias for the new identity.
 - Add user-only `/bailinghub connections list|add|use|remove` lifecycle commands with quoted-name
   parsing, new-session-only selection, existing-session pinning, and revoke-before-remove safety.
+- Restore the SDK registry's current connection before the first new session or user command after
+  restart, with validated public metadata and a non-blocking bootstrap-field fallback.
 
 ## 0.2.0 - 2026-08-26
 

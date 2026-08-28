@@ -214,6 +214,12 @@ registry metadata; a revoke failure preserves both. Repeating add with the same 
 binding selects the existing instance; reusing a name for different public metadata fails.
 `connectionName` remains a local user selector and never becomes a trusted identity claim.
 
+The four static adapter fields bootstrap SDK construction only. Before the first new Agent session
+or user command after process start, the adapter reads `connectionsList()` and adopts the public
+metadata matching `currentConnectionKey`. Invalid, missing, or unavailable registry data leaves the
+bootstrap defaults in place and must not remove or block unrelated host tools. The lookup is not a
+model tool, and restoring or later selecting a default never mutates an already-created session.
+
 The completion request is restricted to:
 
 ```json

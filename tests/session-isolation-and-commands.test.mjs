@@ -238,6 +238,122 @@ test('connection switching affects only new Agent sessions while existing sessio
   assert.equal(starts[2].args[1].workspace, 'demo')
 })
 
+test('restores the SDK registry current connection before the first new Agent session', async () => {
+  const host = createMockHost()
+  const currentConnectionKey = `conn_${'2'.repeat(32)}`
+  const mock = createMockTransport({
+    connectionsList: async () => ({
+      currentConnectionKey,
+      connections: [{
+        connectionKey: currentConnectionKey,
+        connectionName: 'restored',
+        hubUrl: 'https://restored.example.com',
+        clientAppId: 'restored_client',
+        workspace: 'restored_workspace',
+        current: true,
+        state: 'authorized',
+      }],
+    }),
+  })
+  let transportBootstrap
+  createAgentClientPlugin({
+    transportFactory: (bootstrap) => {
+      transportBootstrap = { ...bootstrap }
+      return mock.transport
+    },
+  }).apply(host.ctx, config)
+
+  const restored = createMockAgent('restored-current')
+  const restoredAssembly = await assemble(host, restored.agent, 1, 'Use the persisted current connection')
+
+  assert.deepEqual(transportBootstrap, config)
+  assert.equal(callsFor(mock.calls, 'connectionsList').length, 1)
+  assert.equal(callsFor(mock.calls, 'startTurn')[0].args[1].connectionName, 'restored')
+  assert.equal(callsFor(mock.calls, 'startTurn')[0].args[1].workspace, 'restored_workspace')
+  assert.equal(
+    restoredAssembly.tools.some((tool) => /connection|workspace/i.test(tool.name)),
+    false,
+  )
+
+  const switched = await host.commands.get('bailinghub').handler({ rawInput: 'connections use second' })
+  assert.equal(switched.kind, 'success')
+  const second = createMockAgent('restored-second')
+  await assemble(host, second.agent, 1, 'Use the explicitly selected connection')
+  await assemble(host, restored.agent, 2, 'Keep the original restored connection')
+
+  const starts = callsFor(mock.calls, 'startTurn')
+  assert.equal(starts[1].args[1].connectionName, 'second')
+  assert.equal(starts[1].args[1].workspace, 'staff')
+  assert.equal(starts[2].args[1].connectionName, 'restored')
+  assert.equal(starts[2].args[1].workspace, 'restored_workspace')
+})
+
+test('restores the SDK registry current connection before the first user command', async () => {
+  const host = createMockHost()
+  const currentConnectionKey = `conn_${'3'.repeat(32)}`
+  const mock = createMockTransport({
+    connectionsList: async () => ({
+      currentConnectionKey,
+      connections: [{
+        connectionKey: currentConnectionKey,
+        connectionName: 'command-current',
+        hubUrl: 'https://command.example.com',
+        clientAppId: 'command_client',
+        workspace: 'command_workspace',
+        current: true,
+        state: 'authorized',
+      }],
+    }),
+    status: async () => ({ state: 'authorized', workspace: 'command_workspace' }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const result = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
+
+  assert.equal(result.kind, 'success')
+  assert.deepEqual(mock.calls.slice(0, 2).map((call) => call.method), ['connectionsList', 'status'])
+  assert.equal(callsFor(mock.calls, 'status')[0].args[0].connectionName, 'command-current')
+})
+
+test('falls back to bootstrap fields when registry restore fails without blocking other tools', async () => {
+  const host = createMockHost()
+  const mock = createMockTransport({
+    connectionsList: async () => {
+      throw new Error('private registry failure')
+    },
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  const { agent } = createMockAgent('registry-fallback')
+  const localTool = {
+    name: 'local_file_read',
+    description: 'Read a local file',
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+  }
+  const original = baseAssembly({ tools: [localTool] })
+
+  host.emit('agent/inbox/claimed', {
+    agent,
+    turn: 1,
+    message: userMessage('registry-fallback-message', 'Use the bootstrap connection'),
+  })
+  const assembly = await host.waterfall(
+    'system-prompt/assemble',
+    original,
+    { agent, signal: new AbortController().signal },
+    async () => original,
+  )
+
+  assert.ok(assembly.tools.some((tool) => tool.name === 'local_file_read'))
+  const [start] = callsFor(mock.calls, 'startTurn')
+  assert.equal(start.args[1].connectionName, 'personal')
+  assert.equal(start.args[1].workspace, 'demo')
+  const status = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
+  assert.equal(status.kind, 'success')
+  assert.equal(callsFor(mock.calls, 'connectionsList').length, 1)
+  assert.equal(callsFor(mock.calls, 'status')[0].args[0].connectionName, 'personal')
+  assert.doesNotMatch(status.text, /private registry failure/)
+})
+
 test('doctor stops before SDK load when configuration is invalid', async () => {
   const host = createMockHost()
   let transportRequested = false

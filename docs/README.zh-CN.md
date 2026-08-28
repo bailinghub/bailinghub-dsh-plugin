@@ -144,8 +144,10 @@ dsh web
 | `/bailinghub logout` | 撤销并删除当前 Agent Session |
 
 插件四字段是启动连接。其他连接可用 `connections add` 登记；BailingHub 控制台“智能体客户端”
-页面也能生成同样的不含秘密命令。连接名含空格时需要加引号。执行 `connections use` 后，如果该
-绑定尚未授权，再执行 `/bailinghub login`。
+页面也能生成同样的不含秘密命令。重启后，适配器会在第一个新 Agent 会话或用户命令前读取 SDK
+registry，并采用其中当前连接的公开元数据；registry 缺失或不可用时安全回退到这四个启动字段。
+连接名含空格时需要加引号。执行 `connections use` 后，如果该绑定尚未授权，再执行
+`/bailinghub login`。
 
 连接选择只能由用户斜杠命令发起，不会作为模型工具暴露。切换只影响之后创建的 Agent 会话，已有
 会话继续固定在原连接与 workspace。`/bailinghub use <workspace>` 是另一件事：只有当前 Agent
