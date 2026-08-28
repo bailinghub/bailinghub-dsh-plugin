@@ -15,7 +15,8 @@ Connection Name
 ```
 
 它们用于定位 BailingHub 应用和初始业务空间，不是凭据。不要让管理员把 Client Token、Tool
-Provider 密钥、业务密码、模型 API Key、授权码或浏览器 Cookie 发给你。
+Provider 密钥、业务密码、模型 API Key、授权码、浏览器 Cookie、业务地址或租户专属登录地址
+发给你。
 
 ## 第一步：安装插件
 
@@ -51,8 +52,13 @@ export BAILINGHUB_CONNECTION_NAME='default'
 /bailinghub workspaces
 ```
 
-`login` 会打开业务侧授权页。点击同意前，确认页面显示的是当前登录的业务身份和准备使用的
-workspace。整个过程沿用业务系统原来的登录状态，不会把业务密码交给插件。
+`login` 会打开 Client App 配置的唯一业务授权入口。在该页面登录或切换账号，并在业务系统要求
+时选择租户；点击同意前，确认页面显示的最终业务身份和准备使用的 workspace。整个过程沿用业务
+系统自己的登录流程，不会把业务密码或业务地址交给插件。
+
+`Connection Name` 只是本机选择器。同一可信业务身份再次授权同一 Hub/client/workspace 绑定时，
+SDK 会覆盖旧的本机连接；不同可信身份继续相互独立。如果登录提示需要清理，新连接其实已经授权
+成功，但某个旧连接可能仍需检查或删除：不要再次授权，应先列出连接，再删除提示的旧连接。
 
 ## 第四步：尝试一条安全的业务请求
 

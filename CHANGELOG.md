@@ -6,11 +6,13 @@
   and workspace diagnostics before a business turn starts.
 - Add real lifecycle coverage for DeepSeek Harness `0.1.1-rc.2`; live Agent Client acceptance is
   still required before publishing a compatibility claim.
-- Make `connectionName` select an independently authorized local instance, allowing multiple
-  credentials and Agent Sessions on the same Hub/client/workspace public binding.
+- Make `connectionName` a user-controlled local selector while the business authorization page
+  owns login, account switching, tenant selection, and the trusted identity result.
+- Reconcile same-binding connections by trusted `on_behalf_of`: replace an older same-identity
+  connection, keep different identities independent, and surface cleanup-required authorization
+  as a successful login with an explicit no-reauthorize warning.
 - Add user-only `/bailinghub connections list|add|use|remove` lifecycle commands with quoted-name
-  parsing, new-session-only selection, existing-session pinning, same-binding isolation, and
-  revoke-before-remove safety.
+  parsing, new-session-only selection, existing-session pinning, and revoke-before-remove safety.
 
 ## 0.2.0 - 2026-08-26
 

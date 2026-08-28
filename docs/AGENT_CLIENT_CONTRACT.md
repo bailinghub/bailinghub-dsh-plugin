@@ -16,11 +16,11 @@ connectionName
 ```
 
 `hubUrl`, `clientAppId`, and `workspace` identify a public Hub-side application/workspace binding.
-`connectionName` selects one local SDK connection instance. The same public binding may have
-multiple named instances; each has a separate browser authorization, credential store, Agent
-Session, and revocation lifecycle. The local opaque instance id is not a trusted identity claim
-sent to Core. No business endpoint, authorization endpoint, token, secret, or business credential
-belongs in this config.
+`connectionName` selects one local SDK connection instance, but it is not an account, tenant, or
+identity claim. The Hub Client App resolves to one stable business authorization endpoint; no
+business endpoint, authorization endpoint, token, secret, or business credential belongs in this
+config. The business authorization page owns sign-in, account switching, tenant selection, and
+the trusted identity ultimately represented by `on_behalf_of`.
 
 ## Injectable Transport Seam
 
@@ -30,8 +30,8 @@ adapters may inject an object with all methods below:
 ```js
 connectionsList({})
 connectionsAdd({ connectionName, hubUrl, clientAppId, workspace })
-connectionsUse(connectionName)
-connectionsRemove(connectionName)
+connectionsUse(connectionNameOrKey)
+connectionsRemove(connectionNameOrKey)
 
 login({ hubUrl, clientAppId, workspace, route, connectionName })
 status({ connectionName })
@@ -64,6 +64,28 @@ completeRun(runId, {
 The adapter may pass a second host metadata argument (`workspace`, `connectionName`, and an
 `AbortSignal`) to turn/tool methods. The framework-neutral SDK DTO is always the first argument;
 an SDK implementation that does not consume host metadata may ignore it.
+
+## Browser Identity and Local Reconciliation
+
+`/bailinghub login` always starts from the selected Hub/client/workspace binding. The plugin does
+not accept or derive a business URL, account id, tenant id, or identity selector. Core redirects
+to the single authorization endpoint configured for that Client App, and the business page
+performs any login, account switching, or tenant selection required before it approves the
+authorization.
+
+The SDK may stage more than one named local instance for the same public binding while browser
+authorization is in progress. After authorization it compares the trusted Session
+`on_behalf_of`, never the local `connectionName`:
+
+- the same identity replaces the older local connection and revokes its old Agent Session;
+- a different identity remains a separate named connection;
+- an uncertain identity inspection or failed old-Session revoke keeps the new Session authorized
+  and returns `cleanupRequired: true` with cleanup metadata.
+
+The adapter reports that last result as successful authorization plus a visible warning. It tells
+the user not to authorize again and to retry explicit cleanup with the user-only connection
+lifecycle commands. It does not turn the result into a failed login or let the model perform
+cleanup.
 
 ## Core HTTP Mapping
 
@@ -170,10 +192,11 @@ same bounded recovery state when known locally, and never creates a replacement 
 ## Session and Completion State
 
 Connection selector, workspace, conversation alias, Core run, active definitions, and completion
-state are isolated per DSH Agent/session. Independently created connection names for the same
-Hub/client/workspace binding also own separate SDK credentials and Agent Sessions. A workspace
-switch preserves the selected connection instance and affects future sessions; it is rejected
-while any Core run is active/completing or has an unsynchronized completion payload.
+state are isolated per DSH Agent/session. Named connections for different trusted identities own
+separate SDK credentials and Agent Sessions. Same-binding connections that resolve to the same
+trusted identity are reconciled to one local survivor after authorization. A workspace switch
+preserves the selected connection instance and affects future sessions; it is rejected while any
+Core run is active/completing or has an unsynchronized completion payload.
 
 Multi-connection add/use/remove is exposed only through the `/bailinghub connections` user
 command. It is never registered as a model tool. Selecting a connection changes defaults for new
@@ -182,6 +205,7 @@ connection is rejected while any run is active or has an unsynchronized completi
 revokes only that instance's remote Agent Session before removing its local credentials and
 registry metadata; a revoke failure preserves both. Repeating add with the same name and public
 binding selects the existing instance; reusing a name for different public metadata fails.
+`connectionName` remains a local user selector and never becomes a trusted identity claim.
 
 The completion request is restricted to:
 

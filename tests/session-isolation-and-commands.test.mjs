@@ -83,7 +83,8 @@ test('registers a real DSH command entrypoint including a credential-safe doctor
   assert.equal(doctor.kind, 'success')
   assert.match(doctor.text, /Overall: PASS/)
   assert.match(doctor.text, /DSH host contract: PASS/)
-  assert.match(doctor.text, /connectionName selects one isolated browser authorization/)
+  assert.match(doctor.text, /connectionName is a local user-selected label/)
+  assert.match(doctor.text, /single business authorization page handles sign-in, account switching, and tenant selection/)
   assert.doesNotMatch(doctor.text, /access_token|not-exposed|hub\.example\.com|personal/)
 
   for (const rawInput of ['login', 'status', 'logout', 'workspaces', 'sync']) {
@@ -101,6 +102,31 @@ test('registers a real DSH command entrypoint including a credential-safe doctor
   assert.equal(use.args[0].workspace, 'second_workspace')
   assert.equal(use.args[0].route, 'second_workspace')
   assert.ok(host.services.has('bailingHubAgentClient'))
+})
+
+test('reports cleanup-required login as authorized with an explicit no-reauthorize warning', async () => {
+  const host = createMockHost()
+  const mock = createMockTransport({
+    login: async () => ({
+      state: 'authorized',
+      identityReconciliation: 'cleanup_required',
+      cleanupRequired: true,
+      cleanupConnections: [
+        { connectionKey: 'conn_old' },
+      ],
+      warning: 'Authorization succeeded, but an earlier Session still needs cleanup.',
+    }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const result = await host.commands.get('bailinghub').handler({ rawInput: 'login' })
+
+  assert.equal(result.kind, 'success')
+  assert.match(result.text, /Authorization succeeded\. The selected connection remains authorized\./)
+  assert.match(result.text, /WARNING: an existing connection still requires cleanup/)
+  assert.match(result.text, /Pending cleanup: conn_old/)
+  assert.match(result.text, /Do not authorize again/)
+  assert.match(result.text, /\/bailinghub connections remove <name-or-key>/)
 })
 
 test('parses quoted connection names and exposes user-only connection lifecycle commands', async () => {

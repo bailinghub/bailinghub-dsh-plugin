@@ -77,10 +77,12 @@ The native host configuration remains exactly:
 | `hubUrl` | `BAILINGHUB_HUB_URL` | deployer |
 | `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | Hub/business integrator |
 | `workspace` | `BAILINGHUB_WORKSPACE` | Hub/business integrator; Agent Client v1 route id |
-| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | local end-user connection instance |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | user-selected local connection label |
 
 No Client Token, model key, business endpoint, authorization endpoint, signing secret, or business
-credential belongs in the DSH plugin configuration.
+credential belongs in the DSH plugin configuration. The Hub Client App owns one stable business
+authorization entry; the business page owns login, account switching, tenant selection, and the
+trusted identity result.
 
 ## Source and tarball verification
 
@@ -142,18 +144,22 @@ its credentials, private URL, authorization code, personal data, or raw payload 
 screenshots, release notes, or CI artifacts.
 
 A separate `DSH_HOME` keeps DSH configuration, sessions, and logs apart. The unreleased
-multi-connection candidate must additionally prove that two names created through
-`connections add` on the same Hub/client/workspace binding receive separate Keychain credentials
-and Agent Sessions, and that removing one does not log out the other. Do not infer this from
-separate DSH homes or config aliases alone.
+multi-connection candidate must additionally prove the post-authorization reconciliation rules on
+one Hub/client/workspace binding: a second authorization of the same trusted `on_behalf_of`
+replaces the older local connection, while a different trusted `on_behalf_of` remains independent.
+If old-Session revocation is deliberately made to fail, the new connection must remain authorized,
+the old entry must remain available for explicit cleanup, and the command must say not to
+authorize again. Do not infer any of these results from separate DSH homes or connection names.
 
 In the isolated DSH Web profile:
 
 1. Run `/bailinghub doctor`; before login it must identify the isolated connection as logged out
    without printing any credential, private endpoint, or model-provider key.
-2. Run `/bailinghub login` and confirm the system browser opens the business authorization page.
-3. Confirm the page shows the intended business identity, Hub client, requested workspace, and
-   requested capability boundary before approval.
+2. Run `/bailinghub login` and confirm the system browser opens the single business authorization
+   entry configured for the Hub Client App; no business URL is present in plugin configuration.
+3. Log in or switch account and select a tenant on that business page when required. Confirm it
+   shows the intended final business identity, Hub client, requested workspace, and capability
+   boundary before approval.
 4. Complete the callback and verify `/bailinghub doctor` plus `/bailinghub status` without exposing
    access or refresh tokens.
 5. Run `/bailinghub workspaces`; optionally switch to another already-authorized workspace using
@@ -167,7 +173,10 @@ In the isolated DSH Web profile:
    raw credential material.
 10. Exercise `/bailinghub sync` only for a deliberately pending completion and prove it reuses the
    frozen completion payload.
-11. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
+11. Add a new connection name on the same public binding, authorize the same trusted identity, and
+    confirm the older local connection is replaced. Add another name and authorize a different
+    trusted identity; confirm both identities remain independently selectable and revocable.
+12. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
 
 Native Code Mode must degrade rather than expose stale or unsafe dynamic schemas. Run the live
 business checks in Native Tool Mode.

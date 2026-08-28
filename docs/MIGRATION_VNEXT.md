@@ -35,7 +35,9 @@ selected by the current native package metadata, and its presence is not a dual-
 The new plugin config is limited to `hubUrl`, `clientAppId`, `workspace`, and `connectionName`.
 The old `BAILINGHUB_CLIENT_TOKEN` is not read, copied, exchanged, or converted into an Agent
 Session. Browser authorization creates a new independently revocable credential in SDK-owned
-secure storage.
+secure storage. The plugin does not accept a business URL: the Hub Client App resolves to one
+stable, account- and tenant-neutral business authorization entry, where the user can log in,
+switch account, and select a tenant.
 
 ## Safe evaluation before migration
 
@@ -43,7 +45,9 @@ Do not replace a working production profile merely to evaluate 0.2.0. Use a sepa
 another isolated Web profile and verify that the CLI really honors that location. Stable public
 `0.2.0` still scopes a Keychain credential to the Hub/client/workspace tuple. The unreleased
 multi-connection candidate instead creates a separate credential for each name registered through
-`connections add`; use only a matching SDK/DSH candidate when evaluating that behavior.
+`connections add` while authorization is pending. After authorization, the SDK replaces an older
+same-binding connection when its trusted `on_behalf_of` is the same; different trusted identities
+remain independent. Use only a matching SDK/DSH candidate when evaluating that behavior.
 
 1. Keep the existing `0.1.1` profile and its legacy environment unchanged.
 2. Install the exact released 0.2 package into an isolated profile.
@@ -67,8 +71,8 @@ Only after the isolated acceptance passes:
 3. Install the exact accepted 0.2 plugin version. Do not use an unpinned dist-tag.
 4. Replace the legacy plugin configuration with the four native fields. Remove the old Client
    Token from that process environment after confirming no remaining 0.1 integration uses it.
-5. Start DSH, run `/bailinghub login`, inspect the business authorization page, and authorize the
-   intended workspace.
+5. Start DSH, run `/bailinghub login`, use the business page to log in or switch account and select
+   a tenant if required, then authorize the intended workspace.
 6. Run `/bailinghub status`, open a new conversation, and repeat the accepted read/mutation checks.
 7. Confirm BailingHub receives visible conversation and invocation audit without hidden reasoning.
 
@@ -108,7 +112,8 @@ Before any public 0.2 release:
 3. Installing only `dsh-bailinghub` into a clean DSH `0.1.0-rc.7` profile installs and resolves that
    exact SDK dependency automatically.
 4. Browser login, session isolation, dynamic tool replacement, approval recovery, visible
-   completion, and Hub trajectory pass from the packaged artifact.
+   completion, same-identity replacement, different-identity isolation, and Hub trajectory pass
+   from the packaged artifact.
 5. Public `0.1.1` still works against the new Core through the unchanged Client API.
 6. The maintainer explicitly selects the public version and migration story.
 

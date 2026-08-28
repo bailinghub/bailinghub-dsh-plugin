@@ -62,7 +62,9 @@ The deployer and business integrator must prepare these public identifiers in Ba
 2. A public Agent Client application id (`clientAppId`).
 3. At least one authorized workspace. In Agent Client v1, the workspace id is the BailingHub
    route id.
-4. A business authorization page and governed ACC/Tool Provider integration behind that route.
+4. One stable, account- and tenant-neutral business authorization entry configured on the Hub
+   Client App, plus a governed ACC/Tool Provider integration behind that route. The business page
+   must handle sign-in, account switching, and tenant selection before it approves the request.
 
 The end user does **not** enter a business API URL, business login credential, Tool Provider
 signing secret, BailingHub Client Token, or model-provider key into this plugin.
@@ -94,7 +96,7 @@ The native plugin has exactly four host configuration fields:
 | `hubUrl` | `BAILINGHUB_HUB_URL` | Public HTTPS URL of the developer's own BailingHub | No |
 | `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | Public Agent Client application id registered in that Hub | No |
 | `workspace` | `BAILINGHUB_WORKSPACE` | Initial authorized workspace/route id | No |
-| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | Local name selecting one SDK connection instance | No |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | User-selected local connection label | No |
 
 Example placeholders:
 
@@ -106,10 +108,10 @@ export BAILINGHUB_CONNECTION_NAME='default'
 ```
 
 The same four fields may be supplied through the DSH plugin settings surface. Do not add tokens,
-authorization URLs, business domains, or credentials to the Cordis patch. In the unreleased
-candidate, a new `connectionName` creates a separate local instance even when Hub URL, client app
-id, and workspace are identical. Every instance requires its own browser authorization and owns
-an independently revocable Agent Session.
+authorization URLs, business domains, or credentials to the Cordis patch. The Hub resolves the
+Client App to its single business authorization entry. In the unreleased candidate,
+`connectionName` is only a user-controlled local selector; it is not an account, tenant, or
+identity claim.
 
 Inspect the composed profile before starting it:
 
@@ -129,10 +131,11 @@ In DSH, run:
 /bailinghub workspaces
 ```
 
-`login` opens the system browser. The business-side authorization page confirms the signed-in
-business identity and requested workspace, then returns to a random loopback callback protected
-by `state` and PKCE S256. Access and refresh tokens remain in SDK-owned secure storage and are
-never written to the plugin configuration or printed by the command.
+`login` opens the system browser at the single business authorization entry configured by the Hub
+operator. That business page owns sign-in, account switching, and tenant selection, confirms the
+resulting business identity and requested workspace, then returns to a random loopback callback
+protected by `state` and PKCE S256. Access and refresh tokens remain in SDK-owned secure storage
+and are never written to the plugin configuration or printed by the command.
 
 Useful commands:
 
@@ -141,8 +144,8 @@ Useful commands:
 | `/bailinghub doctor` | Check host APIs, public configuration, SDK resolution, authorization, and workspace reachability without printing credentials |
 | `/bailinghub connections list` | List local public connection metadata and authorization state without tokens |
 | `/bailinghub connections add <name> <hub-url> <client-app-id> <workspace>` | Create and select another local connection instance for new sessions; the public binding may match an existing instance |
-| `/bailinghub connections use <name>` | Select a registered connection for new sessions only |
-| `/bailinghub connections remove <name>` | Remotely revoke its Agent Session, then remove its local credential and metadata |
+| `/bailinghub connections use <name-or-key>` | Select a registered connection for new sessions only |
+| `/bailinghub connections remove <name-or-key>` | Remotely revoke its Agent Session, then remove its local credential and metadata |
 | `/bailinghub login` | Authorize the configured Hub/client/workspace in the browser |
 | `/bailinghub status` | Inspect the selected connection without printing credentials |
 | `/bailinghub workspaces` | List workspaces allowed by the current business authorization |
@@ -158,10 +161,17 @@ command. Quote a connection name when it contains spaces. After `connections use
 Connection selection is a user-only slash command and is never exposed as a model tool. It affects
 only Agent sessions created afterward; existing sessions remain pinned to their original
 connection and workspace. `/bailinghub use <workspace>` remains a different operation: it succeeds
-only when the current Agent Session already authorizes that workspace. Each new `connectionName`
-created with `connections add` is an isolation boundary for credentials and remote revocation,
-even when its `Hub + clientAppId + workspace` public binding matches another instance. It still
-does not let the model choose or invent an identity.
+only when the current Agent Session already authorizes that workspace.
+
+For the same `Hub + clientAppId + workspace` public binding, browser authorization determines the
+identity from the business page and its trusted `on_behalf_of` result. If that identity is already
+authorized under another local connection name, the SDK replaces the older local connection and
+revokes its old Agent Session. A different trusted identity remains an independent connection.
+If login returns `cleanupRequired: true`, the newly selected connection is still authorized, but
+one or more existing same-binding connections need explicit cleanup. Their identity may still be
+unconfirmed when inspection was deferred. Do not authorize again; inspect
+`connections list` and retry `/bailinghub connections remove <name-or-key>` for the reported old
+entry.
 
 For the first acceptance check, start a new DSH conversation and perform one read-only request,
 then one permitted mutation. Confirm the same conversation, run, visible final answer, and tool
@@ -173,8 +183,8 @@ current-turn dynamic schemas. Use native tool mode for governed business actions
 
 ## Security and privacy boundary
 
-- The model cannot choose a Hub URL, workspace, identity, credential, approval result, or
-  capability revision through tool arguments.
+- The model cannot choose a Hub URL, workspace, local connection, business identity, credential,
+  approval result, or capability revision through tool arguments.
 - The SDK stores credentials in macOS Keychain. Linux and other POSIX systems require an explicit
   secure file-store opt-in; Windows Agent Session storage is not supported in 0.2.0.
 - BailingHub revalidates identity, scope, approval, idempotency, and invocation state on every
