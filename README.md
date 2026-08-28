@@ -165,6 +165,12 @@ only Agent sessions created afterward; existing sessions remain pinned to their 
 connection and workspace. `/bailinghub use <workspace>` remains a different operation: it succeeds
 only when the current Agent Session already authorizes that workspace.
 
+After removing the selected connection, the adapter reads the SDK registry and adopts the remaining
+current connection for new sessions, including connections without an alias. Removing the final
+connection leaves the adapter explicitly unconfigured. A failed post-remove registry read never
+turns a successful removal into an error; removing a non-current connection also preserves the
+still-valid default when that refresh is unavailable.
+
 For the same `Hub + clientAppId + workspace` public binding, browser authorization determines the
 identity from the business page and its trusted `on_behalf_of` result. If that identity is already
 authorized under another local connection name, the SDK replaces the older local connection and

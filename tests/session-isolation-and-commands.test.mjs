@@ -354,6 +354,181 @@ test('falls back to bootstrap fields when registry restore fails without blockin
   assert.doesNotMatch(status.text, /private registry failure/)
 })
 
+test('removing the current connection adopts the registry fallback without moving existing sessions', async () => {
+  const host = createMockHost()
+  const removedConnectionKey = `conn_${'4'.repeat(32)}`
+  const fallbackConnectionKey = `conn_${'5'.repeat(32)}`
+  let listCount = 0
+  const mock = createMockTransport({
+    connectionsList: async () => {
+      listCount += 1
+      if (listCount === 1) {
+        return {
+          currentConnectionKey: removedConnectionKey,
+          connections: [{
+            connectionKey: removedConnectionKey,
+            hubUrl: 'https://removed.example.com',
+            clientAppId: 'removed_client',
+            workspace: 'removed_workspace',
+            current: true,
+            state: 'authorized',
+          }],
+        }
+      }
+      return {
+        currentConnectionKey: fallbackConnectionKey,
+        connections: [{
+          connectionKey: fallbackConnectionKey,
+          hubUrl: 'https://fallback.example.com',
+          clientAppId: 'fallback_client',
+          workspace: 'fallback_workspace',
+          current: true,
+          state: 'authorized',
+        }],
+      }
+    },
+    connectionsRemove: async () => ({
+      state: 'removed',
+      connectionKey: removedConnectionKey,
+      remoteRevoked: true,
+      currentConnectionKey: fallbackConnectionKey,
+    }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const existing = createMockAgent('remove-current-existing')
+  const empty = baseAssembly()
+  await host.waterfall(
+    'system-prompt/assemble',
+    empty,
+    { agent: existing.agent, signal: new AbortController().signal },
+    async () => empty,
+  )
+  const removed = await host.commands.get('bailinghub').handler({
+    rawInput: `connections remove ${removedConnectionKey}`,
+  })
+  const login = await host.commands.get('bailinghub').handler({ rawInput: 'login' })
+
+  assert.equal(removed.kind, 'success')
+  assert.equal(login.kind, 'success')
+  assert.equal(listCount, 2)
+  assert.deepEqual(callsFor(mock.calls, 'login')[0].args[0], {
+    hubUrl: 'https://fallback.example.com',
+    clientAppId: 'fallback_client',
+    workspace: 'fallback_workspace',
+    route: 'fallback_workspace',
+    connectionName: fallbackConnectionKey,
+  })
+
+  const fresh = createMockAgent('remove-current-fresh')
+  await assemble(host, fresh.agent, 1, 'Use the fallback connection')
+  await assemble(host, existing.agent, 1, 'Keep the captured connection')
+  const starts = callsFor(mock.calls, 'startTurn')
+  assert.equal(starts[0].args[1].connectionName, fallbackConnectionKey)
+  assert.equal(starts[0].args[1].workspace, 'fallback_workspace')
+  assert.equal(starts[1].args[1].connectionName, removedConnectionKey)
+  assert.equal(starts[1].args[1].workspace, 'removed_workspace')
+})
+
+test('removing the last connection leaves new sessions explicitly unconfigured', async () => {
+  const host = createMockHost()
+  const removedConnectionKey = `conn_${'6'.repeat(32)}`
+  let listCount = 0
+  const mock = createMockTransport({
+    connectionsList: async () => {
+      listCount += 1
+      return listCount === 1
+        ? {
+            currentConnectionKey: removedConnectionKey,
+            connections: [{
+              connectionKey: removedConnectionKey,
+              connectionName: 'last',
+              hubUrl: 'https://last.example.com',
+              clientAppId: 'last_client',
+              workspace: 'last_workspace',
+              current: true,
+              state: 'authorized',
+            }],
+          }
+        : { currentConnectionKey: null, connections: [] }
+    },
+    connectionsRemove: async () => ({
+      state: 'removed',
+      connectionKey: removedConnectionKey,
+      connectionName: 'last',
+      remoteRevoked: true,
+      currentConnectionKey: null,
+    }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const removed = await host.commands.get('bailinghub').handler({ rawInput: 'connections remove last' })
+  const status = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
+  const fresh = createMockAgent('remove-last-fresh')
+  const assembly = await assemble(host, fresh.agent, 1, 'Do not use a removed connection')
+
+  assert.equal(removed.kind, 'success')
+  assert.equal(status.kind, 'success')
+  assert.match(status.text, /"state":"unconfigured"/)
+  assert.match(status.text, /selectedConnection/)
+  assert.equal(listCount, 2)
+  assert.equal(callsFor(mock.calls, 'status').length, 0)
+  assert.equal(callsFor(mock.calls, 'startTurn').length, 0)
+  assert.match(
+    assembly.sections.find((section) => section.name === 'bailinghub:agent-client-profile').text,
+    /configuration required/,
+  )
+})
+
+test('a failed registry refresh after removing a non-current connection preserves the default', async () => {
+  const host = createMockHost()
+  const currentConnectionKey = `conn_${'7'.repeat(32)}`
+  const removedConnectionKey = `conn_${'8'.repeat(32)}`
+  let listCount = 0
+  const mock = createMockTransport({
+    connectionsList: async () => {
+      listCount += 1
+      if (listCount > 1) throw new Error('private post-remove registry failure')
+      return {
+        currentConnectionKey,
+        connections: [{
+          connectionKey: currentConnectionKey,
+          connectionName: 'personal',
+          hubUrl: 'https://hub.example.com',
+          clientAppId: 'dsh_client',
+          workspace: 'demo',
+          current: true,
+          state: 'authorized',
+        }],
+      }
+    },
+    connectionsRemove: async () => ({
+      state: 'removed',
+      connectionKey: removedConnectionKey,
+      connectionName: 'secondary',
+      remoteRevoked: true,
+      currentConnectionKey,
+    }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const removed = await host.commands.get('bailinghub').handler({
+    rawInput: 'connections remove secondary',
+  })
+  const status = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
+  const fresh = createMockAgent('remove-non-current-fresh')
+  await assemble(host, fresh.agent, 1, 'Keep using the current connection')
+
+  assert.equal(removed.kind, 'success')
+  assert.doesNotMatch(removed.text, /private post-remove registry failure/)
+  assert.equal(status.kind, 'success')
+  assert.equal(listCount, 2)
+  assert.equal(callsFor(mock.calls, 'status')[0].args[0].connectionName, 'personal')
+  const [start] = callsFor(mock.calls, 'startTurn')
+  assert.equal(start.args[1].connectionName, 'personal')
+  assert.equal(start.args[1].workspace, 'demo')
+})
+
 test('doctor stops before SDK load when configuration is invalid', async () => {
   const host = createMockHost()
   let transportRequested = false

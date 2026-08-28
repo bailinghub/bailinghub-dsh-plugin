@@ -17,6 +17,9 @@
   parsing, new-session-only selection, existing-session pinning, and revoke-before-remove safety.
 - Restore the SDK registry's current connection before the first new session or user command after
   restart, with validated public metadata and a non-blocking bootstrap-field fallback.
+- Reconcile defaults after connection removal: adopt a remaining current profile, become
+  unconfigured after the last removal, and preserve successful removal across registry refresh
+  failures without disturbing a valid non-current default.
 
 ## 0.2.0 - 2026-08-26
 

@@ -153,6 +153,10 @@ registry，并采用其中当前连接的公开元数据；registry 缺失或不
 会话继续固定在原连接与 workspace。`/bailinghub use <workspace>` 是另一件事：只有当前 Agent
 Session 已经允许目标 workspace 时才成功。
 
+删除当前连接后，适配器会读取 SDK registry，把剩余的当前连接（包括没有别名的连接）设为新会话
+默认值；删除最后一个连接后则明确进入未配置状态。删除后的 registry 刷新失败不会把已经成功的
+删除改写成错误；如果删除的是非当前连接，刷新不可用时也会保留仍然有效的默认连接。
+
 对于同一个 `Hub + clientAppId + workspace` 公开绑定，最终身份由业务授权页及其可信
 `on_behalf_of` 结果决定。如果另一个本机连接名已经授权同一身份，SDK 会用本次连接覆盖旧连接，
 并撤销旧 Agent Session；不同可信身份则继续作为相互独立的连接。如果从一个已经属于其他身份的
