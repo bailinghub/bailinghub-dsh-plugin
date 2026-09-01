@@ -221,17 +221,25 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
 test('drives the installed SDK connection lifecycle through DSH user commands', async () => {
   const sdk = await import(moduleUrl(sdkDist))
   const root = await mkdtemp(join(tmpdir(), 'dsh-bailinghub-sdk-seam-'))
-  const calls = { fetch: 0, login: 0, browser: 0 }
+  const calls = { fetch: 0, login: 0, browser: 0, command: 0 }
+  const storagePlatform = process.platform === 'win32' ? 'win32' : 'linux'
   try {
-    const registry = new sdk.AgentConnectionRegistry(join(root, 'agent-connections.json'), 'linux')
+    const registry = new sdk.AgentConnectionRegistry(
+      join(root, 'agent-connections.json'),
+      storagePlatform,
+    )
     const connectionStore = new sdk.AgentConnectionStore({
-      platform: 'linux',
+      platform: storagePlatform,
       environment: {
         ...process.env,
         BAILINGHUB_ALLOW_FILE_CREDENTIAL_STORE: 'true',
       },
       registry,
       credentialPathFor: (connectionKey) => join(root, `${connectionKey}.json`),
+      commandRunner: async () => {
+        calls.command += 1
+        throw new Error('logged-out connection lifecycle must not invoke a credential command')
+      },
     })
     const transport = sdk.createAgentClientTransport({
       hubUrl: 'https://hub.example.com',
@@ -296,7 +304,7 @@ test('drives the installed SDK connection lifecycle through DSH user commands', 
     assert.match(removedPersonal.text, /"remoteRevoked":true/u)
     assert.match(removedSecond.text, /"currentConnectionKey":null/u)
     assert.match(status.text, /"state":"unconfigured"/u)
-    assert.deepEqual(calls, { fetch: 0, login: 0, browser: 0 })
+    assert.deepEqual(calls, { fetch: 0, login: 0, browser: 0, command: 0 })
     assert.equal((await registry.list()).length, 0)
     assert.equal(await registry.current(), undefined)
   } finally {
