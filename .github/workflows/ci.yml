@@ -10,7 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  verify_matrix:
+    name: verify (${{ matrix.os }}, ${{ matrix.node }})
     strategy:
       fail-fast: false
       matrix:
@@ -30,3 +31,13 @@ jobs:
       - run: npm ci
       - run: npm run verify
       - run: npm pack --dry-run
+
+  verify:
+    name: verify
+    if: ${{ always() }}
+    needs:
+      - verify_matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every platform and Node.js matrix job to pass
+        run: test "${{ needs.verify_matrix.result }}" = "success"
