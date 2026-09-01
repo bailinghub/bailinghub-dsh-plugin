@@ -200,8 +200,8 @@ test('parses quoted connection names and exposes user-only connection lifecycle 
   for (const rawInput of [
     'connections list',
     'connections add "second hub" https://two.example.com second_client staff',
-    'connections use second',
-    'connections remove second',
+    'connections use "second hub"',
+    'connections remove "second hub"',
   ]) {
     const result = await command.handler({ rawInput })
     assert.equal(result.kind, 'success')
@@ -212,8 +212,8 @@ test('parses quoted connection names and exposes user-only connection lifecycle 
     clientAppId: 'second_client',
     workspace: 'staff',
   })
-  assert.equal(callsFor(mock.calls, 'connectionsUse')[0].args[0], 'second')
-  assert.equal(callsFor(mock.calls, 'connectionsRemove')[0].args[0], 'second')
+  assert.equal(callsFor(mock.calls, 'connectionsUse')[0].args[0], 'second hub')
+  assert.equal(callsFor(mock.calls, 'connectionsRemove')[0].args[0], 'second hub')
 })
 
 test('connection switching affects only new Agent sessions while existing sessions stay pinned', async () => {

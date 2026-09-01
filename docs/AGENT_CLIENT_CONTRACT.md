@@ -1,8 +1,8 @@
 # Agent Client Host Adapter Contract
 
-Status: public native Agent Client contract for `dsh-bailinghub@0.2.0`. This contract is not part
-of the legacy public `0.1.x` line. The main-branch P1 multi-connection lifecycle described below
-is an additive, unreleased candidate until its matching Core, SDK, and DSH versions are accepted.
+Status: public native Agent Client contract for `dsh-bailinghub@0.3.0`. This contract is not part
+of the legacy public `0.1.x` line. The multi-connection lifecycle described below is stable with
+BailingHub Core `0.5.1` and `bailinghub-mcp-server@0.3.0`.
 
 ## Host Configuration
 
@@ -130,9 +130,9 @@ object-rooted input schema, and complete governance metadata (`scope`, `risk`,
 Both revision fields are required lowercase 64-character SHA-256 values; shorter labels or
 uppercase digests fail closed.
 
-## Verified DSH rc.7 Lifecycle
+## Verified DSH Lifecycles
 
-DSH `0.1.0-rc.7` claims inbox messages before assembling the current step:
+DSH `0.1.0-rc.7` and `0.1.1-rc.2` claim inbox messages before assembling the current step:
 
 ```text
 agent/inbox/claimed
@@ -245,8 +245,8 @@ the first attempt and reused unchanged for up to three automatic attempts. A fai
 remains pending in its original run; `/bailinghub sync` starts another bounded attempt batch with
 that same id and payload.
 
-DSH `0.1.0-rc.7` reports disjoint camelCase buckets (`inputTokens`, `cacheReadTokens`, optional
-`cacheWriteTokens`, and `outputTokens`) on each durable `assistant/message`. The adapter sums them
+The verified DSH releases report disjoint camelCase buckets (`inputTokens`, `cacheReadTokens`,
+optional `cacheWriteTokens`, and `outputTokens`) on each durable `assistant/message`. The adapter sums them
 across model steps, exposes total input as Core `input_tokens`, cache reads as the
 `cached_input_tokens` subset, and derives `total_tokens` without adding `reasoningTokens` a second
 time. Unknown, non-finite, and negative metrics are discarded; only the Core public usage

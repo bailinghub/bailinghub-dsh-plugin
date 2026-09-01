@@ -23,7 +23,7 @@ Provider 密钥、业务密码、模型 API Key、授权码、浏览器 Cookie�
 把精确公开版本安装到 DSH Web Profile：
 
 ```bash
-dsh plugin --profile web add dsh-bailinghub@0.2.0
+dsh plugin --profile web add dsh-bailinghub@0.3.0
 ```
 
 插件会自动安装匹配版本的 BailingHub SDK，不需要再手工拼装依赖。

@@ -22,16 +22,12 @@ local Agent to act safely.
 This is an independent community integration. It is not developed, certified, endorsed, or
 recommended by DeepSeek.
 
-> **Current stable line:** `dsh-bailinghub@0.2.0` uses the native Agent Client flow documented
+> **Current stable line:** `dsh-bailinghub@0.3.0` uses the native Agent Client flow documented
 > below. Public `0.1.1` remains available only as the explicit static MCP compatibility path.
->
-> **Unreleased candidate:** the `connections list|add|use|remove` commands documented below exist
-> only on this development branch and require the matching SDK candidate. Public `0.2.0` does not
-> provide them yet.
 
 For the shortest end-user path, follow the [three-minute getting started guide](docs/GETTING_STARTED.md).
 
-## How the 0.2 Agent Client fits together
+## How the 0.3 Agent Client fits together
 
 ```text
 DeepSeek Harness local Agent
@@ -69,7 +65,7 @@ The deployer and business integrator must prepare these public identifiers in Ba
 The end user does **not** enter a business API URL, business login credential, Tool Provider
 signing secret, BailingHub Client Token, or model-provider key into this plugin.
 
-## Install the 0.2 line
+## Install the 0.3 line
 
 Prerequisites:
 
@@ -81,10 +77,10 @@ Install the exact stable version into the DSH Web profile:
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
-dsh plugin --profile web add dsh-bailinghub@0.2.0
+dsh plugin --profile web add dsh-bailinghub@0.3.0
 ```
 
-`dsh-bailinghub@0.2.0` installs its exact compatible `bailinghub-mcp-server@0.2.0` dependency
+`dsh-bailinghub@0.3.0` installs its exact compatible `bailinghub-mcp-server@0.3.0` dependency
 automatically. DSH users should not separately guess or install an SDK version.
 
 ## Configure one Hub connection
@@ -109,9 +105,8 @@ export BAILINGHUB_CONNECTION_NAME='default'
 
 The same four fields may be supplied through the DSH plugin settings surface. Do not add tokens,
 authorization URLs, business domains, or credentials to the Cordis patch. The Hub resolves the
-Client App to its single business authorization entry. In the unreleased candidate,
-`connectionName` is only a user-controlled local selector; it is not an account, tenant, or
-identity claim.
+Client App to its single business authorization entry. `connectionName` is only a user-controlled
+local selector; it is not an account, tenant, or identity claim.
 
 Inspect the composed profile before starting it:
 
@@ -197,8 +192,9 @@ current-turn dynamic schemas. Use native tool mode for governed business actions
 
 - The model cannot choose a Hub URL, workspace, local connection, business identity, credential,
   approval result, or capability revision through tool arguments.
-- The SDK stores credentials in macOS Keychain. Linux and other POSIX systems require an explicit
-  secure file-store opt-in; Windows Agent Session storage is not supported in 0.2.0.
+- The SDK stores credentials in macOS Keychain. On Windows it protects credential files under
+  LocalAppData with CurrentUser DPAPI; unavailable Windows PowerShell or DPAPI fails closed without
+  a plaintext fallback. Linux and other POSIX systems require an explicit secure file-store opt-in.
 - BailingHub revalidates identity, scope, approval, idempotency, and invocation state on every
   governed call. The downstream business system still performs final authorization.
 - The adapter sends visible user input, governed tool arguments/results, and the visible final
@@ -232,13 +228,13 @@ mcp__bailinghub__get_governed_job
 mcp__bailinghub__wait_for_governed_job
 ```
 
-The 0.2 Agent Client does not automatically consume or migrate the 0.1 Client Token. Keep versions
-explicit and follow the [0.1-to-0.2 migration boundary](docs/MIGRATION_VNEXT.md) when testing or
+The 0.3 Agent Client does not automatically consume or migrate the 0.1 Client Token. Keep versions
+explicit and follow the [0.1-to-0.3 migration boundary](docs/MIGRATION_VNEXT.md) when testing or
 rolling back.
 
 ## Compatibility and feedback
 
-Version 0.2.0 is verified only against the versions listed in
+Version 0.3.0 is verified only against the versions listed in
 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md). DeepSeek Harness remains a developer preview, so
 every Harness release requires a new native lifecycle smoke test.
 

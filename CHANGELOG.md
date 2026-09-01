@@ -2,10 +2,12 @@
 
 ## Unreleased
 
+## 0.3.0 - 2026-09-01
+
 - Add `/bailinghub doctor` for credential-safe host-contract, configuration, SDK, authorization,
   and workspace diagnostics before a business turn starts.
-- Add real lifecycle coverage for DeepSeek Harness `0.1.1-rc.2`; live Agent Client acceptance is
-  still required before publishing a compatibility claim.
+- Add real lifecycle coverage for DeepSeek Harness `0.1.1-rc.2` and enforce it in Ubuntu,
+  Windows, and tagged publication workflows.
 - Make `connectionName` a user-controlled local selector while the business authorization page
   owns login, account switching, tenant selection, and the trusted identity result.
 - Reconcile same-binding connections by trusted `on_behalf_of`: replace an older same-identity
@@ -20,6 +22,8 @@
 - Reconcile defaults after connection removal: adopt a remaining current profile, become
   unconfigured after the last removal, and preserve successful removal across registry refresh
   failures without disturbing a valid non-current default.
+- Pin the stable public `bailinghub-mcp-server@0.3.0` SDK, including Windows CurrentUser DPAPI
+  credential storage for Agent Session connections.
 
 ## 0.2.0 - 2026-08-26
 

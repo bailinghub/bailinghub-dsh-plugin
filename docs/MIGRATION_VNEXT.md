@@ -1,7 +1,7 @@
-# Migration Boundary: Public 0.1.x to Native 0.2
+# Migration Boundary: Public 0.1.x to the Native Agent Client
 
 There is no automatic credential, configuration, tool, or orchestration migration from public
-`dsh-bailinghub@0.1.x` to the native 0.2 Agent Client.
+`dsh-bailinghub@0.1.x` to the native 0.3 Agent Client.
 
 ## What remains unchanged
 
@@ -20,9 +20,9 @@ the orchestration. Local DSH does not obtain a trusted Agent Session or dynamic 
 The retained [legacy patch](../cordis.patch.yml) documents that historical meaning. It is not
 selected by the current native package metadata, and its presence is not a dual-mode switch.
 
-## What changes in 0.2
+## What changed in 0.2
 
-| Concern | Public 0.1.1 | Native 0.2 |
+| Concern | Public 0.1.1 | Native 0.2 and later |
 | --- | --- | --- |
 | DSH integration | in-box MCP client | native Cordis host adapter |
 | Core unit | governed job | conversation, run, and governed invocation |
@@ -31,6 +31,12 @@ selected by the current native package metadata, and its presence is not a dual-
 | Reasoning/orchestration | BailingHub route | local DSH Agent |
 | Business identity | not established by DSH | Agent Session approved through the business boundary |
 | Hub audit | job records | conversation, run, completion, and invocation trajectory |
+
+## What 0.3 adds
+
+Version 0.3 keeps the same native boundary and adds stable named multi-connection lifecycle,
+same-binding trusted-identity reconciliation, and Windows CurrentUser DPAPI credential storage.
+It does not reinterpret or migrate the public 0.1.x Client Token path.
 
 The new plugin config is limited to `hubUrl`, `clientAppId`, `workspace`, and `connectionName`.
 The old `BAILINGHUB_CLIENT_TOKEN` is not read, copied, exchanged, or converted into an Agent
@@ -41,18 +47,17 @@ switch account, and select a tenant.
 
 ## Safe evaluation before migration
 
-Do not replace a working production profile merely to evaluate 0.2.0. Use a separate DSH home or
+Do not replace a working production profile merely to evaluate 0.3.0. Use a separate DSH home or
 another isolated Web profile and verify that the CLI really honors that location. Stable public
-`0.2.0` still scopes a Keychain credential to the Hub/client/workspace tuple. The unreleased
-multi-connection candidate instead creates a separate credential for each name registered through
+`0.3.0` creates a separate credential for each name registered through
 `connections add` while authorization is pending. After authorization, the SDK replaces an older
 same-binding connection when its trusted `on_behalf_of` is the same; different trusted identities
 remain independent. A different identity returned from a same-alias login keeps the original
-alias and Session and receives a non-conflicting alias that becomes current. Use only a matching
-SDK/DSH candidate when evaluating that behavior.
+alias and Session and receives a non-conflicting alias that becomes current. Use the exact matching
+SDK installed by the DSH package when evaluating that behavior.
 
 1. Keep the existing `0.1.1` profile and its legacy environment unchanged.
-2. Install the exact released 0.2 package into an isolated profile.
+2. Install the exact released 0.3 package into an isolated profile.
 3. Configure only the four public native fields using neutral values for dry composition.
 4. Run `/bailinghub login` and approve a dedicated non-production client app/workspace whose
    credential can be revoked without affecting a maintainer's existing profile.
@@ -63,14 +68,14 @@ SDK/DSH candidate when evaluating that behavior.
 Passing the native path does not prove legacy compatibility, and passing the legacy path does not
 prove the native Agent Client.
 
-## Moving a profile to 0.2
+## Moving a profile to 0.3
 
 Only after the isolated acceptance passes:
 
 1. Record the exact old plugin, DSH, MCP, and Core versions without copying credentials into the
    migration record.
 2. Finish or cancel outstanding legacy jobs. A wait timeout is not a terminal failure.
-3. Install the exact accepted 0.2 plugin version. Do not use an unpinned dist-tag.
+3. Install the exact accepted 0.3 plugin version. Do not use an unpinned dist-tag.
 4. Replace the legacy plugin configuration with the four native fields. Remove the old Client
    Token from that process environment after confirming no remaining 0.1 integration uses it.
 5. Start DSH, run `/bailinghub login`, use the business page to log in or switch account and select
@@ -86,11 +91,11 @@ key to this plugin.
 
 Rollback is explicit; it does not convert the Agent Session back into a Client Token.
 
-If an unreleased multi-connection candidate wrote schema-v2 registry metadata, first use that same
-candidate to finish active runs and remove every candidate-only named instance through
-`/bailinghub connections remove <name>`. The SDK returns the registry to schema v1 after the last
-such instance is removed. Stable `0.2.0` fails closed on schema v2; do not manually delete the
-registry or Keychain credentials as a downgrade shortcut.
+Before downgrading a 0.3 profile to 0.2, first use the installed 0.3 plugin to finish active runs
+and remove every named instance through `/bailinghub connections remove <name>`. The SDK returns
+the registry to schema v1 after the last such instance is removed. Stable `0.2.0` fails closed on
+schema v2; do not manually delete the registry, Keychain entry, DPAPI ciphertext, or secure file
+credentials as a downgrade shortcut.
 
 1. Finish active native runs and use `/bailinghub sync` for any known pending completion.
 2. Run `/bailinghub logout` if the new Agent Session should be revoked.
@@ -106,12 +111,12 @@ reuse, move, or republish an npm version or Git tag as a rollback mechanism.
 
 ## Release gates
 
-Before any public 0.2 release:
+Before any public 0.3 release:
 
 1. The matching BailingHub Core Agent Auth/Agent API contracts are released.
 2. The exact `bailinghub-mcp-server/sdk` version is publicly installable and has passed DTO,
    credential, invoke/resume, and completion tests.
-3. Installing only `dsh-bailinghub` into a clean DSH `0.1.0-rc.7` profile installs and resolves that
+3. Installing only `dsh-bailinghub` into a clean DSH `0.1.1-rc.2` profile installs and resolves that
    exact SDK dependency automatically.
 4. Browser login, session isolation, dynamic tool replacement, approval recovery, visible
    completion, same-identity replacement, different-identity isolation, and Hub trajectory pass
@@ -119,5 +124,5 @@ Before any public 0.2 release:
 5. Public `0.1.1` still works against the new Core through the unchanged Client API.
 6. The maintainer explicitly selects the public version and migration story.
 
-Do not tag or publish a future 0.2.x version until all gates pass, and do not describe release
+Do not tag or publish a future 0.3.x version until all gates pass, and do not describe release
 validation as public adoption.

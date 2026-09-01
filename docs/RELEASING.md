@@ -26,13 +26,13 @@ its package, or silently reinterpret its Client Token and Hub-orchestrated seman
 
 ## Public manifest gates
 
-The stable `0.2.0` manifest is publishable and must retain all of these properties:
+The stable `0.3.0` manifest is publishable and must retain all of these properties:
 
 ```text
-version: 0.2.0
+version: 0.3.0
 publishConfig.access: public
 publishConfig.provenance: true
-dependency: bailinghub-mcp-server@0.2.0 (exact ordinary dependency)
+dependency: bailinghub-mcp-server@0.3.0 (exact ordinary dependency)
 ```
 
 For every public prerelease or stable version:
@@ -143,8 +143,8 @@ Use a dedicated non-production Hub client/workspace and a no-surprise business f
 its credentials, private URL, authorization code, personal data, or raw payload into logs,
 screenshots, release notes, or CI artifacts.
 
-A separate `DSH_HOME` keeps DSH configuration, sessions, and logs apart. The unreleased
-multi-connection candidate must additionally prove the post-authorization reconciliation rules on
+A separate `DSH_HOME` keeps DSH configuration, sessions, and logs apart. A multi-connection
+release must additionally prove the post-authorization reconciliation rules on
 one Hub/client/workspace binding: a second authorization of the same trusted `on_behalf_of`
 replaces the older local connection, while a different trusted `on_behalf_of` remains independent.
 If old-Session revocation is deliberately made to fail, the new connection must remain authorized,

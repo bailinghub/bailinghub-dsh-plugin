@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
 
@@ -11,15 +11,13 @@ import {
   userMessage,
 } from './helpers/mock-host.mjs'
 
-const dshNodeModules = process.env.DSH_NODE_MODULES
+const dshNodeModules = process.env.DSH_NODE_MODULES ?? resolve('node_modules')
 
 async function importFromDsh(specifier) {
   return import(pathToFileURL(join(dshNodeModules, specifier)).href)
 }
 
-test('loads in the installed real DSH lifecycle and safely replaces the executing search tool', {
-  skip: dshNodeModules ? false : 'set DSH_NODE_MODULES to the installed DSH node_modules directory',
-}, async () => {
+test('loads in the installed real DSH lifecycle and safely replaces the executing search tool', async () => {
   const [{ Context }, { default: SystemPrompt }, { default: ToolRuntime },
     { default: CommandRuntime }, { createScope }] = await Promise.all([
     importFromDsh('@deepseek-ai/cordis/lib/index.js'),

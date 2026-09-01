@@ -24,7 +24,7 @@ API key, authorization code, browser session cookie, business URL, or tenant-spe
 Install the exact public version into the DSH Web profile:
 
 ```bash
-dsh plugin --profile web add dsh-bailinghub@0.2.0
+dsh plugin --profile web add dsh-bailinghub@0.3.0
 ```
 
 The plugin installs the matching BailingHub SDK automatically.

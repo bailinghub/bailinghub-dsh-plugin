@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { resolve } from 'node:path'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
 
@@ -15,10 +17,12 @@ import {
   userMessage,
 } from './helpers/mock-host.mjs'
 
-const sdkDist = process.env.BAILINGHUB_SDK_DIST
+const sdkDist = process.env.BAILINGHUB_SDK_DIST ?? 'bailinghub-mcp-server/sdk'
 
 function moduleUrl(path) {
-  return path.startsWith('file:') ? path : pathToFileURL(resolve(path)).href
+  if (path.startsWith('file:')) return path
+  if (path.startsWith('/') || path.startsWith('.')) return pathToFileURL(resolve(path)).href
+  return path
 }
 
 function jsonResponse(value) {
@@ -28,9 +32,7 @@ function jsonResponse(value) {
   })
 }
 
-test('matches the real generic SDK facade argument and HTTP DTO contract', {
-  skip: sdkDist ? false : 'set BAILINGHUB_SDK_DIST to bailinghub-mcp-server dist/sdk.js',
-}, async () => {
+test('matches the real generic SDK facade argument and HTTP DTO contract', async () => {
   const sdk = await import(moduleUrl(sdkDist))
   assert.equal(typeof sdk.createAgentClientTransport, 'function')
 
@@ -214,4 +216,90 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', {
     tool_calls: 1,
   })
   assert.equal(Object.hasOwn(requests[5].body, 'reasoning'), false)
+})
+
+test('drives the installed SDK connection lifecycle through DSH user commands', async () => {
+  const sdk = await import(moduleUrl(sdkDist))
+  const root = await mkdtemp(join(tmpdir(), 'dsh-bailinghub-sdk-seam-'))
+  const calls = { fetch: 0, login: 0, browser: 0 }
+  try {
+    const registry = new sdk.AgentConnectionRegistry(join(root, 'agent-connections.json'), 'linux')
+    const connectionStore = new sdk.AgentConnectionStore({
+      platform: 'linux',
+      environment: {
+        ...process.env,
+        BAILINGHUB_ALLOW_FILE_CREDENTIAL_STORE: 'true',
+      },
+      registry,
+      credentialPathFor: (connectionKey) => join(root, `${connectionKey}.json`),
+    })
+    const transport = sdk.createAgentClientTransport({
+      hubUrl: 'https://hub.example.com',
+      clientAppId: 'dsh_client',
+      workspace: 'demo',
+      connectionName: 'bootstrap',
+    }, {
+      connectionStore,
+      fetchImpl: async () => {
+        calls.fetch += 1
+        throw new Error('connection lifecycle must not call the Hub')
+      },
+      loginImpl: async () => {
+        calls.login += 1
+        throw new Error('connection lifecycle must not start browser authorization')
+      },
+      openBrowser: async () => {
+        calls.browser += 1
+        throw new Error('connection lifecycle must not open a browser')
+      },
+    })
+    const host = createMockHost()
+    createAgentClientPlugin({ transport }).apply(host.ctx, {
+      hubUrl: 'https://hub.example.com',
+      clientAppId: 'dsh_client',
+      workspace: 'demo',
+      connectionName: 'bootstrap',
+    })
+    const command = host.commands.get('bailinghub')
+
+    const initial = await command.handler({ rawInput: 'connections list' })
+    const personal = await command.handler({
+      rawInput: 'connections add personal https://hub.example.com dsh_client demo',
+    })
+    const second = await command.handler({
+      rawInput: 'connections add "second hub" https://two.example.com second_client staff',
+    })
+    assert.equal((await registry.current())?.alias, 'second hub')
+    const selected = await command.handler({ rawInput: 'connections use personal' })
+    assert.equal((await registry.current())?.alias, 'personal')
+    const listed = await command.handler({ rawInput: 'connections list' })
+    const removedPersonal = await command.handler({ rawInput: 'connections remove personal' })
+    assert.equal((await registry.current())?.alias, 'second hub')
+    const removedSecond = await command.handler({
+      rawInput: 'connections remove "second hub"',
+    })
+    const status = await command.handler({ rawInput: 'status' })
+    const final = await command.handler({ rawInput: 'connections list' })
+
+    const results = [initial, personal, second, selected, listed, removedPersonal, removedSecond, status, final]
+    for (const result of results) {
+      assert.equal(result.kind, 'success')
+      assert.doesNotMatch(result.text, /access[_-]?token|refresh[_-]?token|bearer\s+/iu)
+    }
+    assert.match(personal.text, /"connectionName":"personal"/u)
+    assert.match(second.text, /"connectionName":"second hub"/u)
+    assert.match(second.text, /"state":"logged_out"/u)
+    assert.match(selected.text, /"state":"selected"/u)
+    assert.match(listed.text, /"connectionName":"personal"/u)
+    assert.match(listed.text, /"connectionName":"second hub"/u)
+    assert.match(removedPersonal.text, /"hadCredentials":false/u)
+    assert.match(removedPersonal.text, /"remoteRevoked":true/u)
+    assert.match(removedSecond.text, /"currentConnectionKey":null/u)
+    assert.match(status.text, /"state":"unconfigured"/u)
+    assert.deepEqual(calls, { fetch: 0, login: 0, browser: 0 })
+    assert.equal((await registry.list()).length, 0)
+    assert.equal(await registry.current(), undefined)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })

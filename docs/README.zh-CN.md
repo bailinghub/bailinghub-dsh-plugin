@@ -18,15 +18,12 @@
 
 这是独立社区集成，不是 DeepSeek 官方开发、认证、合作、背书或推荐的插件。
 
-> **当前稳定版本线：**`dsh-bailinghub@0.2.0` 使用下文说明的原生 Agent Client 流程。
+> **当前稳定版本线：**`dsh-bailinghub@0.3.0` 使用下文说明的原生 Agent Client 流程。
 > 公开 `0.1.1` 仅作为明确的静态 MCP 兼容路径继续保留。
->
-> **未发布候选能力：**下文的 `connections list|add|use|remove` 命令目前只存在于本开发分支，
-> 需要配套 SDK 候选版本；公开 `0.2.0` 暂不包含这些命令。
 
 希望用最短路径完成首次使用，可以直接阅读[三分钟开始使用](GETTING_STARTED.zh-CN.md)。
 
-## 0.2 Agent Client 的关系
+## 0.3 Agent Client 的关系
 
 ```text
 DeepSeek Harness 本地智能体
@@ -62,7 +59,7 @@ Agent Client 不是 BailingHub 现有的“执行器”。执行器接收中枢�
 最终用户**不需要**在插件中填写业务 API 地址、业务账号密码、Tool Provider 签名密钥、
 BailingHub Client Token 或模型提供方 Key。
 
-## 安装 0.2 版本线
+## 安装 0.3 版本线
 
 前置条件：
 
@@ -74,10 +71,10 @@ BailingHub Client Token 或模型提供方 Key。
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
-dsh plugin --profile web add dsh-bailinghub@0.2.0
+dsh plugin --profile web add dsh-bailinghub@0.3.0
 ```
 
-`dsh-bailinghub@0.2.0` 会自动安装精确兼容的 `bailinghub-mcp-server@0.2.0` 依赖。
+`dsh-bailinghub@0.3.0` 会自动安装精确兼容的 `bailinghub-mcp-server@0.3.0` 依赖。
 DSH 用户不应该再自行猜测或单独安装某个 SDK 版本。
 
 ## 配置一个中枢连接
@@ -101,8 +98,8 @@ export BAILINGHUB_CONNECTION_NAME='default'
 ```
 
 也可以通过 DSH 的插件设置界面填写同样四个字段。不要在 Cordis Patch 中增加 Token、授权
-页面地址、业务域名或任何凭据。中枢会根据 Client App 找到唯一业务授权入口。在未发布候选版
-中，`connectionName` 只是用户控制的本机连接选择器，不是账号、租户或身份声明。
+页面地址、业务域名或任何凭据。中枢会根据 Client App 找到唯一业务授权入口。
+`connectionName` 只是用户控制的本机连接选择器，不是账号、租户或身份声明。
 
 启动前检查最终合成配置：
 
@@ -178,8 +175,9 @@ Session 已经允许目标 workspace 时才成功。
 ## 安全与隐私边界
 
 - 模型不能通过工具参数选择 Hub URL、workspace、本机连接、业务身份、凭据、审批结论或能力版本；
-- SDK 在 macOS 使用 Keychain；Linux 与其他 POSIX 系统必须显式启用安全文件回退；0.2.0
-  暂不支持 Windows Agent Session 凭据存储；
+- SDK 在 macOS 使用 Keychain；Windows 凭据文件保存在 LocalAppData 并由 CurrentUser DPAPI
+  保护，Windows PowerShell 或 DPAPI 不可用时失败关闭，不会降级为明文；Linux 与其他 POSIX
+  系统必须显式启用安全文件回退；
 - BailingHub 对每次治理调用重新校验身份、scope、审批、幂等与调用状态，业务系统仍执行
   最终权限判断；
 - 适配器会发送 Agent Client 契约所需的可见用户输入、受治理工具参数/结果和可见最终回复，
@@ -211,12 +209,12 @@ mcp__bailinghub__get_governed_job
 mcp__bailinghub__wait_for_governed_job
 ```
 
-0.2 Agent Client 不会自动读取或迁移 0.1 Client Token。测试升级或回滚时必须显式固定版本，
-并遵循 [0.1 到 0.2 的迁移边界](MIGRATION_VNEXT.md)。
+0.3 Agent Client 不会自动读取或迁移 0.1 Client Token。测试升级或回滚时必须显式固定版本，
+并遵循 [0.1 到 0.3 的迁移边界](MIGRATION_VNEXT.md)。
 
 ## 兼容范围与反馈
 
-0.2.0 只对 [COMPATIBILITY.md](COMPATIBILITY.md) 中列出的版本完成了验证。DeepSeek
+0.3.0 只对 [COMPATIBILITY.md](COMPATIBILITY.md) 中列出的版本完成了验证。DeepSeek
 Harness 仍是 Developer Preview，每次 Harness 升级都必须重新执行 Native Lifecycle Smoke。
 
 问题请提交到 [GitHub Issues](https://github.com/bailinghub/bailinghub-dsh-plugin/issues)。
