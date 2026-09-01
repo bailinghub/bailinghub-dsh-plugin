@@ -15,7 +15,7 @@ body:
     attributes:
       label: Versions used
       description: Include DeepSeek Harness, dsh-bailinghub, and BailingHub Core versions.
-      placeholder: DSH 0.1.0-rc.7, dsh-bailinghub 0.2.0, BailingHub 0.5.0
+      placeholder: DSH 0.1.1-rc.2, dsh-bailinghub 0.3.0, BailingHub 0.5.1
     validations:
       required: true
   - type: input

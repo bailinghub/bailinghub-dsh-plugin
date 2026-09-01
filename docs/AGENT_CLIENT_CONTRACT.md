@@ -1,7 +1,8 @@
 # Agent Client Host Adapter Contract
 
-Status: public native Agent Client contract for `dsh-bailinghub@0.2.0`. This contract is not part
-of the legacy public `0.1.x` line.
+Status: public native Agent Client contract for `dsh-bailinghub@0.3.0`. This contract is not part
+of the legacy public `0.1.x` line. The multi-connection lifecycle described below is stable with
+BailingHub Core `0.5.1` and `bailinghub-mcp-server@0.3.0`.
 
 ## Host Configuration
 
@@ -14,9 +15,12 @@ workspace
 connectionName
 ```
 
-`hubUrl`, `clientAppId`, and `workspace` identify a public Hub-side application/workspace.
-`connectionName` is a local SDK alias. No business endpoint, authorization endpoint, token, secret,
-or business credential belongs in this config.
+`hubUrl`, `clientAppId`, and `workspace` identify a public Hub-side application/workspace binding.
+`connectionName` selects one local SDK connection instance, but it is not an account, tenant, or
+identity claim. The Hub Client App resolves to one stable business authorization endpoint; no
+business endpoint, authorization endpoint, token, secret, or business credential belongs in this
+config. The business authorization page owns sign-in, account switching, tenant selection, and
+the trusted identity ultimately represented by `on_behalf_of`.
 
 ## Injectable Transport Seam
 
@@ -24,6 +28,11 @@ The default transport is lazily created from `bailinghub-mcp-server/sdk`. Tests 
 adapters may inject an object with all methods below:
 
 ```js
+connectionsList({})
+connectionsAdd({ connectionName, hubUrl, clientAppId, workspace })
+connectionsUse(connectionNameOrKey)
+connectionsRemove(connectionNameOrKey)
+
 login({ hubUrl, clientAppId, workspace, route, connectionName })
 status({ connectionName })
 logout({ connectionName })
@@ -55,6 +64,30 @@ completeRun(runId, {
 The adapter may pass a second host metadata argument (`workspace`, `connectionName`, and an
 `AbortSignal`) to turn/tool methods. The framework-neutral SDK DTO is always the first argument;
 an SDK implementation that does not consume host metadata may ignore it.
+
+## Browser Identity and Local Reconciliation
+
+`/bailinghub login` always starts from the selected Hub/client/workspace binding. The plugin does
+not accept or derive a business URL, account id, tenant id, or identity selector. Core redirects
+to the single authorization endpoint configured for that Client App, and the business page
+performs any login, account switching, or tenant selection required before it approves the
+authorization.
+
+The SDK may stage more than one named local instance for the same public binding while browser
+authorization is in progress. After authorization it compares the trusted Session
+`on_behalf_of`, never the local `connectionName`:
+
+- the same identity replaces the older local connection and revokes its old Agent Session;
+- a different identity remains a separate named connection; when login was launched from an alias
+  already owned by the old identity, the SDK preserves that alias and Session, allocates an
+  available alias such as `default-2` to the new identity, and makes the new connection current;
+- an uncertain identity inspection or failed old-Session revoke keeps the new Session authorized
+  and returns `cleanupRequired: true` with cleanup metadata.
+
+The adapter reports that last result as successful authorization plus a visible warning. It tells
+the user not to authorize again and to retry explicit cleanup with the user-only connection
+lifecycle commands. It does not turn the result into a failed login or let the model perform
+cleanup.
 
 ## Core HTTP Mapping
 
@@ -97,9 +130,9 @@ object-rooted input schema, and complete governance metadata (`scope`, `risk`,
 Both revision fields are required lowercase 64-character SHA-256 values; shorter labels or
 uppercase digests fail closed.
 
-## Verified DSH rc.7 Lifecycle
+## Verified DSH Lifecycles
 
-DSH `0.1.0-rc.7` claims inbox messages before assembling the current step:
+DSH `0.1.0-rc.7` and `0.1.1-rc.2` claim inbox messages before assembling the current step:
 
 ```text
 agent/inbox/claimed
@@ -160,9 +193,38 @@ same bounded recovery state when known locally, and never creates a replacement 
 
 ## Session and Completion State
 
-Connection name, workspace, conversation alias, Core run, active definitions, and completion
-state are isolated per DSH Agent/session. A workspace switch affects future sessions and is
-rejected while any Core run is active/completing or has an unsynchronized completion payload.
+Connection selector, workspace, conversation alias, Core run, active definitions, and completion
+state are isolated per DSH Agent/session. Named connections for different trusted identities own
+separate SDK credentials and Agent Sessions. Same-binding connections that resolve to the same
+trusted identity are reconciled to one local survivor after authorization. A workspace switch
+preserves the selected connection instance and affects future sessions; it is rejected while any
+Core run is active/completing or has an unsynchronized completion payload.
+
+After a same-alias login resolves to a different trusted identity, the SDK-returned replacement
+alias becomes the adapter default for new sessions. The retained old alias and the new alias both
+remain visible through `connections list` and user-selectable through `connections use`; existing
+DSH sessions remain pinned as described below.
+
+Multi-connection add/use/remove is exposed only through the `/bailinghub connections` user
+command. It is never registered as a model tool. Selecting a connection changes defaults for new
+Agent sessions only; existing states keep their captured connection and workspace. Removing a
+connection is rejected while any run is active or has an unsynchronized completion. The SDK then
+revokes only that instance's remote Agent Session before removing its local credentials and
+registry metadata; a revoke failure preserves both. Repeating add with the same name and public
+binding selects the existing instance; reusing a name for different public metadata fails.
+`connectionName` remains a local user selector and never becomes a trusted identity claim.
+
+After a successful remove, the adapter reads the registry again. A valid remaining
+`currentConnectionKey` replaces all four public defaults for future sessions, using the key itself
+when the profile has no alias; no remaining connection sets the adapter to unconfigured. A refresh
+failure does not change the successful remove result. It makes a removed default unavailable, but
+does not invalidate an unchanged non-current default. Existing session state is never rewritten.
+
+The four static adapter fields bootstrap SDK construction only. Before the first new Agent session
+or user command after process start, the adapter reads `connectionsList()` and adopts the public
+metadata matching `currentConnectionKey`. Invalid, missing, or unavailable registry data leaves the
+bootstrap defaults in place and must not remove or block unrelated host tools. The lookup is not a
+model tool, and restoring or later selecting a default never mutates an already-created session.
 
 The completion request is restricted to:
 
@@ -183,8 +245,8 @@ the first attempt and reused unchanged for up to three automatic attempts. A fai
 remains pending in its original run; `/bailinghub sync` starts another bounded attempt batch with
 that same id and payload.
 
-DSH `0.1.0-rc.7` reports disjoint camelCase buckets (`inputTokens`, `cacheReadTokens`, optional
-`cacheWriteTokens`, and `outputTokens`) on each durable `assistant/message`. The adapter sums them
+The verified DSH releases report disjoint camelCase buckets (`inputTokens`, `cacheReadTokens`,
+optional `cacheWriteTokens`, and `outputTokens`) on each durable `assistant/message`. The adapter sums them
 across model steps, exposes total input as Core `input_tokens`, cache reads as the
 `cached_input_tokens` subset, and derives `total_tokens` without adding `reasoningTokens` a second
 time. Unknown, non-finite, and negative metrics are discarded; only the Core public usage

@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+## 0.3.0 - 2026-09-01
+
+- Add `/bailinghub doctor` for credential-safe host-contract, configuration, SDK, authorization,
+  and workspace diagnostics before a business turn starts.
+- Add real lifecycle coverage for DeepSeek Harness `0.1.1-rc.2` and enforce it in Ubuntu,
+  Windows, and tagged publication workflows.
+- Make `connectionName` a user-controlled local selector while the business authorization page
+  owns login, account switching, tenant selection, and the trusted identity result.
+- Reconcile same-binding connections by trusted `on_behalf_of`: replace an older same-identity
+  connection, keep different identities independent, and surface cleanup-required authorization
+  as a successful login with an explicit no-reauthorize warning.
+- Preserve an existing alias and Session when same-alias authorization returns a different trusted
+  identity; allocate and select a non-conflicting local alias for the new identity.
+- Add user-only `/bailinghub connections list|add|use|remove` lifecycle commands with quoted-name
+  parsing, new-session-only selection, existing-session pinning, and revoke-before-remove safety.
+- Restore the SDK registry's current connection before the first new session or user command after
+  restart, with validated public metadata and a non-blocking bootstrap-field fallback.
+- Reconcile defaults after connection removal: adopt a remaining current profile, become
+  unconfigured after the last removal, and preserve successful removal across registry refresh
+  failures without disturbing a valid non-current default.
+- Pin the stable public `bailinghub-mcp-server@0.3.0` SDK, including Windows CurrentUser DPAPI
+  credential storage for Agent Session connections.
+
 ## 0.2.0 - 2026-08-26
 
 - Add the native Cordis Agent Client adapter that keeps reasoning and orchestration in local DSH

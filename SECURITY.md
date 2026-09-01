@@ -19,15 +19,33 @@ configuration and are never model tool arguments.
 
 Non-loopback HTTP is denied by default. Do not enable insecure HTTP on an untrusted network.
 
-## Native 0.2.0 boundary
+## Native 0.3.0 boundary
 
-The native 0.2.0 plugin accepts only `hubUrl`, `clientAppId`, `workspace`, and
+The native 0.3.0 plugin accepts only `hubUrl`, `clientAppId`, `workspace`, and
 `connectionName`. The generic SDK owns browser authorization, refresh, and secure credential
-storage; business endpoints and final authorization remain Core/business-system concerns.
+storage; business endpoints and final authorization remain Core/business-system concerns. The
+Hub Client App owns one business authorization entry. That business page, not the plugin or model,
+handles login, account switching, tenant selection, and the trusted `on_behalf_of` identity.
+
+The multi-connection registry stores only public Hub/client/workspace metadata. `connectionName`
+is a user-only local selector, not an identity claim. After browser
+authorization, the SDK replaces an older same-binding connection only when the trusted
+`on_behalf_of` matches; different trusted identities remain isolated. A same-alias authorization
+for a different identity preserves the original alias and Session and assigns the new identity a
+non-conflicting local alias. If inspection or old-Session revocation is uncertain, the new
+connection stays authorized and explicit cleanup is required.
+Connection add/use/remove are user slash commands, not model tools. Removing an authorized
+connection is remote-revoke-first and keeps the local credential if revocation fails, so it cannot
+falsely report a complete logout.
 
 Tools are Agent/run scoped. Message ids are replaced by Core-safe hash aliases, invocation ids are
 stable 64-character digests, and an `accepted_unknown` outcome must resume that exact invocation
 instead of creating a replacement. Completion retries are bounded and reuse one frozen,
-visible-only payload. Version 0.2.0 installs `bailinghub-mcp-server@0.2.0` as an exact ordinary
+visible-only payload. Version 0.3.0 installs `bailinghub-mcp-server@0.3.0` as an exact ordinary
 dependency and resolves its `./sdk` export. It does not depend on ambient modules, an optional
 peer, a range, a dist-tag, or a local path. Public `0.1.1` does not provide that facade.
+
+Agent Session credentials use macOS Keychain or Windows CurrentUser DPAPI-protected files under
+LocalAppData. Windows PowerShell or DPAPI unavailability fails closed without a plaintext fallback.
+Linux and other POSIX hosts must explicitly enable the SDK's isolated mode-0600 file store. The
+plugin never receives the credential value and never writes one into Cordis configuration.

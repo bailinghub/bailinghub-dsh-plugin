@@ -18,12 +18,12 @@
 
 这是独立社区集成，不是 DeepSeek 官方开发、认证、合作、背书或推荐的插件。
 
-> **当前稳定版本线：**`dsh-bailinghub@0.2.0` 使用下文说明的原生 Agent Client 流程。
+> **当前稳定版本线：**`dsh-bailinghub@0.3.0` 使用下文说明的原生 Agent Client 流程。
 > 公开 `0.1.1` 仅作为明确的静态 MCP 兼容路径继续保留。
 
 希望用最短路径完成首次使用，可以直接阅读[三分钟开始使用](GETTING_STARTED.zh-CN.md)。
 
-## 0.2 Agent Client 的关系
+## 0.3 Agent Client 的关系
 
 ```text
 DeepSeek Harness 本地智能体
@@ -38,7 +38,7 @@ DeepSeek Harness 本地智能体
 - **BailingHub Core** 负责 Agent Auth、可信业务身份、运行时上下文、知识库与记忆投影、
   能力治理、审批、调用状态和审计记录。
 - **`bailinghub-mcp-server/sdk`** 负责浏览器登录、PKCE、凭据存储与刷新，以及按
-  Hub/client/workspace 隔离连接和映射 HTTP DTO。
+  Hub/client/workspace 选择连接和映射 HTTP DTO。
 - **`dsh-bailinghub`** 只负责 DSH 会话、提示词、命令和动态工具生命周期，不保存凭据，
   也不直接调用业务 API。
 
@@ -53,27 +53,28 @@ Agent Client 不是 BailingHub 现有的“执行器”。执行器接收中枢�
 2. 一个公开 Agent Client 应用标识 `clientAppId`；
 3. 至少一个允许授权的 workspace；在 Agent Client v1 中，workspace id 就是
    BailingHub route id；
-4. 该 route 后方已经接通业务授权页面，以及受治理的 ACC/Tool Provider 能力。
+4. 在中枢 Client App 上配置一个稳定且不绑定具体账号、租户的业务授权入口，并在该 route
+   后方接通受治理的 ACC/Tool Provider 能力。登录、切换账号和选择租户都由业务授权页完成。
 
 最终用户**不需要**在插件中填写业务 API 地址、业务账号密码、Tool Provider 签名密钥、
 BailingHub Client Token 或模型提供方 Key。
 
-## 安装 0.2 版本线
+## 安装 0.3 版本线
 
 前置条件：
 
 - Node.js `22.19.0+` 或 `24+`；
-- `pnpm` 与 DeepSeek Harness `0.1.0-rc.7`；
+- `pnpm` 与兼容矩阵中列出的 DeepSeek Harness 版本；
 - 已完成上面的 BailingHub 接入准备。
 
 将精确稳定版本安装到 DSH Web Profile：
 
 ```bash
-npm install --global pnpm @deepseek-ai/dsh@0.1.0-rc.7
-dsh plugin --profile web add dsh-bailinghub@0.2.0
+npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
+dsh plugin --profile web add dsh-bailinghub@0.3.0
 ```
 
-`dsh-bailinghub@0.2.0` 会自动安装精确兼容的 `bailinghub-mcp-server@0.2.0` 依赖。
+`dsh-bailinghub@0.3.0` 会自动安装精确兼容的 `bailinghub-mcp-server@0.3.0` 依赖。
 DSH 用户不应该再自行猜测或单独安装某个 SDK 版本。
 
 ## 配置一个中枢连接
@@ -85,7 +86,7 @@ DSH 用户不应该再自行猜测或单独安装某个 SDK 版本。
 | `hubUrl` | `BAILINGHUB_HUB_URL` | 开发者自己部署的 BailingHub 公共 HTTPS 地址 | 否 |
 | `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | 在该中枢注册的公共 Agent Client 应用标识 | 否 |
 | `workspace` | `BAILINGHUB_WORKSPACE` | 初始已授权 workspace/route id | 否 |
-| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | 当前 SDK 隔离连接的本地别名 | 否 |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | 用户选择的本机连接名称 | 否 |
 
 使用中性占位值的示例：
 
@@ -97,7 +98,8 @@ export BAILINGHUB_CONNECTION_NAME='default'
 ```
 
 也可以通过 DSH 的插件设置界面填写同样四个字段。不要在 Cordis Patch 中增加 Token、授权
-页面地址、业务域名或任何凭据。
+页面地址、业务域名或任何凭据。中枢会根据 Client App 找到唯一业务授权入口。
+`connectionName` 只是用户控制的本机连接选择器，不是账号、租户或身份声明。
 
 启动前检查最终合成配置：
 
@@ -112,18 +114,25 @@ dsh web
 
 ```text
 /bailinghub login
+/bailinghub doctor
 /bailinghub status
 /bailinghub workspaces
 ```
 
-`login` 会打开系统浏览器。业务侧授权页面负责确认当前已登录的业务身份和申请的
-workspace，然后返回受 `state` 与 PKCE S256 保护的随机回环回调。Access Token 与 Refresh
-Token 只进入 SDK 所有的安全存储，不会写入插件配置，也不会由命令输出。
+`login` 会在系统浏览器打开中枢管理员配置的唯一业务授权入口。业务授权页负责登录、切换账号、
+选择租户，并确认最终业务身份和申请的 workspace，然后返回受 `state` 与 PKCE S256 保护的
+随机回环回调。Access Token 与 Refresh Token 只进入 SDK 所有的安全存储，不会写入插件配置，
+也不会由命令输出。
 
 常用命令：
 
 | 命令 | 用途 |
 | --- | --- |
+| `/bailinghub doctor` | 在不输出凭据的前提下检查宿主 API、公开配置、SDK、授权状态和 workspace 连通性 |
+| `/bailinghub connections list` | 查看本机公开连接元数据与授权状态，不输出 Token |
+| `/bailinghub connections add <名称> <中枢地址> <clientAppId> <workspace>` | 创建并选择另一个本机连接实例；公开绑定可以与已有实例相同 |
+| `/bailinghub connections use <名称或连接键>` | 只为之后新建的会话选择一个已登记连接 |
+| `/bailinghub connections remove <名称或连接键>` | 先远程撤销 Agent Session，再删除本机凭据和公开元数据 |
 | `/bailinghub login` | 在浏览器授权当前 Hub/client/workspace |
 | `/bailinghub status` | 查看当前连接状态，但不输出凭据 |
 | `/bailinghub workspaces` | 查看当前业务授权允许使用的 workspace |
@@ -131,10 +140,30 @@ Token 只进入 SDK 所有的安全存储，不会写入插件配置，也不会
 | `/bailinghub sync` | 重试同步待处理的可见回复，不重复业务工具调用 |
 | `/bailinghub logout` | 撤销并删除当前 Agent Session |
 
-标准 v1 登录只申请当前配置的 workspace。`use` 只有在当前 Agent Session 明确包含目标
-workspace 时才会成功，不能借此任意切换中枢 route。当前命令始终使用这个插件实例配置的四个
-字段，不接受连接别名选择器。连接另一套 Hub 或 route 时，应使用第二个 DSH Profile/插件实例，
-或修改四字段并重新加载当前 Profile；设置新的 `connectionName` 后再完成浏览器授权。
+插件四字段是启动连接。其他连接可用 `connections add` 登记；BailingHub 控制台“智能体客户端”
+页面也能生成同样的不含秘密命令。重启后，适配器会在第一个新 Agent 会话或用户命令前读取 SDK
+registry，并采用其中当前连接的公开元数据；registry 缺失或不可用时安全回退到这四个启动字段。
+连接名含空格时需要加引号。执行 `connections use` 后，如果该绑定尚未授权，再执行
+`/bailinghub login`。
+
+连接选择只能由用户斜杠命令发起，不会作为模型工具暴露。切换只影响之后创建的 Agent 会话，已有
+会话继续固定在原连接与 workspace。`/bailinghub use <workspace>` 是另一件事：只有当前 Agent
+Session 已经允许目标 workspace 时才成功。
+
+删除当前连接后，适配器会读取 SDK registry，把剩余的当前连接（包括没有别名的连接）设为新会话
+默认值；删除最后一个连接后则明确进入未配置状态。删除后的 registry 刷新失败不会把已经成功的
+删除改写成错误；如果删除的是非当前连接，刷新不可用时也会保留仍然有效的默认连接。
+
+对于同一个 `Hub + clientAppId + workspace` 公开绑定，最终身份由业务授权页及其可信
+`on_behalf_of` 结果决定。如果另一个本机连接名已经授权同一身份，SDK 会用本次连接覆盖旧连接，
+并撤销旧 Agent Session；不同可信身份则继续作为相互独立的连接。如果从一个已经属于其他身份的
+`connectionName` 发起登录，SDK 会保留原连接名及其 Session，为新身份分配一个不冲突的本机名称
+（例如 `default-2`），并把新连接设为后续会话的当前选择。用户可以用 `connections list` 查看
+两者，再用 `connections use <名称或连接键>` 显式切换。如果登录结果返回
+`cleanupRequired: true`，说明新连接仍然授权成功，但一个或多个同绑定旧连接还需要显式清理；
+如果身份检查被推迟，此时还不能断言它们是同一身份。不要重复授权；先查看 `connections list`，
+再对提示的旧连接执行
+`/bailinghub connections remove <名称或连接键>`。
 
 首次验收时，新建一个 DSH 会话，先做一次只读查询，再做一次允许的修改。确认 BailingHub
 后台能看到同一个会话、run、可见最终回复和工具调用轨迹。需要审批的能力必须在审批后恢复
@@ -145,9 +174,10 @@ workspace 时才会成功，不能借此任意切换中枢 route。当前命令�
 
 ## 安全与隐私边界
 
-- 模型不能通过工具参数选择 Hub URL、workspace、身份、凭据、审批结论或能力版本；
-- SDK 在 macOS 使用 Keychain；Linux 与其他 POSIX 系统必须显式启用安全文件回退；0.2.0
-  暂不支持 Windows Agent Session 凭据存储；
+- 模型不能通过工具参数选择 Hub URL、workspace、本机连接、业务身份、凭据、审批结论或能力版本；
+- SDK 在 macOS 使用 Keychain；Windows 凭据文件保存在 LocalAppData 并由 CurrentUser DPAPI
+  保护，Windows PowerShell 或 DPAPI 不可用时失败关闭，不会降级为明文；Linux 与其他 POSIX
+  系统必须显式启用安全文件回退；
 - BailingHub 对每次治理调用重新校验身份、scope、审批、幂等与调用状态，业务系统仍执行
   最终权限判断；
 - 适配器会发送 Agent Client 契约所需的可见用户输入、受治理工具参数/结果和可见最终回复，
@@ -179,12 +209,12 @@ mcp__bailinghub__get_governed_job
 mcp__bailinghub__wait_for_governed_job
 ```
 
-0.2 Agent Client 不会自动读取或迁移 0.1 Client Token。测试升级或回滚时必须显式固定版本，
-并遵循 [0.1 到 0.2 的迁移边界](MIGRATION_VNEXT.md)。
+0.3 Agent Client 不会自动读取或迁移 0.1 Client Token。测试升级或回滚时必须显式固定版本，
+并遵循 [0.1 到 0.3 的迁移边界](MIGRATION_VNEXT.md)。
 
 ## 兼容范围与反馈
 
-0.2.0 只对 [COMPATIBILITY.md](COMPATIBILITY.md) 中列出的版本完成了验证。DeepSeek
+0.3.0 只对 [COMPATIBILITY.md](COMPATIBILITY.md) 中列出的版本完成了验证。DeepSeek
 Harness 仍是 Developer Preview，每次 Harness 升级都必须重新执行 Native Lifecycle Smoke。
 
 问题请提交到 [GitHub Issues](https://github.com/bailinghub/bailinghub-dsh-plugin/issues)。

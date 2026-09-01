@@ -22,12 +22,12 @@ local Agent to act safely.
 This is an independent community integration. It is not developed, certified, endorsed, or
 recommended by DeepSeek.
 
-> **Current stable line:** `dsh-bailinghub@0.2.0` uses the native Agent Client flow documented
+> **Current stable line:** `dsh-bailinghub@0.3.0` uses the native Agent Client flow documented
 > below. Public `0.1.1` remains available only as the explicit static MCP compatibility path.
 
 For the shortest end-user path, follow the [three-minute getting started guide](docs/GETTING_STARTED.md).
 
-## How the 0.2 Agent Client fits together
+## How the 0.3 Agent Client fits together
 
 ```text
 DeepSeek Harness local Agent
@@ -42,7 +42,7 @@ The packages have separate responsibilities:
 - **BailingHub Core** owns Agent Auth, trusted business identity, runtime context, knowledge and
   memory projection, capability governance, approvals, invocation state, and audit records.
 - **`bailinghub-mcp-server/sdk`** owns browser login, PKCE, credential storage, refresh,
-  Hub/client/workspace connection isolation, and HTTP DTO mapping.
+  Hub/client/workspace connection selection, and HTTP DTO mapping.
 - **`dsh-bailinghub`** owns only DSH session, prompt, command, and dynamic-tool lifecycle
   integration. It does not store credentials or call a business API directly.
 
@@ -58,27 +58,29 @@ The deployer and business integrator must prepare these public identifiers in Ba
 2. A public Agent Client application id (`clientAppId`).
 3. At least one authorized workspace. In Agent Client v1, the workspace id is the BailingHub
    route id.
-4. A business authorization page and governed ACC/Tool Provider integration behind that route.
+4. One stable, account- and tenant-neutral business authorization entry configured on the Hub
+   Client App, plus a governed ACC/Tool Provider integration behind that route. The business page
+   must handle sign-in, account switching, and tenant selection before it approves the request.
 
 The end user does **not** enter a business API URL, business login credential, Tool Provider
 signing secret, BailingHub Client Token, or model-provider key into this plugin.
 
-## Install the 0.2 line
+## Install the 0.3 line
 
 Prerequisites:
 
 - Node.js `22.19.0+` or `24+`;
-- `pnpm` and DeepSeek Harness `0.1.0-rc.7`;
+- `pnpm` and a DeepSeek Harness release listed in the compatibility matrix;
 - the BailingHub preparation above.
 
 Install the exact stable version into the DSH Web profile:
 
 ```bash
-npm install --global pnpm @deepseek-ai/dsh@0.1.0-rc.7
-dsh plugin --profile web add dsh-bailinghub@0.2.0
+npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
+dsh plugin --profile web add dsh-bailinghub@0.3.0
 ```
 
-`dsh-bailinghub@0.2.0` installs its exact compatible `bailinghub-mcp-server@0.2.0` dependency
+`dsh-bailinghub@0.3.0` installs its exact compatible `bailinghub-mcp-server@0.3.0` dependency
 automatically. DSH users should not separately guess or install an SDK version.
 
 ## Configure one Hub connection
@@ -90,7 +92,7 @@ The native plugin has exactly four host configuration fields:
 | `hubUrl` | `BAILINGHUB_HUB_URL` | Public HTTPS URL of the developer's own BailingHub | No |
 | `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | Public Agent Client application id registered in that Hub | No |
 | `workspace` | `BAILINGHUB_WORKSPACE` | Initial authorized workspace/route id | No |
-| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | Local alias for this isolated SDK connection | No |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | User-selected local connection label | No |
 
 Example placeholders:
 
@@ -102,7 +104,9 @@ export BAILINGHUB_CONNECTION_NAME='default'
 ```
 
 The same four fields may be supplied through the DSH plugin settings surface. Do not add tokens,
-authorization URLs, business domains, or credentials to the Cordis patch.
+authorization URLs, business domains, or credentials to the Cordis patch. The Hub resolves the
+Client App to its single business authorization entry. `connectionName` is only a user-controlled
+local selector; it is not an account, tenant, or identity claim.
 
 Inspect the composed profile before starting it:
 
@@ -117,19 +121,26 @@ In DSH, run:
 
 ```text
 /bailinghub login
+/bailinghub doctor
 /bailinghub status
 /bailinghub workspaces
 ```
 
-`login` opens the system browser. The business-side authorization page confirms the signed-in
-business identity and requested workspace, then returns to a random loopback callback protected
-by `state` and PKCE S256. Access and refresh tokens remain in SDK-owned secure storage and are
-never written to the plugin configuration or printed by the command.
+`login` opens the system browser at the single business authorization entry configured by the Hub
+operator. That business page owns sign-in, account switching, and tenant selection, confirms the
+resulting business identity and requested workspace, then returns to a random loopback callback
+protected by `state` and PKCE S256. Access and refresh tokens remain in SDK-owned secure storage
+and are never written to the plugin configuration or printed by the command.
 
 Useful commands:
 
 | Command | Purpose |
 | --- | --- |
+| `/bailinghub doctor` | Check host APIs, public configuration, SDK resolution, authorization, and workspace reachability without printing credentials |
+| `/bailinghub connections list` | List local public connection metadata and authorization state without tokens |
+| `/bailinghub connections add <name> <hub-url> <client-app-id> <workspace>` | Create and select another local connection instance for new sessions; the public binding may match an existing instance |
+| `/bailinghub connections use <name-or-key>` | Select a registered connection for new sessions only |
+| `/bailinghub connections remove <name-or-key>` | Remotely revoke its Agent Session, then remove its local credential and metadata |
 | `/bailinghub login` | Authorize the configured Hub/client/workspace in the browser |
 | `/bailinghub status` | Inspect the selected connection without printing credentials |
 | `/bailinghub workspaces` | List workspaces allowed by the current business authorization |
@@ -137,12 +148,37 @@ Useful commands:
 | `/bailinghub sync` | Retry a pending visible completion record without repeating a tool call |
 | `/bailinghub logout` | Revoke and remove the selected Agent Session |
 
-The standard v1 login requests only the configured workspace. `use` succeeds only when the
-current Agent Session explicitly contains the target workspace; it is not permission to switch to
-an arbitrary Hub route. The current command set always operates on this plugin instance's four
-configured fields; it does not accept a connection selector. For another Hub or route, use a
-second DSH profile/plugin instance, or edit those fields and reload the profile, set a different
-`connectionName`, and complete browser authorization again.
+The four plugin fields are the bootstrap connection. Additional connections can be registered with
+`connections add`; the BailingHub console's Agent Client page can generate the same secret-free
+command. On restart, the adapter reads the SDK registry before the first new Agent session or user
+command and adopts its current connection's public metadata; a missing or unavailable registry
+safely falls back to the four bootstrap fields. Quote a connection name when it contains spaces.
+After `connections use`, run `/bailinghub login` if that binding is not authorized yet.
+
+Connection selection is a user-only slash command and is never exposed as a model tool. It affects
+only Agent sessions created afterward; existing sessions remain pinned to their original
+connection and workspace. `/bailinghub use <workspace>` remains a different operation: it succeeds
+only when the current Agent Session already authorizes that workspace.
+
+After removing the selected connection, the adapter reads the SDK registry and adopts the remaining
+current connection for new sessions, including connections without an alias. Removing the final
+connection leaves the adapter explicitly unconfigured. A failed post-remove registry read never
+turns a successful removal into an error; removing a non-current connection also preserves the
+still-valid default when that refresh is unavailable.
+
+For the same `Hub + clientAppId + workspace` public binding, browser authorization determines the
+identity from the business page and its trusted `on_behalf_of` result. If that identity is already
+authorized under another local connection name, the SDK replaces the older local connection and
+revokes its old Agent Session. A different trusted identity remains an independent connection.
+If login starts from a `connectionName` that already belongs to another identity, the SDK keeps
+that original alias and Session, gives the newly authorized identity an available local alias such
+as `default-2`, and selects the new alias for future sessions. Use `connections list` to see both
+and `connections use <name-or-key>` to switch explicitly.
+If login returns `cleanupRequired: true`, the newly selected connection is still authorized, but
+one or more existing same-binding connections need explicit cleanup. Their identity may still be
+unconfirmed when inspection was deferred. Do not authorize again; inspect
+`connections list` and retry `/bailinghub connections remove <name-or-key>` for the reported old
+entry.
 
 For the first acceptance check, start a new DSH conversation and perform one read-only request,
 then one permitted mutation. Confirm the same conversation, run, visible final answer, and tool
@@ -154,10 +190,11 @@ current-turn dynamic schemas. Use native tool mode for governed business actions
 
 ## Security and privacy boundary
 
-- The model cannot choose a Hub URL, workspace, identity, credential, approval result, or
-  capability revision through tool arguments.
-- The SDK stores credentials in macOS Keychain. Linux and other POSIX systems require an explicit
-  secure file-store opt-in; Windows Agent Session storage is not supported in 0.2.0.
+- The model cannot choose a Hub URL, workspace, local connection, business identity, credential,
+  approval result, or capability revision through tool arguments.
+- The SDK stores credentials in macOS Keychain. On Windows it protects credential files under
+  LocalAppData with CurrentUser DPAPI; unavailable Windows PowerShell or DPAPI fails closed without
+  a plaintext fallback. Linux and other POSIX systems require an explicit secure file-store opt-in.
 - BailingHub revalidates identity, scope, approval, idempotency, and invocation state on every
   governed call. The downstream business system still performs final authorization.
 - The adapter sends visible user input, governed tool arguments/results, and the visible final
@@ -191,13 +228,13 @@ mcp__bailinghub__get_governed_job
 mcp__bailinghub__wait_for_governed_job
 ```
 
-The 0.2 Agent Client does not automatically consume or migrate the 0.1 Client Token. Keep versions
-explicit and follow the [0.1-to-0.2 migration boundary](docs/MIGRATION_VNEXT.md) when testing or
+The 0.3 Agent Client does not automatically consume or migrate the 0.1 Client Token. Keep versions
+explicit and follow the [0.1-to-0.3 migration boundary](docs/MIGRATION_VNEXT.md) when testing or
 rolling back.
 
 ## Compatibility and feedback
 
-Version 0.2.0 is verified only against the versions listed in
+Version 0.3.0 is verified only against the versions listed in
 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md). DeepSeek Harness remains a developer preview, so
 every Harness release requires a new native lifecycle smoke test.
 

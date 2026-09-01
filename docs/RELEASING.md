@@ -26,13 +26,13 @@ its package, or silently reinterpret its Client Token and Hub-orchestrated seman
 
 ## Public manifest gates
 
-The stable `0.2.0` manifest is publishable and must retain all of these properties:
+The stable `0.3.0` manifest is publishable and must retain all of these properties:
 
 ```text
-version: 0.2.0
+version: 0.3.0
 publishConfig.access: public
 publishConfig.provenance: true
-dependency: bailinghub-mcp-server@0.2.0 (exact ordinary dependency)
+dependency: bailinghub-mcp-server@0.3.0 (exact ordinary dependency)
 ```
 
 For every public prerelease or stable version:
@@ -77,10 +77,12 @@ The native host configuration remains exactly:
 | `hubUrl` | `BAILINGHUB_HUB_URL` | deployer |
 | `clientAppId` | `BAILINGHUB_CLIENT_APP_ID` | Hub/business integrator |
 | `workspace` | `BAILINGHUB_WORKSPACE` | Hub/business integrator; Agent Client v1 route id |
-| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | local end-user profile |
+| `connectionName` | `BAILINGHUB_CONNECTION_NAME` | user-selected local connection label |
 
 No Client Token, model key, business endpoint, authorization endpoint, signing secret, or business
-credential belongs in the DSH plugin configuration.
+credential belongs in the DSH plugin configuration. The Hub Client App owns one stable business
+authorization entry; the business page owns login, account switching, tenant selection, and the
+trusted identity result.
 
 ## Source and tarball verification
 
@@ -141,24 +143,43 @@ Use a dedicated non-production Hub client/workspace and a no-surprise business f
 its credentials, private URL, authorization code, personal data, or raw payload into logs,
 screenshots, release notes, or CI artifacts.
 
+A separate `DSH_HOME` keeps DSH configuration, sessions, and logs apart. A multi-connection
+release must additionally prove the post-authorization reconciliation rules on
+one Hub/client/workspace binding: a second authorization of the same trusted `on_behalf_of`
+replaces the older local connection, while a different trusted `on_behalf_of` remains independent.
+If old-Session revocation is deliberately made to fail, the new connection must remain authorized,
+the old entry must remain available for explicit cleanup, and the command must say not to
+authorize again. Do not infer any of these results from separate DSH homes or connection names.
+
 In the isolated DSH Web profile:
 
-1. Run `/bailinghub login` and confirm the system browser opens the business authorization page.
-2. Confirm the page shows the intended business identity, Hub client, requested workspace, and
-   requested capability boundary before approval.
-3. Complete the callback and verify `/bailinghub status` without exposing access or refresh tokens.
-4. Run `/bailinghub workspaces`; optionally switch to another already-authorized workspace using
+1. Run `/bailinghub doctor`; before login it must identify the isolated connection as logged out
+   without printing any credential, private endpoint, or model-provider key.
+2. Run `/bailinghub login` and confirm the system browser opens the single business authorization
+   entry configured for the Hub Client App; no business URL is present in plugin configuration.
+3. Log in or switch account and select a tenant on that business page when required. Confirm it
+   shows the intended final business identity, Hub client, requested workspace, and capability
+   boundary before approval.
+4. Complete the callback and verify `/bailinghub doctor` plus `/bailinghub status` without exposing
+   access or refresh tokens.
+5. Run `/bailinghub workspaces`; optionally switch to another already-authorized workspace using
    `/bailinghub use <workspace>` before opening a new session.
-5. Start a new conversation and perform one read-only query.
-6. Perform one permitted mutation whose ACC governance does not require approval.
-7. Exercise one approval-required or pending invocation and prove DSH resumes the exact original
+6. Start a new conversation and perform one read-only query.
+7. Perform one permitted mutation whose ACC governance does not require approval.
+8. Exercise one approval-required or pending invocation and prove DSH resumes the exact original
    invocation id instead of repeating `invoke`.
-8. Confirm BailingHub contains the same conversation, run, user message, visible final assistant
+9. Confirm BailingHub contains the same conversation, run, user message, visible final assistant
    response, legal completion status, public usage, and tool trajectory without hidden reasoning or
    raw credential material.
-9. Exercise `/bailinghub sync` only for a deliberately pending completion and prove it reuses the
+10. Exercise `/bailinghub sync` only for a deliberately pending completion and prove it reuses the
    frozen completion payload.
-10. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
+11. Add a new connection name on the same public binding, authorize the same trusted identity, and
+    confirm the older local connection is replaced. Add another name and authorize a different
+    trusted identity; confirm both identities remain independently selectable and revocable. Then
+    start login from an existing alias and return a different trusted identity: confirm the old
+    alias and Session remain, the new identity receives a non-conflicting alias that becomes
+    current, and `connections list|use` can select either one.
+12. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
 
 Native Code Mode must degrade rather than expose stale or unsafe dynamic schemas. Run the live
 business checks in Native Tool Mode.

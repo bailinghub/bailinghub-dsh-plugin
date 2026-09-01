@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { createAgentClientPlugin } from '../lib/index.js'
+import { parseCommandArguments } from '../lib/runtime.js'
 import {
   baseAssembly,
   callsFor,
@@ -71,13 +72,21 @@ test('keeps connection, conversation, run, and active definitions isolated per A
   assert.notEqual(invokes[0].args[0].agentRunId, invokes[1].args[0].agentRunId)
 })
 
-test('registers a real DSH command entrypoint for login/status/logout/workspaces/use', async () => {
+test('registers a real DSH command entrypoint including a credential-safe doctor', async () => {
   const host = createMockHost()
   const mock = createMockTransport()
   createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
 
   const command = host.commands.get('bailinghub')
   assert.ok(command)
+  const doctor = await command.handler({ rawInput: 'doctor' })
+  assert.equal(doctor.kind, 'success')
+  assert.match(doctor.text, /Overall: PASS/)
+  assert.match(doctor.text, /DSH host contract: PASS/)
+  assert.match(doctor.text, /connectionName is a local user-selected label/)
+  assert.match(doctor.text, /single business authorization page handles sign-in, account switching, and tenant selection/)
+  assert.doesNotMatch(doctor.text, /access_token|not-exposed|hub\.example\.com|personal/)
+
   for (const rawInput of ['login', 'status', 'logout', 'workspaces', 'sync']) {
     const result = await command.handler({ rawInput })
     assert.equal(result.kind, 'success')
@@ -93,6 +102,472 @@ test('registers a real DSH command entrypoint for login/status/logout/workspaces
   assert.equal(use.args[0].workspace, 'second_workspace')
   assert.equal(use.args[0].route, 'second_workspace')
   assert.ok(host.services.has('bailingHubAgentClient'))
+})
+
+test('reports cleanup-required login as authorized with an explicit no-reauthorize warning', async () => {
+  const host = createMockHost()
+  const mock = createMockTransport({
+    login: async () => ({
+      state: 'authorized',
+      identityReconciliation: 'cleanup_required',
+      cleanupRequired: true,
+      cleanupConnections: [
+        { connectionKey: 'conn_old' },
+      ],
+      warning: 'Authorization succeeded, but an earlier Session still needs cleanup.',
+    }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const result = await host.commands.get('bailinghub').handler({ rawInput: 'login' })
+
+  assert.equal(result.kind, 'success')
+  assert.match(result.text, /Authorization succeeded\. The selected connection remains authorized\./)
+  assert.match(result.text, /WARNING: an existing connection still requires cleanup/)
+  assert.match(result.text, /Pending cleanup: conn_old/)
+  assert.match(result.text, /Do not authorize again/)
+  assert.match(result.text, /\/bailinghub connections remove <name-or-key>/)
+})
+
+test('keeps different-identity aliases visible and user-selectable after same-alias login', async () => {
+  const host = createMockHost()
+  const connection = (connectionName, connectionKey, current) => ({
+    connectionName,
+    connectionKey,
+    hubUrl: 'https://hub.example.com',
+    clientAppId: 'dsh_client',
+    workspace: 'demo',
+    current,
+    state: 'authorized',
+  })
+  const mock = createMockTransport({
+    login: async () => ({
+      state: 'authorized',
+      connectionName: 'personal-2',
+      connectionKey: 'conn_identity_2',
+      identityReconciliation: 'distinct',
+      cleanupRequired: false,
+    }),
+    connectionsList: async () => ({
+      currentConnectionKey: 'conn_identity_2',
+      connections: [
+        connection('personal', 'conn_identity_1', false),
+        connection('personal-2', 'conn_identity_2', true),
+      ],
+    }),
+    connectionsUse: async (selector) => ({
+      state: 'selected',
+      connection: selector === 'personal'
+        ? connection('personal', 'conn_identity_1', true)
+        : connection('personal-2', 'conn_identity_2', true),
+    }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  const command = host.commands.get('bailinghub')
+
+  const login = await command.handler({ rawInput: 'login' })
+  const newIdentity = createMockAgent('different-identity-current')
+  await assemble(host, newIdentity.agent, 1, 'Use the newly authorized identity')
+  const listed = await command.handler({ rawInput: 'connections list' })
+  const selected = await command.handler({ rawInput: 'connections use personal' })
+  const originalIdentity = createMockAgent('different-identity-original')
+  await assemble(host, originalIdentity.agent, 1, 'Switch back to the original identity')
+
+  assert.equal(login.kind, 'success')
+  assert.match(login.text, /"identityReconciliation":"distinct"/)
+  assert.match(login.text, /"connectionName":"personal-2"/)
+  assert.match(listed.text, /"connectionName":"personal"/)
+  assert.match(listed.text, /"connectionName":"personal-2"/)
+  assert.equal(selected.kind, 'success')
+  assert.equal(callsFor(mock.calls, 'connectionsUse')[0].args[0], 'personal')
+  const starts = callsFor(mock.calls, 'startTurn')
+  assert.equal(starts[0].args[1].connectionName, 'personal-2')
+  assert.equal(starts[1].args[1].connectionName, 'personal')
+})
+
+test('parses quoted connection names and exposes user-only connection lifecycle commands', async () => {
+  assert.deepEqual(
+    parseCommandArguments('connections add "second hub" https://two.example.com second_client staff'),
+    ['connections', 'add', 'second hub', 'https://two.example.com', 'second_client', 'staff'],
+  )
+  assert.throws(() => parseCommandArguments('connections use "unfinished'), /unfinished quote/)
+
+  const host = createMockHost()
+  const mock = createMockTransport()
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  const command = host.commands.get('bailinghub')
+
+  for (const rawInput of [
+    'connections list',
+    'connections add "second hub" https://two.example.com second_client staff',
+    'connections use "second hub"',
+    'connections remove "second hub"',
+  ]) {
+    const result = await command.handler({ rawInput })
+    assert.equal(result.kind, 'success')
+  }
+  assert.deepEqual(callsFor(mock.calls, 'connectionsAdd')[0].args[0], {
+    connectionName: 'second hub',
+    hubUrl: 'https://two.example.com',
+    clientAppId: 'second_client',
+    workspace: 'staff',
+  })
+  assert.equal(callsFor(mock.calls, 'connectionsUse')[0].args[0], 'second hub')
+  assert.equal(callsFor(mock.calls, 'connectionsRemove')[0].args[0], 'second hub')
+})
+
+test('connection switching affects only new Agent sessions while existing sessions stay pinned', async () => {
+  const host = createMockHost()
+  const mock = createMockTransport()
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  const first = createMockAgent('connection-first')
+  await assemble(host, first.agent, 1, 'First request')
+
+  const switched = await host.commands.get('bailinghub').handler({ rawInput: 'connections use second' })
+  assert.equal(switched.kind, 'success')
+  const second = createMockAgent('connection-second')
+  await assemble(host, second.agent, 1, 'Second request')
+  await assemble(host, first.agent, 2, 'First connection again')
+
+  const starts = callsFor(mock.calls, 'startTurn')
+  assert.equal(starts[0].args[1].connectionName, 'personal')
+  assert.equal(starts[0].args[1].workspace, 'demo')
+  assert.equal(starts[1].args[1].connectionName, 'second')
+  assert.equal(starts[1].args[1].workspace, 'staff')
+  assert.equal(starts[2].args[1].connectionName, 'personal')
+  assert.equal(starts[2].args[1].workspace, 'demo')
+})
+
+test('restores the SDK registry current connection before the first new Agent session', async () => {
+  const host = createMockHost()
+  const currentConnectionKey = `conn_${'2'.repeat(32)}`
+  const mock = createMockTransport({
+    connectionsList: async () => ({
+      currentConnectionKey,
+      connections: [{
+        connectionKey: currentConnectionKey,
+        connectionName: 'restored',
+        hubUrl: 'https://restored.example.com',
+        clientAppId: 'restored_client',
+        workspace: 'restored_workspace',
+        current: true,
+        state: 'authorized',
+      }],
+    }),
+  })
+  let transportBootstrap
+  createAgentClientPlugin({
+    transportFactory: (bootstrap) => {
+      transportBootstrap = { ...bootstrap }
+      return mock.transport
+    },
+  }).apply(host.ctx, config)
+
+  const restored = createMockAgent('restored-current')
+  const restoredAssembly = await assemble(host, restored.agent, 1, 'Use the persisted current connection')
+
+  assert.deepEqual(transportBootstrap, config)
+  assert.equal(callsFor(mock.calls, 'connectionsList').length, 1)
+  assert.equal(callsFor(mock.calls, 'startTurn')[0].args[1].connectionName, 'restored')
+  assert.equal(callsFor(mock.calls, 'startTurn')[0].args[1].workspace, 'restored_workspace')
+  assert.equal(
+    restoredAssembly.tools.some((tool) => /connection|workspace/i.test(tool.name)),
+    false,
+  )
+
+  const switched = await host.commands.get('bailinghub').handler({ rawInput: 'connections use second' })
+  assert.equal(switched.kind, 'success')
+  const second = createMockAgent('restored-second')
+  await assemble(host, second.agent, 1, 'Use the explicitly selected connection')
+  await assemble(host, restored.agent, 2, 'Keep the original restored connection')
+
+  const starts = callsFor(mock.calls, 'startTurn')
+  assert.equal(starts[1].args[1].connectionName, 'second')
+  assert.equal(starts[1].args[1].workspace, 'staff')
+  assert.equal(starts[2].args[1].connectionName, 'restored')
+  assert.equal(starts[2].args[1].workspace, 'restored_workspace')
+})
+
+test('restores the SDK registry current connection before the first user command', async () => {
+  const host = createMockHost()
+  const currentConnectionKey = `conn_${'3'.repeat(32)}`
+  const mock = createMockTransport({
+    connectionsList: async () => ({
+      currentConnectionKey,
+      connections: [{
+        connectionKey: currentConnectionKey,
+        connectionName: 'command-current',
+        hubUrl: 'https://command.example.com',
+        clientAppId: 'command_client',
+        workspace: 'command_workspace',
+        current: true,
+        state: 'authorized',
+      }],
+    }),
+    status: async () => ({ state: 'authorized', workspace: 'command_workspace' }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const result = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
+
+  assert.equal(result.kind, 'success')
+  assert.deepEqual(mock.calls.slice(0, 2).map((call) => call.method), ['connectionsList', 'status'])
+  assert.equal(callsFor(mock.calls, 'status')[0].args[0].connectionName, 'command-current')
+})
+
+test('falls back to bootstrap fields when registry restore fails without blocking other tools', async () => {
+  const host = createMockHost()
+  const mock = createMockTransport({
+    connectionsList: async () => {
+      throw new Error('private registry failure')
+    },
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  const { agent } = createMockAgent('registry-fallback')
+  const localTool = {
+    name: 'local_file_read',
+    description: 'Read a local file',
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+  }
+  const original = baseAssembly({ tools: [localTool] })
+
+  host.emit('agent/inbox/claimed', {
+    agent,
+    turn: 1,
+    message: userMessage('registry-fallback-message', 'Use the bootstrap connection'),
+  })
+  const assembly = await host.waterfall(
+    'system-prompt/assemble',
+    original,
+    { agent, signal: new AbortController().signal },
+    async () => original,
+  )
+
+  assert.ok(assembly.tools.some((tool) => tool.name === 'local_file_read'))
+  const [start] = callsFor(mock.calls, 'startTurn')
+  assert.equal(start.args[1].connectionName, 'personal')
+  assert.equal(start.args[1].workspace, 'demo')
+  const status = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
+  assert.equal(status.kind, 'success')
+  assert.equal(callsFor(mock.calls, 'connectionsList').length, 1)
+  assert.equal(callsFor(mock.calls, 'status')[0].args[0].connectionName, 'personal')
+  assert.doesNotMatch(status.text, /private registry failure/)
+})
+
+test('removing the current connection adopts the registry fallback without moving existing sessions', async () => {
+  const host = createMockHost()
+  const removedConnectionKey = `conn_${'4'.repeat(32)}`
+  const fallbackConnectionKey = `conn_${'5'.repeat(32)}`
+  let listCount = 0
+  const mock = createMockTransport({
+    connectionsList: async () => {
+      listCount += 1
+      if (listCount === 1) {
+        return {
+          currentConnectionKey: removedConnectionKey,
+          connections: [{
+            connectionKey: removedConnectionKey,
+            hubUrl: 'https://removed.example.com',
+            clientAppId: 'removed_client',
+            workspace: 'removed_workspace',
+            current: true,
+            state: 'authorized',
+          }],
+        }
+      }
+      return {
+        currentConnectionKey: fallbackConnectionKey,
+        connections: [{
+          connectionKey: fallbackConnectionKey,
+          hubUrl: 'https://fallback.example.com',
+          clientAppId: 'fallback_client',
+          workspace: 'fallback_workspace',
+          current: true,
+          state: 'authorized',
+        }],
+      }
+    },
+    connectionsRemove: async () => ({
+      state: 'removed',
+      connectionKey: removedConnectionKey,
+      remoteRevoked: true,
+      currentConnectionKey: fallbackConnectionKey,
+    }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const existing = createMockAgent('remove-current-existing')
+  const empty = baseAssembly()
+  await host.waterfall(
+    'system-prompt/assemble',
+    empty,
+    { agent: existing.agent, signal: new AbortController().signal },
+    async () => empty,
+  )
+  const removed = await host.commands.get('bailinghub').handler({
+    rawInput: `connections remove ${removedConnectionKey}`,
+  })
+  const login = await host.commands.get('bailinghub').handler({ rawInput: 'login' })
+
+  assert.equal(removed.kind, 'success')
+  assert.equal(login.kind, 'success')
+  assert.equal(listCount, 2)
+  assert.deepEqual(callsFor(mock.calls, 'login')[0].args[0], {
+    hubUrl: 'https://fallback.example.com',
+    clientAppId: 'fallback_client',
+    workspace: 'fallback_workspace',
+    route: 'fallback_workspace',
+    connectionName: fallbackConnectionKey,
+  })
+
+  const fresh = createMockAgent('remove-current-fresh')
+  await assemble(host, fresh.agent, 1, 'Use the fallback connection')
+  await assemble(host, existing.agent, 1, 'Keep the captured connection')
+  const starts = callsFor(mock.calls, 'startTurn')
+  assert.equal(starts[0].args[1].connectionName, fallbackConnectionKey)
+  assert.equal(starts[0].args[1].workspace, 'fallback_workspace')
+  assert.equal(starts[1].args[1].connectionName, removedConnectionKey)
+  assert.equal(starts[1].args[1].workspace, 'removed_workspace')
+})
+
+test('removing the last connection leaves new sessions explicitly unconfigured', async () => {
+  const host = createMockHost()
+  const removedConnectionKey = `conn_${'6'.repeat(32)}`
+  let listCount = 0
+  const mock = createMockTransport({
+    connectionsList: async () => {
+      listCount += 1
+      return listCount === 1
+        ? {
+            currentConnectionKey: removedConnectionKey,
+            connections: [{
+              connectionKey: removedConnectionKey,
+              connectionName: 'last',
+              hubUrl: 'https://last.example.com',
+              clientAppId: 'last_client',
+              workspace: 'last_workspace',
+              current: true,
+              state: 'authorized',
+            }],
+          }
+        : { currentConnectionKey: null, connections: [] }
+    },
+    connectionsRemove: async () => ({
+      state: 'removed',
+      connectionKey: removedConnectionKey,
+      connectionName: 'last',
+      remoteRevoked: true,
+      currentConnectionKey: null,
+    }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const removed = await host.commands.get('bailinghub').handler({ rawInput: 'connections remove last' })
+  const status = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
+  const fresh = createMockAgent('remove-last-fresh')
+  const assembly = await assemble(host, fresh.agent, 1, 'Do not use a removed connection')
+
+  assert.equal(removed.kind, 'success')
+  assert.equal(status.kind, 'success')
+  assert.match(status.text, /"state":"unconfigured"/)
+  assert.match(status.text, /selectedConnection/)
+  assert.equal(listCount, 2)
+  assert.equal(callsFor(mock.calls, 'status').length, 0)
+  assert.equal(callsFor(mock.calls, 'startTurn').length, 0)
+  assert.match(
+    assembly.sections.find((section) => section.name === 'bailinghub:agent-client-profile').text,
+    /configuration required/,
+  )
+})
+
+test('a failed registry refresh after removing a non-current connection preserves the default', async () => {
+  const host = createMockHost()
+  const currentConnectionKey = `conn_${'7'.repeat(32)}`
+  const removedConnectionKey = `conn_${'8'.repeat(32)}`
+  let listCount = 0
+  const mock = createMockTransport({
+    connectionsList: async () => {
+      listCount += 1
+      if (listCount > 1) throw new Error('private post-remove registry failure')
+      return {
+        currentConnectionKey,
+        connections: [{
+          connectionKey: currentConnectionKey,
+          connectionName: 'personal',
+          hubUrl: 'https://hub.example.com',
+          clientAppId: 'dsh_client',
+          workspace: 'demo',
+          current: true,
+          state: 'authorized',
+        }],
+      }
+    },
+    connectionsRemove: async () => ({
+      state: 'removed',
+      connectionKey: removedConnectionKey,
+      connectionName: 'secondary',
+      remoteRevoked: true,
+      currentConnectionKey,
+    }),
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const removed = await host.commands.get('bailinghub').handler({
+    rawInput: 'connections remove secondary',
+  })
+  const status = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
+  const fresh = createMockAgent('remove-non-current-fresh')
+  await assemble(host, fresh.agent, 1, 'Keep using the current connection')
+
+  assert.equal(removed.kind, 'success')
+  assert.doesNotMatch(removed.text, /private post-remove registry failure/)
+  assert.equal(status.kind, 'success')
+  assert.equal(listCount, 2)
+  assert.equal(callsFor(mock.calls, 'status')[0].args[0].connectionName, 'personal')
+  const [start] = callsFor(mock.calls, 'startTurn')
+  assert.equal(start.args[1].connectionName, 'personal')
+  assert.equal(start.args[1].workspace, 'demo')
+})
+
+test('doctor stops before SDK load when configuration is invalid', async () => {
+  const host = createMockHost()
+  let transportRequested = false
+  createAgentClientPlugin({
+    transportFactory: () => {
+      transportRequested = true
+      throw new Error('private transport failure')
+    },
+  }).apply(host.ctx, {
+    hubUrl: '',
+    clientAppId: '',
+    workspace: '',
+    connectionName: 'default',
+  })
+
+  const result = await host.commands.get('bailinghub').handler({ rawInput: 'doctor' })
+  assert.equal(result.kind, 'error')
+  assert.match(result.text, /Overall: FAIL/)
+  assert.match(result.text, /hubUrl, clientAppId, workspace/)
+  assert.doesNotMatch(result.text, /private transport failure/)
+  assert.equal(transportRequested, false)
+})
+
+test('doctor reports logged-out isolation without probing authorized workspaces', async () => {
+  const host = createMockHost()
+  const mock = createMockTransport({
+    status: async () => ({ state: 'logged_out', refresh_token: 'must-not-leak' }),
+    workspaces: async () => {
+      throw new Error('must not probe workspaces before authorization')
+    },
+  })
+  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+
+  const result = await host.commands.get('bailinghub').handler({ rawInput: 'doctor' })
+  assert.equal(result.kind, 'error')
+  assert.match(result.text, /Authorization: FAIL \(logged_out\)/)
+  assert.match(result.text, /Run \/bailinghub login/)
+  assert.doesNotMatch(result.text, /refresh_token|must-not-leak/)
+  assert.equal(callsFor(mock.calls, 'workspaces').length, 0)
 })
 
 test('keeps an immutable pending completion and lets the sync command replay it', async () => {

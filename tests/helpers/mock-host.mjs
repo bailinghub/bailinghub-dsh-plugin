@@ -149,8 +149,48 @@ export function createMockTransport(overrides = {}) {
     return implementation(...args)
   }
   const transport = {
+    connectionsList: record('connectionsList', async () => ({
+      currentConnectionKey: `conn_${'1'.repeat(32)}`,
+      connections: [{
+        connectionKey: `conn_${'1'.repeat(32)}`,
+        connectionName: 'personal',
+        hubUrl: 'https://hub.example.com',
+        clientAppId: 'dsh_client',
+        workspace: 'demo',
+        current: true,
+        state: 'authorized',
+      }],
+    })),
+    connectionsAdd: record('connectionsAdd', async (input) => ({
+      state: 'registered',
+      connection: {
+        connectionName: input.connectionName,
+        hubUrl: input.hubUrl,
+        clientAppId: input.clientAppId,
+        workspace: input.workspace,
+        current: true,
+        state: 'logged_out',
+      },
+    })),
+    connectionsUse: record('connectionsUse', async (connectionName) => ({
+      state: 'selected',
+      connection: {
+        connectionName,
+        hubUrl: connectionName === 'second' ? 'https://two.example.com' : 'https://hub.example.com',
+        clientAppId: connectionName === 'second' ? 'second_client' : 'dsh_client',
+        workspace: connectionName === 'second' ? 'staff' : 'demo',
+        current: true,
+      },
+    })),
+    connectionsRemove: record('connectionsRemove', async (connectionName) => ({
+      state: 'removed', connectionName, remoteRevoked: true,
+    })),
     login: record('login', async () => ({ state: 'authorized' })),
-    status: record('status', async () => ({ state: 'authorized', access_token: 'not-exposed' })),
+    status: record('status', async () => ({
+      state: 'authorized',
+      workspace: 'demo',
+      access_token: 'not-exposed',
+    })),
     logout: record('logout', async () => ({ state: 'logged_out' })),
     workspaces: record('workspaces', async () => ({ workspaces: [{ route: 'demo', name: 'Demo' }] })),
     use: record('use', async (input) => ({ state: 'selected', workspace: input.workspace })),

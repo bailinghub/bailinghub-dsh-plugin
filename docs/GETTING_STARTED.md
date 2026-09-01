@@ -17,14 +17,14 @@ Connection Name
 
 They identify the BailingHub application and starting workspace. They are not credentials. Do not
 ask the administrator to send you a Client Token, Tool Provider secret, business password, model
-API key, authorization code, or browser session cookie.
+API key, authorization code, browser session cookie, business URL, or tenant-specific login URL.
 
 ## 1. Install the plugin
 
 Install the exact public version into the DSH Web profile:
 
 ```bash
-dsh plugin --profile web add dsh-bailinghub@0.2.0
+dsh plugin --profile web add dsh-bailinghub@0.3.0
 ```
 
 The plugin installs the matching BailingHub SDK automatically.
@@ -53,9 +53,19 @@ Start DSH and run:
 /bailinghub workspaces
 ```
 
-`login` opens the business-side authorization page. Check the signed-in business identity and
-requested workspace before approving. Authorization uses the existing business login; it does not
-send the business password to the plugin.
+`login` opens the one business-side authorization entry configured for the Client App. Sign in or
+switch account there, select a tenant there when the business system asks, and check the resulting
+business identity and requested workspace before approving. Authorization uses the business
+system's own login; it does not send the business password or business URL to the plugin.
+
+`Connection Name` is only a local selector. If the same trusted business identity authorizes the
+same Hub/client/workspace binding again, the SDK replaces the older local connection. A different
+trusted identity remains separate. When the selected name already belongs to the old identity,
+the SDK preserves it and assigns the new identity an available alias such as `default-2`; the new
+alias becomes current. Run `/bailinghub connections list` to see both and
+`/bailinghub connections use <name-or-key>` to switch. If login says cleanup is required, the new
+connection is already authorized, but an existing connection may still need inspection or
+removal: do not authorize again; list connections and remove the reported old entry.
 
 ## 4. Try one safe business request
 

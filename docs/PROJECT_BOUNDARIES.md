@@ -21,9 +21,10 @@ BailingHub tool surface.
 DeepSeek and DeepSeek Harness are names of their respective owners. This is an independent
 community integration, not an official DeepSeek plugin or partnership.
 
-## Public native 0.2.0
+## Public native line (0.2.0 onward)
 
-Version 0.2.0 adds a separate dependency path without reinterpreting the public static MCP path:
+Version 0.2.0 introduced this dependency path. Version 0.3.0 keeps it separate from the public
+static MCP path and adds the stable multi-connection lifecycle:
 
 ```text
 DeepSeek Harness local Agent

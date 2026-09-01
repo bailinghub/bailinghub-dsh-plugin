@@ -10,15 +10,22 @@ const legacyPatch = await readFile(new URL('../cordis.patch.yml', import.meta.ur
 
 test('is a publishable stable native Cordis plugin', () => {
   assert.notEqual(packageJson.private, true)
-  assert.equal(packageJson.version, '0.2.0')
+  assert.equal(packageJson.version, '0.3.0')
   assert.deepEqual(packageJson.publishConfig, { access: 'public', provenance: true })
   assert.equal(packageJson.main, 'lib/index.js')
   assert.equal(packageJson.exports, './lib/index.js')
   assert.deepEqual(packageJson.dsh, { bundle: { patch: './cordis.agent-client.patch.yml' } })
   assert.equal(packageJson.dependencies['@deepseek-ai/schemastery'], '^3.18.1')
-  assert.equal(packageJson.dependencies['bailinghub-mcp-server'], '0.2.0')
+  assert.equal(packageJson.dependencies['bailinghub-mcp-server'], '0.3.0')
   assert.equal(packageJson.peerDependencies?.['bailinghub-mcp-server'], undefined)
   assert.equal(packageJson.peerDependenciesMeta?.['bailinghub-mcp-server'], undefined)
+  assert.deepEqual(packageJson.devDependencies, {
+    '@deepseek-ai/cordis': '4.0.1',
+    '@deepseek-ai/dsh-commands': '0.1.1-rc.2',
+    '@deepseek-ai/dsh-scope': '0.1.1-rc.2',
+    '@deepseek-ai/dsh-system-prompt': '0.1.1-rc.2',
+    '@deepseek-ai/dsh-tools': '0.1.1-rc.2',
+  })
 })
 
 test('native configuration contains only Hub-owned public routing fields', () => {
@@ -54,19 +61,19 @@ test('has no install hooks or local file dependencies', () => {
 test('requires every publishable package to install one exact SDK version', () => {
   const publicStable = {
     ...packageJson,
-    version: '0.2.0',
+    version: '0.3.0',
     private: false,
     dependencies: {
       ...packageJson.dependencies,
-      'bailinghub-mcp-server': '0.2.0',
+      'bailinghub-mcp-server': '0.3.0',
     },
   }
   delete publicStable.peerDependencies
   delete publicStable.peerDependenciesMeta
   const publicLock = {
     packages: {
-      '': { dependencies: { 'bailinghub-mcp-server': '0.2.0' } },
-      'node_modules/bailinghub-mcp-server': { version: '0.2.0' },
+      '': { dependencies: { 'bailinghub-mcp-server': '0.3.0' } },
+      'node_modules/bailinghub-mcp-server': { version: '0.3.0' },
     },
   }
 
@@ -76,7 +83,7 @@ test('requires every publishable package to install one exact SDK version', () =
 test('rejects public packages with ranged, optional-peer, optional, or local SDK dependencies', () => {
   const publicStable = {
     ...packageJson,
-    version: '0.2.0',
+    version: '0.3.0',
     private: false,
     dependencies: { ...packageJson.dependencies },
   }
@@ -84,7 +91,7 @@ test('rejects public packages with ranged, optional-peer, optional, or local SDK
   assert.throws(
     () => validateReleaseDependencyContract({
       ...publicStable,
-      dependencies: { ...publicStable.dependencies, 'bailinghub-mcp-server': '^0.2.0' },
+      dependencies: { ...publicStable.dependencies, 'bailinghub-mcp-server': '^0.3.0' },
     }),
     /exact ordinary dependency/,
   )
@@ -98,7 +105,7 @@ test('rejects public packages with ranged, optional-peer, optional, or local SDK
   assert.throws(
     () => validateReleaseDependencyContract({
       ...publicStable,
-      dependencies: { ...publicStable.dependencies, 'bailinghub-mcp-server': '0.2.0-rc.1' },
+      dependencies: { ...publicStable.dependencies, 'bailinghub-mcp-server': '0.3.0-rc.1' },
       peerDependencies: undefined,
       peerDependenciesMeta: undefined,
     }),
@@ -107,13 +114,13 @@ test('rejects public packages with ranged, optional-peer, optional, or local SDK
   assert.throws(
     () => validateReleaseDependencyContract({
       ...publicStable,
-      dependencies: { ...publicStable.dependencies, 'bailinghub-mcp-server': '0.2.0' },
-      peerDependencies: { 'bailinghub-mcp-server': '>=0.2.0' },
+      dependencies: { ...publicStable.dependencies, 'bailinghub-mcp-server': '0.3.0' },
+      peerDependencies: { 'bailinghub-mcp-server': '>=0.3.0' },
       peerDependenciesMeta: { 'bailinghub-mcp-server': { optional: true } },
     }, {
       packages: {
-        '': { dependencies: { 'bailinghub-mcp-server': '0.2.0' } },
-        'node_modules/bailinghub-mcp-server': { version: '0.2.0' },
+        '': { dependencies: { 'bailinghub-mcp-server': '0.3.0' } },
+        'node_modules/bailinghub-mcp-server': { version: '0.3.0' },
       },
     }),
     /peer dependency/,
@@ -121,14 +128,14 @@ test('rejects public packages with ranged, optional-peer, optional, or local SDK
   assert.throws(
     () => validateReleaseDependencyContract({
       ...publicStable,
-      dependencies: { ...publicStable.dependencies, 'bailinghub-mcp-server': '0.2.0' },
+      dependencies: { ...publicStable.dependencies, 'bailinghub-mcp-server': '0.3.0' },
       peerDependencies: undefined,
       peerDependenciesMeta: undefined,
-      optionalDependencies: { 'bailinghub-mcp-server': '0.2.0' },
+      optionalDependencies: { 'bailinghub-mcp-server': '0.3.0' },
     }, {
       packages: {
-        '': { dependencies: { 'bailinghub-mcp-server': '0.2.0' } },
-        'node_modules/bailinghub-mcp-server': { version: '0.2.0' },
+        '': { dependencies: { 'bailinghub-mcp-server': '0.3.0' } },
+        'node_modules/bailinghub-mcp-server': { version: '0.3.0' },
       },
     }),
     /optional dependency/,
@@ -138,8 +145,8 @@ test('rejects public packages with ranged, optional-peer, optional, or local SDK
 test('keeps the current stable dependency contract valid', () => {
   const matchingLock = {
     packages: {
-      '': { dependencies: { 'bailinghub-mcp-server': '0.2.0' } },
-      'node_modules/bailinghub-mcp-server': { version: '0.2.0' },
+      '': { dependencies: { 'bailinghub-mcp-server': '0.3.0' } },
+      'node_modules/bailinghub-mcp-server': { version: '0.3.0' },
     },
   }
   assert.doesNotThrow(() => validateReleaseDependencyContract(packageJson, matchingLock))
