@@ -2,14 +2,28 @@
 
 ## Unreleased
 
-- Add a source candidate for one DSH conversation to select among independently authorized
-  identities sharing one Hub/client/workspace binding, without changing the global connection.
+- Change the unreleased candidate to explicit per-conversation scope: unset or empty scope stays
+  ordinary chat. Registered authorizations and the global default no longer automatically enable
+  business tools or runs in a new candidate conversation.
+- Add host `setSessionScope`, `getSessionScope`, and `restoreSessionScope` APIs, plus user-only
+  `/bailinghub scope`, `scope none`, and `scope set <connection-key>...` commands. Validate selected
+  keys before sending business input and freeze scope on the first `user/message` event, with
+  the inbox claim as a fallback for drivers that do not emit it.
+  Hosts must await and display successful selection before sending; scope changes require a new
+  conversation after the first message.
+- Persist non-secret scope snapshots with revision compare-and-swap, cross-process locking, and
+  atomic files under the DSH home. Permit injected stores and an explicit non-persistent memory
+  adapter. Missing or invalid old snapshots, failed selection, or any unavailable selected
+  authorization block the whole business scope without a default or subset fallback.
+- Allow explicitly selected, independently authorized identities sharing one Hub/client/workspace
+  binding in one conversation, without changing the global connection.
 - Register matching typed business tools once, with a host-issued `authorization_ref` selector
   outside the original business arguments in multi-authorization conversations. Preserve the
   original argument shape for single-authorization conversations and the 12-tool total budget.
 - Keep per-authorization context, permission checks, run state, and exact-invocation recovery
   across turns of the same live conversation; pin the original Agent Session before transport,
   reject conflicting same-name declarations and never retarget a pending operation.
+  Scope restoration across a process restart does not restore invocations, approvals, or tasks.
 - Synchronize separate deterministic call summaries for multi-authorization runs while keeping
   the combined final answer in DSH. Document the user-input and context-sharing boundary.
 - Keep public `dsh-bailinghub@0.3.0` as the stable release; this candidate has not been published.

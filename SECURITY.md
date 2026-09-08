@@ -55,8 +55,20 @@ plugin never receives the credential value and never writes one into Cordis conf
 The source candidate lets the model select a session-local `authorization_ref` from the current
 conversation's directory. This is a constrained per-call selector, not a connection-management
 tool or authority to supply a Hub, route, raw connection key, credential, or business identity.
-The captured bindings must share the selected Hub/client/workspace; other bindings are excluded.
+The host must first explicitly select fixed connection keys for this conversation through
+`setSessionScope` or the user-only `/bailinghub scope set <connection-key>...` command. Aliases are
+not scope keys. Unset scope and `[]` (`/bailinghub scope none`) remain ordinary chat, without
+BailingHub tools or runs. Authorization and registry defaults cannot grant conversation scope.
+The selected bindings must share one Hub/client/workspace; unselected bindings are excluded.
 The adapter never implements selection by changing the SDK's global current connection.
+
+Hosts must await successful scope persistence and confirmation before sending the first user
+message. The first `user/message` event freezes scope, with the inbox claim as a fallback, before
+`startTurn`; an in-flight or
+failed selection cannot admit business work. Subsequent changes require a new conversation.
+The full selected group is checked before business input is sent. Any missing, revoked, replaced,
+or unreadable selected authorization pauses the whole conversation's business access. The adapter
+must not silently adopt a default or shrink the scope to the remaining valid authorizations.
 
 Local connection names are untrusted display data. They do not prove tenant identity, widen an
 authorization, or replace the business system's final permission checks. The directory is a
@@ -75,6 +87,25 @@ model cannot provide a replacement authorization. Changing a default connection 
 an existing call.
 This invocation map lasts only for the live conversation: later turns can recover its original
 calls, while new conversations and process restarts must reject unknown invocation ids.
+
+Only non-secret scope metadata is durable. The default file store uses SHA-256 session filenames,
+mode-0600 files and mode-0700 directories on POSIX, bounded reads, rejection of symlinks/non-regular files,
+revision compare-and-swap, a cross-process lock, and atomic replacement. Lock timeout reports a
+conflict without deleting another process's lock. Corrupt data and I/O failure fail closed; they
+are never interpreted as an absent selection or a reason to use memory storage. Before validating
+a replacement scope, a durable `needs_selection` record prevents the previous broader scope from
+reappearing after a failed selection and restart.
+
+The host may inject a store with the same CAS semantics; the provided memory adapter is explicitly
+non-persistent. `restoreSessionScope` verifies the stored keys, binding, and original Agent Session
+ids, and keeps old conversations without valid snapshots blocked. It restores scope only, not
+invocations, approvals, pending completions, or task execution. A new conversation is required to
+choose different authorizations. No token, credential, prompt, or business payload belongs in the
+scope snapshot.
+The trusted host owns stable, unique conversation ids and the store namespace. Scope APIs and
+records must not be exposed as model-controlled storage or allow an untrusted caller to select
+another conversation's id. This plugin does not secure unrelated host filesystem tools; the host
+must enforce that access boundary.
 
 The candidate keeps authorization-specific instructions and context labeled, and synchronizes
 only each authorization's own deterministic call summary. It does not broadcast a combined final

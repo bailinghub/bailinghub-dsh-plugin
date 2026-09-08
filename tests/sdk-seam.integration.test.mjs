@@ -12,6 +12,9 @@ import {
   baseAssembly,
   createMockAgent,
   createMockHost,
+  createMemorySessionScopeStore,
+  selectSessionScope,
+  MOCK_CONNECTION_KEY,
   SEARCH_CAPABILITY_REVISION,
   settle,
   turnResponse,
@@ -184,8 +187,9 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
   })
   const host = createMockHost()
   t.after(() => host.dispose())
-  createAgentClientPlugin({ transport, recovery: { pollIntervalMilliseconds: 1 } }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport, recovery: { pollIntervalMilliseconds: 1 } }).apply(host.ctx, config)
   const { agent, local } = createMockAgent('sdk-multiple-authorizations')
+  await selectSessionScope(host, agent, accounts.map((account) => account.connectionKey))
   host.emit('agent/inbox/claimed', {
     agent, turn: 1,
     message: userMessage('sdk-multi-user', 'Update employee 42 in both authorized stores.'),
@@ -262,7 +266,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
     base_url: profile.baseUrl,
     client_app_id: profile.clientAppId,
     route: profile.workspace,
-    session_id: 'integration-session',
+    session_id: '123e4567-e89b-42d3-a456-426614179001',
     access_token: nonSecretAccessValue,
     refresh_token: nonSecretRefreshValue,
     access_expires_at: new Date(now + 60 * 60 * 1_000).toISOString(),
@@ -271,10 +275,13 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
   const credentialStore = new sdk.MemoryCredentialStore(credentials)
   const connectionStore = {
     registry: {
+      list: async () => [profile],
+      current: async () => profile,
       get: async (key) => key === profile.connectionKey ? profile : undefined,
       getByAlias: async (alias) => alias === profile.alias ? profile : undefined,
     },
     credentialStore: () => credentialStore,
+    load: async (key) => key === profile.connectionKey ? credentialStore.load() : undefined,
   }
   const requests = []
   const fetchImpl = async (url, init = {}) => {
@@ -288,6 +295,16 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
       authorized: headers.get('authorization')?.startsWith('Bearer ') === true,
     })
 
+    if (path === '/agent-auth/v1/session') {
+      return jsonResponse({
+        session_id: credentials.session_id, client_app_id: profile.clientAppId,
+        device_label: 'single-authorization integration fixture',
+        principal: { subject: 'fixture-operator' }, on_behalf_of: 'fixture-operator',
+        allowed_routes: [profile.workspace],
+        created_at: new Date(now).toISOString(), expires_at: credentials.access_expires_at,
+        refresh_expires_at: credentials.refresh_expires_at,
+      })
+    }
     if (path === '/agent-api/v1/workspaces/demo/turns') return jsonResponse(turnResponse())
     if (path === '/agent-api/v1/workspaces/demo/capabilities/search') {
       return jsonResponse({
@@ -342,7 +359,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
     connectionName: profile.alias,
   }, { connectionStore, fetchImpl, now: () => now })
   const host = createMockHost()
-  createAgentClientPlugin({
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(),
     transport,
     recovery: { pollIntervalMilliseconds: 1 },
   }).apply(host.ctx, {
@@ -352,6 +369,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
     connectionName: profile.alias,
   })
   const { agent, local } = createMockAgent('real-sdk')
+  await selectSessionScope(host, agent, [profile.connectionKey])
   host.emit('agent/inbox/claimed', {
     agent,
     turn: 1,
@@ -372,11 +390,10 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
     { query: 'read employee', limit: 8 },
     { agent, callId: 'sdk-search-1', signal: new AbortController().signal },
   )
-  const resumeId = 'b'.repeat(64)
-  await local.get('resume_governed_tool_invocation').execute(
-    { invocation_id: resumeId },
-    { agent, callId: 'sdk-resume-1', signal: new AbortController().signal },
-  )
+  await assert.rejects(() => local.get('resume_governed_tool_invocation').execute(
+    { invocation_id: 'b'.repeat(64) },
+    { agent, callId: 'sdk-resume-unknown', signal: new AbortController().signal },
+  ), /not bound|unknown|original invocation/i)
 
   host.emit('session/event', agent.session, {
     type: 'tool/call',
@@ -403,27 +420,27 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
   await settle()
 
   assert.equal(requests.every((request) => request.authorized), true)
-  assert.deepEqual(requests.map((request) => request.path), [
+  const businessRequests = requests.filter((request) => request.path.startsWith('/agent-api/'))
+  assert.ok(requests.some((request) => request.path === '/agent-auth/v1/session'))
+  assert.deepEqual(businessRequests.map((request) => request.path), [
     '/agent-api/v1/workspaces/demo/turns',
     '/agent-api/v1/tool-invocations',
-    `/agent-api/v1/tool-invocations/${requests[1].body.invocation_id}/resume`,
+    `/agent-api/v1/tool-invocations/${businessRequests[1].body.invocation_id}/resume`,
     '/agent-api/v1/workspaces/demo/capabilities/search',
-    `/agent-api/v1/tool-invocations/${resumeId}/resume`,
     '/agent-api/v1/runs/123e4567-e89b-42d3-a456-426614174000/complete',
   ])
-  assert.match(requests[0].body.client_conversation_id, /^dsh\.conversation\.[0-9a-f]{32}$/u)
-  assert.equal(requests[1].body.agent_run_id, '123e4567-e89b-42d3-a456-426614174000')
-  assert.equal(requests[2].body, undefined)
-  assert.equal(requests[3].body.run_id, '123e4567-e89b-42d3-a456-426614174000')
-  assert.equal(requests[4].body, undefined)
-  assert.deepEqual(requests[5].body.usage, {
+  assert.match(businessRequests[0].body.client_conversation_id, /^dsh\.conversation\.[0-9a-f]{32}$/u)
+  assert.equal(businessRequests[1].body.agent_run_id, '123e4567-e89b-42d3-a456-426614174000')
+  assert.equal(businessRequests[2].body, undefined)
+  assert.equal(businessRequests[3].body.run_id, '123e4567-e89b-42d3-a456-426614174000')
+  assert.deepEqual(businessRequests[4].body.usage, {
     input_tokens: 10,
     cached_input_tokens: 2,
     output_tokens: 5,
     total_tokens: 15,
     tool_calls: 1,
   })
-  assert.equal(Object.hasOwn(requests[5].body, 'reasoning'), false)
+  assert.equal(Object.hasOwn(businessRequests[4].body, 'reasoning'), false)
 })
 
 test('drives the installed SDK connection lifecycle through DSH user commands', async () => {
@@ -470,7 +487,7 @@ test('drives the installed SDK connection lifecycle through DSH user commands', 
       },
     })
     const host = createMockHost()
-    createAgentClientPlugin({ transport }).apply(host.ctx, {
+    createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport }).apply(host.ctx, {
       hubUrl: 'https://hub.example.com',
       clientAppId: 'dsh_client',
       workspace: 'demo',

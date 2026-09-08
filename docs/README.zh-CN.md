@@ -132,64 +132,87 @@ dsh web
 | `/bailinghub doctor` | 在不输出凭据的前提下检查宿主 API、公开配置、SDK、授权状态和 workspace 连通性 |
 | `/bailinghub connections list` | 查看本机公开连接元数据与授权状态，不输出 Token |
 | `/bailinghub connections add <名称> <中枢地址> <clientAppId> <workspace>` | 创建并选择另一个本机连接实例；公开绑定可以与已有实例相同 |
-| `/bailinghub connections use <名称或连接键>` | 只为之后新建的会话选择一个已登记连接 |
+| `/bailinghub connections use <名称或连接键>` | 修改 registry 默认连接；候选会话仍须显式选择业务范围 |
 | `/bailinghub connections remove <名称或连接键>` | 先远程撤销 Agent Session，再删除本机凭据和公开元数据 |
 | `/bailinghub login` | 在浏览器授权当前 Hub/client/workspace |
 | `/bailinghub status` | 查看当前连接状态，但不输出凭据 |
 | `/bailinghub workspaces` | 查看当前业务授权允许使用的 workspace |
-| `/bailinghub use <workspace>` | 为新会话切换到另一个已授权 workspace |
+| `/bailinghub use <workspace>` | 把连接管理所用 workspace 切换到另一个已授权 workspace |
 | `/bailinghub sync` | 重试同步待处理的可见回复，不重复业务工具调用 |
 | `/bailinghub logout` | 撤销并删除当前 Agent Session |
 
 插件四字段是启动连接。其他连接可用 `connections add` 登记；BailingHub 控制台“智能体客户端”
-页面也能生成同样的不含秘密命令。重启后，适配器会在第一个新 Agent 会话或用户命令前读取 SDK
-registry，并采用其中当前连接的公开元数据；registry 缺失或不可用时安全回退到这四个启动字段。
+页面也能生成同样的不含秘密命令。适配器为连接管理读取 SDK registry，并采用其中当前连接的
+公开元数据；registry 缺失或不可用时，这些命令继续使用四个启动字段，不会选择候选会话范围。
 连接名含空格时需要加引号。执行 `connections use` 后，如果该绑定尚未授权，再执行
 `/bailinghub login`。
 
-连接管理和默认连接选择仍只能由用户斜杠命令发起，不会作为模型工具暴露，且只影响之后创建的
-Agent 会话。公开 `0.3.0` 的每个会话固定使用一份连接；未发布候选则按下文规则记录同一绑定的
-多份授权。`/bailinghub use <workspace>` 是另一件事：只有当前 Agent
+连接管理和默认连接选择仍只能由用户斜杠命令发起，不会作为模型工具暴露。公开 `0.3.0` 为之后
+创建的会话采用当前连接，并把每个会话固定到一份连接。未发布候选中，这些命令不会为任何会话
+开启业务访问；必须按下文规则显式选择会话范围。registry 或启动字段回退只用于连接管理，不能
+用于恢复失败的会话范围。`/bailinghub use <workspace>` 是另一件事：只有当前 Agent
 Session 已经允许目标 workspace 时才成功。
 
-删除当前连接后，适配器会读取 SDK registry，把剩余的当前连接（包括没有别名的连接）设为新会话
-默认值；删除最后一个连接后则明确进入未配置状态。删除后的 registry 刷新失败不会把已经成功的
+删除当前连接后，适配器会读取 SDK registry，把剩余的当前连接（包括没有别名的连接）设为连接
+管理默认值；删除最后一个连接后则明确进入未配置状态。删除后的 registry 刷新失败不会把已经成功的
 删除改写成错误；如果删除的是非当前连接，刷新不可用时也会保留仍然有效的默认连接。
 
 对于同一个 `Hub + clientAppId + workspace` 公开绑定，最终身份由业务授权页及其可信
 `on_behalf_of` 结果决定。如果另一个本机连接名已经授权同一身份，SDK 会用本次连接覆盖旧连接，
 并撤销旧 Agent Session；不同可信身份则继续作为相互独立的连接。如果从一个已经属于其他身份的
 `connectionName` 发起登录，SDK 会保留原连接名及其 Session，为新身份分配一个不冲突的本机名称
-（例如 `default-2`），并把新连接设为后续会话的当前选择。用户可以用 `connections list` 查看
+（例如 `default-2`），并把新连接设为 registry 当前连接。用户可以用 `connections list` 查看
 两者，再用 `connections use <名称或连接键>` 显式切换。如果登录结果返回
 `cleanupRequired: true`，说明新连接仍然授权成功，但一个或多个同绑定旧连接还需要显式清理；
 如果身份检查被推迟，此时还不能断言它们是同一身份。不要重复授权；先查看 `connections list`，
 再对提示的旧连接执行
 `/bailinghub connections remove <名称或连接键>`。
 
-首次验收时，新建一个 DSH 会话，先做一次只读查询，再做一次允许的修改。确认 BailingHub
+公开 `0.3.0` 首次验收时，新建一个 DSH 会话，先做一次只读查询，再做一次允许的修改。确认 BailingHub
 后台能看到同一个会话、run、可见最终回复和工具调用轨迹。需要审批的能力必须在审批后恢复
 原 invocation，不能生成替代业务调用。
+测试源码候选时，必须先为新会话选择业务范围，等待宿主成功回显，再发送第一条请求。
 
 本版本在 DSH Code Mode 下会明确降级，因为当前 Code Mode 无法安全呈现本轮动态 Schema。
 需要执行受治理业务操作时应使用 Native Tool Mode。
 
 ## 未发布源码候选：同一系统，多份授权
 
-候选能力允许同一个会话使用同一 `Hub + clientAppId + workspace` 下独立授权的多个身份。
-例如，智能体分别用 A 店和 B 店的授权调用同一个报表工具，再汇总比较结果，无须手动切换连接。
+候选能力允许用户显式选择同一个会话可使用的业务账号，所选授权必须属于同一
+`Hub + clientAppId + workspace`。例如，智能体为两份选中授权分别调用报表工具，再汇总比较结果。
 本次范围不包括不同中枢、Client App 或 workspace，也不要求修改业务侧已有能力声明。
 业务接入方继续沿用现有 SDK 流程，为各身份分别完成授权；本次能力的首个消费端是 DSH 插件
 源码候选。
-对象名称来自现有本机 `connectionName`，不会解码 Token 推导门店名，也没有新增 Core 可信
-门店展示名字段。应以清晰名称创建连接，再通过原业务授权页分别授权对应身份；`default` 和
-`default-2` 这样的名称不能让模型猜出哪份是 A 店、哪份是 B 店。
+对象名称来自现有本机 `connectionName`，不会解码 Token 推导业务名称，也没有新增 Core 可信
+身份展示名字段。应以清晰名称创建连接，再通过原业务授权页分别授权对应身份；`default` 和
+`default-2` 这样的名称不能让模型猜测用户要操作哪个账号。
 
-新会话从 SDK registry 记录符合条件的连接，向模型提供仅限本会话的 `authorization_ref`、
-本机显示名称及可用状态。名称帮助用户辨认连接，但不证明它属于哪家门店、租户或身份；
-目标有歧义时应先确认。新增授权或名称变化在新会话生效。目录记录的是连接绑定，不是凭据快照或
-永久访问权；每次调用仍需有效授权，并经过业务系统原有权限检查。
-记录到至少两份符合条件的连接时自动启用多授权形式，否则继续使用原有单连接路径。
+**本候选改变默认行为。** 新会话未选择范围，或显式选择空数组 `[]` 时，都只进行普通聊天：
+不启动 BailingHub run，不暴露 BailingHub 业务工具。登录成功、切换默认连接都不会选中会话
+业务范围。原生 DSH 用户可在第一条用户消息前执行：
+
+```text
+/bailinghub connections list
+/bailinghub scope set <连接键> [<另一连接键> ...]
+/bailinghub scope
+```
+
+用 `/bailinghub scope none` 显式选择普通聊天。占位符须替换为列表中的固定连接键，不接受别名；
+等待范围设置成功回显后再发送消息。这些命令仅属于源码候选，不会启动业务 run 或采用默认连接。
+第一条消息发送前，宿主必须调用 `setSessionScope(sessionId, { connectionKeys,
+expectedRevision })`，等待成功并回显确认的范围；`getSessionScope` 用于读取状态。
+原生命令也使用该 API；没有这些命令或范围选择界面的嵌入宿主需要接入
+[宿主 API](AGENT_CLIENT_CONTRACT.md#host-owned-session-scope-api)，
+不能用 `connections use` 替代。
+
+只选一个连接键时保留原有 typed 业务参数与结果；选中多个键时才使用下文的共享工具 envelope。
+目录只包含用户显式选中的授权，向模型提供本会话 `authorization_ref`、脱敏本机名称及可用状态。
+名称只是显示数据，不是可信身份声明。宿主收到第一条用户消息时，范围立即冻结；之后增减或
+替换账号，以及在普通聊天与业务模式间切换，都需要由 UI 新建会话。
+
+任何选中系统收到用户输入前，会先验证整组选中授权。任意一份授权失效、撤销、被替换或无法
+检查时，整个会话的业务访问暂停，不会改用默认连接，也不会自动缩小为剩余有效授权。需要调整
+范围时，新建会话并显式选择有效授权。
 
 声明相同的业务工具只注册一次。在多授权会话里，模型在原业务参数外选择本次授权：
 
@@ -211,6 +234,11 @@ Schema 或治理声明冲突时不会合并执行。工具声明相同也不代�
 run，即使中间使用了另一份授权，也不会改变恢复目标。授权过期或撤销时不会自动改用其他连接。
 传输操作前会核对固定连接键、workspace 和原 Agent Session id；Agent Session 被替换后须新建
 会话。原调用绑定支持同一运行中会话跨轮恢复，不会持久化为进程重启后或新会话的恢复凭据。
+
+默认适配器在 DSH home 下保存非秘密范围快照，使用 revision 校验、跨进程锁及原子文件替换。
+重开会话的宿主必须先等待 `restoreSessionScope(sessionId)` 完成并显示状态，再发送消息。
+旧会话缺少有效快照时暂停业务访问，不会采用当前 registry 默认连接。范围恢复不等于恢复原
+invocation、审批或未完成任务。嵌入宿主可注入持久化 `scopeStore`；显式内存适配器不提供重启恢复。
 
 跨授权汇总的最终回答留在 DSH；各 Core run 只接收自身业务调用的确定性摘要，不接收包含其他
 授权结果的汇总回答。详见[候选契约](AGENT_CLIENT_CONTRACT.md#unreleased-same-system-authorization-selection)

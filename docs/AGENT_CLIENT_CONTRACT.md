@@ -13,9 +13,16 @@ This increment supports multiple independently authorized identities for one pub
 systems or routes, alter business capability declarations, or change Core authorization rules.
 It is a source candidate with no new npm release or version claim.
 
-At session creation, the adapter captures eligible same-binding connections from the SDK
-registry. At least two eligible connections activate this path; fewer preserve the original
-single-connection behavior and tool schemas. The model receives a projected directory containing
+This candidate changes the default: a new conversation with no selected scope, or an explicitly
+empty `connectionKeys: []`, is ordinary chat. It starts no BailingHub run and exposes no BailingHub
+business tools. Browser authorization, the registry's current connection, and the four bootstrap
+fields do not select a conversation's scope. There is no automatic discovery-and-enable fallback.
+
+The host explicitly selects fixed SDK connection keys before sending the first user message.
+Exactly one selected authorization keeps the original typed arguments and result shape; two or
+more selected authorizations use the shared envelope below. All selected keys must be authorized
+under the same Hub/client/workspace binding. Unselected connections are never added to the scope.
+The model receives a projected directory containing
 session-local `authorization_ref` values, local display names, and availability, not raw connection
 keys, credentials, Agent Session metadata,
 or permission to supply arbitrary route or identity values. A local name is untrusted display
@@ -26,18 +33,24 @@ Core identity-display field. Generic aliases such as `default` and `default-2` d
 an A/B business mapping; the user must supply clear labels while the business authorization page
 continues to determine the trusted identity.
 
-The directory's references resolve to captured SDK connection bindings. Calls do not change or
-re-resolve the global current connection. New authorizations and renamed aliases take effect in
-new sessions. Capturing a binding does not freeze credentials or bypass refresh, expiry,
-revocation, or downstream authorization checks; unavailable original access must not fall back
-to another identity.
+The directory's references resolve to the explicitly selected SDK connection bindings. The first
+`user/message` event freezes the selection, with `agent/inbox/claimed` as a fallback for drivers
+that do not emit that event, before `startTurn`. Changing the selected keys after
+that point requires a new conversation, including switching between ordinary chat and business
+mode. Adding a registry authorization or changing its alias never expands an existing scope.
+Capturing a binding does not freeze credentials or bypass refresh, expiry, revocation, or
+downstream authorization checks.
 Before transport operations, `status({ connectionKey })` must report the captured connection key,
-workspace, and the original authorized Agent Session id. The first valid check captures that id;
-a later replacement requires a new conversation. These inspection fields stay host-side. The
+workspace, and the original authorized Agent Session id captured during selection. If any selected
+authorization is missing, invalid, replaced, or cannot be checked, business access for the entire
+conversation pauses. It neither falls back to a default nor silently shrinks to the remaining
+authorizations. A new conversation can explicitly select the still-valid subset. These inspection
+fields stay host-side. The
 candidate passes `connectionKey` and `workspace` as explicit SDK host metadata instead of
 resolving a mutable alias or default.
 
-For each direct user turn, the adapter starts one Core run per captured authorization before
+The full selection is validated before any selected system receives the turn. For each direct
+user turn, the adapter starts one Core run per selected authorization before
 assembling the model request. Instructions, governance, knowledge, memory, and tool results carry
 authorization labels. The user input is sent to each of those runs. Separate run state preserves
 attribution; all injected context still shares the local Agent/model boundary described in
@@ -79,6 +92,78 @@ assistant answer, another authorization's results, or hidden reasoning to every 
 answer remains local to DSH. Single-authorization completion keeps the existing visible-answer
 behavior. Connection add/use/remove remain user-only commands, not model tools.
 
+### Host-owned session scope API
+
+The runtime service exposes asynchronous `getSessionScope(sessionId)`,
+`setSessionScope(sessionId, { connectionKeys, expectedRevision? })`, and
+`restoreSessionScope(sessionId)`. They are host APIs, never model tools. Use keys returned by the
+SDK registry, not aliases or model-provided identity values.
+
+Native DSH users can inspect `/bailinghub scope`, choose ordinary chat with
+`/bailinghub scope none`, or select fixed keys with `/bailinghub scope set <connection-key>...`
+before the first user message. Obtain keys from `/bailinghub connections list`; the scope command
+does not accept aliases, adopt a registry default, or start a business run. These are user-only
+commands over the same scope API.
+
+```js
+const runtime = ctx.get('bailingHubAgentClient')
+const previous = await runtime.getSessionScope(sessionId)
+const selected = await runtime.setSessionScope(sessionId, {
+  connectionKeys: selectedConnectionKeys, // [] explicitly chooses ordinary chat
+  expectedRevision: previous.revision,
+})
+// Render selected.mode and selected.authorizations, then enable sending.
+// Do not dispatch the first user message while this operation is pending or failed.
+```
+
+The returned view includes `schema`, `sessionId`, integer-or-null `revision`, `state`
+(`unselected`, `ready`, or `needs_selection`), `locked`, `mode` (`chat`, `business`, or `blocked`),
+and public authorization entries. `get` reads the scope; it does not grant access. A host must await
+a successful `set`, show its returned selection, and only then send the first message. Never
+optimistically send using an earlier scope. Before the first message, a failed replacement
+selection leaves business access blocked; it cannot restore the previous broader selection.
+After the scope is frozen, a change request returns `SESSION_SCOPE_LOCKED` and leaves the original
+frozen scope unchanged. The host must open a new conversation, not treat that rejection as a
+successful selection of the requested keys. Revision values may advance more than once
+during selection; always use the returned value for the next compare-and-swap request.
+
+Each returned `authorizations` entry has exactly the public host-facing fields
+`{ authorizationRef, connectionKey, label, workspace }`. The selection accepts at most 64 unique
+connection keys. The trusted host owns `sessionId`: it must remain stable when reopening the same
+conversation and be unique within that store's namespace. Do not let the model or an untrusted
+client choose another conversation's id, edit scope records, or control the storage namespace.
+The store and its access policy belong to the host. The model sees only the projected reference,
+label, and availability directory; raw connection keys and scope storage are not model APIs.
+
+Reopening an existing conversation must call `restoreSessionScope` before sending. It restores
+the saved keys and verifies the original binding and Agent Sessions. An old conversation without
+a valid snapshot stays blocked; missing or corrupt state must not adopt today's registry default
+or discovered authorizations. `locked` selections remain locked. The UI should offer a new
+conversation to change the scope. Embedded hosts without the native commands or a scope-selection
+UI must integrate these APIs; `connections use` is not a substitute.
+
+### Scope persistence seam
+
+`createAgentClientPlugin({ scopeStore })` accepts an explicit store with `load(sessionId)` and
+`save(sessionId, record, expectedRevision)`. `load` returns a validated record or `null` for absence;
+errors and corrupt records are not absence. `save` compares the stored revision atomically:
+`null` means the record must not exist, the first revision is `1`, and each update increments it.
+Before validating a replacement selection, the coordinator saves a `needs_selection` record so
+a failed replacement cannot resurrect the previous scope after restart.
+
+The default `createFileSessionScopeStore()` saves non-secret JSON under
+`$DSH_HOME/plugins/dsh-bailinghub/session-scopes`, using `~/.dsh` when `DSH_HOME` is unset. Session
+ids are hashed into filenames. On POSIX, files use mode `0600` and directories `0700`; writes use a
+cross-process lock, compare-and-swap, and atomic replacement. Lock conflicts and storage failures
+fail closed; the adapter never switches to an in-memory fallback. Hosts may inject another
+durable implementation. `createMemorySessionScopeStore()` is an explicit, non-persistent option
+for tests or hosts that deliberately accept losing scope state on restart.
+
+The snapshot contains only the scope schema, DSH session id, revision, state/lock, public binding,
+and selected connection keys, sanitized labels, workspace, and original Agent Session ids. It
+contains no credentials, tokens, prompts, business arguments/results, or invocation state.
+Restoring a scope does **not** restore an invocation, approval, pending completion, or task.
+
 ## Host Configuration
 
 The Cordis Config schema contains only:
@@ -91,7 +176,8 @@ connectionName
 ```
 
 `hubUrl`, `clientAppId`, and `workspace` identify a public Hub-side application/workspace binding.
-`connectionName` selects one local SDK connection instance, but it is not an account, tenant, or
+`connectionName` selects a local SDK connection for connection-management commands; in the
+candidate it does not select the conversation scope. It is not an account, tenant, or
 identity claim. The Hub Client App resolves to one stable business authorization endpoint; no
 business endpoint, authorization endpoint, token, secret, or business credential belongs in this
 config. The business authorization page owns sign-in, account switching, tenant selection, and
@@ -217,7 +303,10 @@ agent/inbox/claimed
   -> model request
 ```
 
-The adapter captures only a claimed message whose `source.kind` is `user`. On the authoritative
+The adapter captures only a claimed message whose `source.kind` is `user`. In the candidate, the
+first `user/message` event freezes scope; the inbox claim is a fallback if that event is absent.
+The assembly gate permits business work only for the saved selection.
+On the authoritative
 `system-prompt/assemble` waterfall, it calls `startTurn`, registers the returned definitions
 through `agent.ctx.tools.register()`, and also adds their schemas to the already-sampled current
 assembly. Later steps receive the same agent-scoped definitions from the ordinary ToolRuntime
@@ -273,18 +362,19 @@ Connection selector, workspace, conversation alias, Core run, active definitions
 state are isolated per DSH Agent/session. Named connections for different trusted identities own
 separate SDK credentials and Agent Sessions. Same-binding connections that resolve to the same
 trusted identity are reconciled to one local survivor after authorization. A workspace switch
-preserves the selected connection instance and affects future sessions; it is rejected while any
+preserves the selected connection instance and changes connection-management defaults; it is rejected while any
 Core run is active/completing or has an unsynchronized completion payload.
 
 After a same-alias login resolves to a different trusted identity, the SDK-returned replacement
-alias becomes the adapter default for new sessions. The retained old alias and the new alias both
+alias becomes the adapter's registry default. The retained old alias and the new alias both
 remain visible through `connections list` and user-selectable through `connections use`; existing
 DSH sessions remain pinned as described below.
 
 Multi-connection add/use/remove is exposed only through the `/bailinghub connections` user
-command. It is never registered as a model tool. Selecting a connection changes defaults for new
-Agent sessions only; existing states keep their captured bindings. In public `0.3.0` this is one
-connection and workspace; in the candidate it is the same-binding authorization directory.
+command. It is never registered as a model tool. Selecting a connection changes registry defaults;
+existing states keep their captured bindings. Public `0.3.0` uses that default for new Agent
+sessions and pins one connection and workspace. In the candidate, defaults affect connection management only;
+the host-owned scope API alone selects the conversation's authorization directory.
 Removing a connection is rejected while any run is active or has an unsynchronized completion. The SDK then
 revokes only that instance's remote Agent Session before removing its local credentials and
 registry metadata; a revoke failure preserves both. Repeating add with the same name and public
@@ -292,16 +382,18 @@ binding selects the existing instance; reusing a name for different public metad
 `connectionName` remains a local user selector and never becomes a trusted identity claim.
 
 After a successful remove, the adapter reads the registry again. A valid remaining
-`currentConnectionKey` replaces all four public defaults for future sessions, using the key itself
+`currentConnectionKey` replaces all four public connection-management defaults, using the key itself
 when the profile has no alias; no remaining connection sets the adapter to unconfigured. A refresh
 failure does not change the successful remove result. It makes a removed default unavailable, but
 does not invalidate an unchanged non-current default. Existing session state is never rewritten.
 
-The four static adapter fields bootstrap SDK construction only. Before the first new Agent session
-or user command after process start, the adapter reads `connectionsList()` and adopts the public
+The four static adapter fields bootstrap SDK construction only. For connection management, the
+adapter reads `connectionsList()` and adopts the public
 metadata matching `currentConnectionKey`. Invalid, missing, or unavailable registry data leaves the
 bootstrap defaults in place and must not remove or block unrelated host tools. The lookup is not a
 model tool, and restoring or later selecting a default never mutates an already-created session.
+These registry bootstrap rules do not grant business scope in the candidate, even to a new
+conversation. A failed scope load or selection never uses the bootstrap fields as a fallback.
 
 The completion request is restricted to:
 

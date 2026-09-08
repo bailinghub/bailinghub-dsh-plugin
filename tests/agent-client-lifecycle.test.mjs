@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { createAgentClientPlugin } from '../lib/index.js'
 import {
-  BailingHubAgentClientRuntime,
   buildCompletionPayload,
   normalizeStartTurnResponse,
 } from '../lib/runtime.js'
@@ -12,6 +12,9 @@ import {
   callsFor,
   createMockAgent,
   createMockHost,
+  createMemorySessionScopeStore,
+  selectSessionScope,
+  MOCK_CONNECTION_KEY,
   createMockTransport,
   SEARCH_CAPABILITY_REVISION,
   settle,
@@ -29,15 +32,13 @@ const config = {
 function createRuntime(overrides = {}) {
   const host = createMockHost()
   const mock = createMockTransport(overrides)
-  const runtime = new BailingHubAgentClientRuntime(
-    host.ctx,
-    config,
-    async () => mock.transport,
-  ).install()
+  createAgentClientPlugin({ transport: mock.transport, scopeStore: createMemorySessionScopeStore() }).apply(host.ctx, config)
+  const runtime = host.services.get('bailingHubAgentClient')
   return { host, mock, runtime }
 }
 
 async function startOneTurn(host, agent, turn = 1, id = 'raw/message?id=1') {
+  if (turn === 1) await selectSessionScope(host, agent, [MOCK_CONNECTION_KEY])
   host.emit('agent/inbox/claimed', {
     agent,
     turn,
@@ -64,6 +65,8 @@ test('starts the Core turn before prompt assembly and exposes scoped typed tools
   assert.notStrictEqual(start.args[0].userMessageId, 'raw/message?id=1')
   assert.equal(start.args[0].userInput, 'Please update employee 42.')
   assert.equal(start.args[1].workspace, 'demo')
+  assert.equal(start.args[1].connectionKey, MOCK_CONNECTION_KEY)
+  assert.equal(Object.hasOwn(start.args[1], 'connectionName'), false)
 
   assert.match(
     assembly.sections.find((section) => section.name === 'bailinghub:agent-client-profile').text,
@@ -119,7 +122,7 @@ test('recovers accepted_unknown with the original invocation id instead of invok
   assert.equal(callsFor(mock.calls, 'invoke').length, 1)
 })
 
-test('search replaces only this session active set and resume uses the exact invocation id', async () => {
+test('search replaces only this session active set and unknown invocation recovery is rejected', async () => {
   const { host, mock } = createRuntime()
   const { agent, local } = createMockAgent('search')
   await startOneTurn(host, agent)
@@ -140,17 +143,12 @@ test('search replaces only this session active set and resume uses the exact inv
     runId: '123e4567-e89b-42d3-a456-426614174001',
   })
 
-  const invocationId = 'a'.repeat(64)
-  const resumed = await local.get('resume_governed_tool_invocation').execute(
-    { invocation_id: invocationId },
-    { agent, callId: 'resume-1', signal: new AbortController().signal },
-  )
-  assert.equal(resumed.invocation_id, invocationId)
-  const resumedCall = callsFor(mock.calls, 'resume').at(-1)
-  assert.equal(resumedCall.args[0], invocationId)
-  assert.deepEqual(resumedCall.args[1], {})
-  assert.equal(resumedCall.args[2].workspace, 'demo')
-  assert.equal(resumedCall.args[2].connectionName, 'personal')
+  await assert.rejects(() => local.get('resume_governed_tool_invocation').execute(
+    { invocation_id: 'a'.repeat(64) },
+    { agent, callId: 'resume-unknown', signal: new AbortController().signal },
+  ), /not bound|unknown|original invocation/i)
+  assert.equal(callsFor(mock.calls, 'resume').length, 0)
+  assert.equal(searchCall.args[1].connectionKey, MOCK_CONNECTION_KEY)
 })
 
 test('syncs only the visible final assistant message and public usage at turn end', async () => {

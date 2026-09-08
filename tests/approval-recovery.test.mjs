@@ -7,6 +7,9 @@ import {
   callsFor,
   createMockAgent,
   createMockHost,
+  createMemorySessionScopeStore,
+  selectSessionScope,
+  MOCK_CONNECTION_KEY,
   createMockTransport,
   settle,
   userMessage,
@@ -36,7 +39,7 @@ function invocation(input, state, overrides = {}) {
 async function createApprovalRuntime(overrides, recovery = {}) {
   const host = createMockHost()
   const mock = createMockTransport(overrides)
-  createAgentClientPlugin({
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(),
     transport: mock.transport,
     recovery: {
       pollIntervalMilliseconds: 1,
@@ -47,6 +50,7 @@ async function createApprovalRuntime(overrides, recovery = {}) {
     },
   }).apply(host.ctx, config)
   const client = createMockAgent('approval')
+  await selectSessionScope(host, client.agent, [MOCK_CONNECTION_KEY])
   host.emit('agent/inbox/claimed', {
     agent: client.agent,
     turn: 1,
@@ -194,7 +198,7 @@ test('coalesces concurrent DSH replays and rejects argument drift for the same c
 
   await assert.rejects(
     definition.execute({ employee_id: '43' }, exec),
-    /changed the original arguments/,
+    /changed the original (?:tool or )?arguments/,
   )
   assert.equal(callsFor(mock.calls, 'invoke').length, 1)
   assert.equal(callsFor(mock.calls, 'resume').length, 1)

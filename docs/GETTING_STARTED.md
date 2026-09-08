@@ -71,9 +71,27 @@ alias becomes current. Run `/bailinghub connections list` to see both and
 connection is already authorized, but an existing connection may still need inspection or
 removal: do not authorize again; list connections and remove the reported old entry.
 
-## 4. Try one safe business request
+## 4. Confirm the conversation scope, then try a business request
 
-Start a new conversation and ask for one read-only action that the connected system exposes, for
+For public `0.3.0`, a new conversation uses its selected connection. The **unreleased source
+candidate changes this default**: unset scope or `/bailinghub scope none` means ordinary chat,
+with no BailingHub business tools or runs. When testing that candidate, before the first user
+message run:
+
+```text
+/bailinghub connections list
+/bailinghub scope set <connection-key> [<another-connection-key> ...]
+/bailinghub scope
+```
+
+Use fixed keys from the list, not aliases. Select only the accounts this conversation needs;
+multiple accounts must share the same Hub/client/workspace. Wait for successful scope confirmation
+before sending. The first user message freezes the scope, so changing accounts or switching from
+ordinary chat requires a new conversation. A selection/check failure pauses business access for
+the whole scope, without using the default or a remaining subset. Embedded hosts without native
+commands must integrate the [scope API](AGENT_CLIENT_CONTRACT.md#host-owned-session-scope-api).
+
+In that new conversation, ask for one read-only action that the selected system exposes, for
 example:
 
 ```text
@@ -87,9 +105,13 @@ permissions must remain unavailable.
 
 ## 5. Confirm the result in BailingHub
 
-The BailingHub console should show the same visible conversation, Agent Run, governed tool calls,
+The BailingHub console should show the corresponding conversation, Agent Run, governed tool calls,
 approval state, and final result. Do not treat a successful installation alone as proof that a
 business action ran.
+For a candidate scope containing multiple authorizations, each run receives only its own call
+summary; the combined answer remains in DSH. Reopening a saved conversation restores only its
+confirmed scope after validation. Missing or invalid old snapshots block business access, and
+scope restoration does not recover pending invocations or approvals after a process restart.
 
 If setup fails, include the DSH version, plugin version, operating system, the command that failed,
 and redacted error text in a GitHub Issue. Never attach tokens, private URLs, personal information,

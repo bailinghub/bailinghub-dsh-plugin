@@ -140,31 +140,33 @@ Useful commands:
 | --- | --- |
 | `/bailinghub doctor` | Check host APIs, public configuration, SDK resolution, authorization, and workspace reachability without printing credentials |
 | `/bailinghub connections list` | List local public connection metadata and authorization state without tokens |
-| `/bailinghub connections add <name> <hub-url> <client-app-id> <workspace>` | Create and select another local connection instance for new sessions; the public binding may match an existing instance |
-| `/bailinghub connections use <name-or-key>` | Select a registered connection for new sessions only |
+| `/bailinghub connections add <name> <hub-url> <client-app-id> <workspace>` | Register another local connection and select its registry default; this does not select a candidate conversation's scope |
+| `/bailinghub connections use <name-or-key>` | Change the registry default; candidate conversations still require explicit scope selection |
 | `/bailinghub connections remove <name-or-key>` | Remotely revoke its Agent Session, then remove its local credential and metadata |
 | `/bailinghub login` | Authorize the configured Hub/client/workspace in the browser |
 | `/bailinghub status` | Inspect the selected connection without printing credentials |
 | `/bailinghub workspaces` | List workspaces allowed by the current business authorization |
-| `/bailinghub use <workspace>` | Select another already-authorized workspace for new sessions |
+| `/bailinghub use <workspace>` | Change the connection-management workspace to another already-authorized workspace |
 | `/bailinghub sync` | Retry a pending visible completion record without repeating a tool call |
 | `/bailinghub logout` | Revoke and remove the selected Agent Session |
 
 The four plugin fields are the bootstrap connection. Additional connections can be registered with
 `connections add`; the BailingHub console's Agent Client page can generate the same secret-free
-command. On restart, the adapter reads the SDK registry before the first new Agent session or user
-command and adopts its current connection's public metadata; a missing or unavailable registry
-safely falls back to the four bootstrap fields. Quote a connection name when it contains spaces.
+command. For connection management, the adapter reads the SDK registry and adopts its current
+connection's public metadata; a missing or unavailable registry leaves the four bootstrap fields
+in use for those commands. This does not select candidate conversation scope. Quote a connection name when it contains spaces.
 After `connections use`, run `/bailinghub login` if that binding is not authorized yet.
 
-Connection management and default selection are user-only slash commands, not model tools. They
-affect only Agent sessions created afterward. Public `0.3.0` pins each session to one connection;
-the unreleased candidate captures the same-binding authorizations described below.
+Connection management and default selection are user-only slash commands, not model tools.
+Public `0.3.0` uses the selected default for future sessions and pins each session to one connection.
+In the unreleased candidate, these commands do not enable business access in any conversation:
+the host must explicitly select its scope as described below. Registry/bootstrap fallback is
+only for connection management, never a fallback for a failed scope selection or restore.
 `/bailinghub use <workspace>` remains a different operation: it succeeds
 only when the current Agent Session already authorizes that workspace.
 
 After removing the selected connection, the adapter reads the SDK registry and adopts the remaining
-current connection for new sessions, including connections without an alias. Removing the final
+current connection for connection management, including connections without an alias. Removing the final
 connection leaves the adapter explicitly unconfigured. A failed post-remove registry read never
 turns a successful removal into an error; removing a non-current connection also preserves the
 still-valid default when that refresh is unavailable.
@@ -175,7 +177,7 @@ authorized under another local connection name, the SDK replaces the older local
 revokes its old Agent Session. A different trusted identity remains an independent connection.
 If login starts from a `connectionName` that already belongs to another identity, the SDK keeps
 that original alias and Session, gives the newly authorized identity an available local alias such
-as `default-2`, and selects the new alias for future sessions. Use `connections list` to see both
+as `default-2`, and selects the new registry default. Use `connections list` to see both
 and `connections use <name-or-key>` to switch explicitly.
 If login returns `cleanupRequired: true`, the newly selected connection is still authorized, but
 one or more existing same-binding connections need explicit cleanup. Their identity may still be
@@ -183,36 +185,61 @@ unconfirmed when inspection was deferred. Do not authorize again; inspect
 `connections list` and retry `/bailinghub connections remove <name-or-key>` for the reported old
 entry.
 
-For the first acceptance check, start a new DSH conversation and perform one read-only request,
+For the public `0.3.0` acceptance check, start a new DSH conversation and perform one read-only request,
 then one permitted mutation. Confirm the same conversation, run, visible final answer, and tool
 invocation trajectory appear in BailingHub. An approval-required capability must resume the
 original invocation after approval; it must never create a replacement business call.
+When testing the source candidate, first select the new conversation's scope and wait for the
+host to confirm it before sending that request.
 
 DSH Code Mode is deliberately degraded in this release because it cannot safely present the
 current-turn dynamic schemas. Use native tool mode for governed business actions.
 
 ## Unreleased source candidate: one system, multiple authorizations
 
-The candidate lets one conversation use multiple independently authorized identities for the
-same `Hub + clientAppId + workspace`. For example, the Agent can call the same reporting tool
-once with Store A's authorization and once with Store B's, then compare the results without a
-manual connection switch. Different Hubs, client applications, and workspaces are outside this
-increment; no business-side capability declaration change is required.
+The candidate lets a user explicitly choose which independently authorized accounts one
+conversation may use under the same `Hub + clientAppId + workspace`. For example, the Agent can
+call a reporting tool for each of two selected accounts and compare the results. Different Hubs,
+client applications, and workspaces are outside this increment; no business-side capability
+declaration change is required.
 Business integrations continue authorizing each identity through the existing SDK flow. The first
 consumer of this change is the DSH plugin source candidate.
 Account labels come from existing local `connectionName` values, not from decoding tokens or a
 new Core display-name field. Create clearly named connections and authorize the corresponding
 identities separately on the original business page. Names such as `default` and `default-2` do
-not tell the model which one is Store A or B; it must not guess that mapping.
+not establish the intended account mapping; the model must not guess it.
 
-A new conversation captures eligible connections from the SDK registry and gives the model a
-directory of session-local `authorization_ref` values, local display names, and availability.
-A name helps the user recognize a connection; it does not prove a store, tenant, or identity. Choose clear names
-and confirm ambiguous targets. Adding an authorization or changing a name takes effect in a new
-conversation. The directory captures connection bindings, not credentials or continuing access:
-each call still needs a valid authorization and the business system's permission checks.
-The multi-authorization path activates automatically when at least two eligible connections are
-captured; otherwise the existing single-connection path remains in use.
+**This candidate changes the default.** A new conversation with no selection, or an explicit empty
+selection `[]`, is ordinary chat: no BailingHub run starts and no BailingHub business tool is
+exposed. Logging in or changing the default connection does not select business access.
+Native DSH users can run these commands before the first user message:
+
+```text
+/bailinghub connections list
+/bailinghub scope set <connection-key> [<another-connection-key> ...]
+/bailinghub scope
+```
+
+Use `/bailinghub scope none` to explicitly choose ordinary chat. Replace the placeholders with
+fixed keys from the list; aliases are not accepted. Wait for a successful scope confirmation
+before sending. These candidate-only commands do not start business runs or select defaults.
+Before sending the first message, the host must call `setSessionScope(sessionId, { connectionKeys,
+expectedRevision })`, await success, and display the confirmed selection. `getSessionScope` reads
+its state. The native commands use that API. Embedded hosts without those commands or a scope
+selector must integrate these [host APIs](docs/AGENT_CLIENT_CONTRACT.md#host-owned-session-scope-api); `connections use` cannot
+substitute for them.
+
+One selected key keeps the original typed business arguments and result. Two or more selected
+keys expose a shared tool with the authorization envelope below. Only explicitly selected keys
+are included; the model's directory contains session-local `authorization_ref` values, sanitized
+local names, and availability. Names are display data, not verified business identity claims.
+The first user message freezes the scope. To add, remove, or replace an account—or move
+between ordinary chat and business mode—the UI must start a new conversation.
+
+Before any selected system receives user input, the whole selection is validated. If any selected
+authorization expires, is revoked or replaced, or cannot be checked, business access for the
+whole conversation pauses. It never switches to the default or silently keeps only the remaining
+accounts. Start a new conversation to explicitly select a different valid scope.
 
 Matching business-tool declarations are registered once. In a conversation with multiple
 authorizations, the model supplies a host selector outside the unchanged business arguments:
@@ -244,6 +271,13 @@ to another connection. Before transport operations, the adapter checks the captu
 key, workspace, and original Agent Session id. A replacement Agent Session requires a new
 conversation. Invocation bindings support recovery across turns in the same live conversation;
 they are not persisted for recovery after a process restart or in a new conversation.
+
+The default adapter persists a non-secret scope snapshot under the DSH home using revision checks,
+a cross-process lock, and atomic file replacement. A host reopening a conversation must await
+`restoreSessionScope(sessionId)` and display its state before sending. Missing or invalid snapshots
+on old conversations block business access; they do not adopt current registry connections.
+Scope restoration does not recover previous invocations, approvals, or pending tasks. Embedded
+hosts can inject a durable `scopeStore`; the explicit memory adapter is not persistent.
 
 The combined final answer stays in DSH. Each Core run receives a deterministic summary of only
 its own governed calls, rather than the cross-authorization final answer. See the

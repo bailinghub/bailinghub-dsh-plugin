@@ -8,6 +8,8 @@ import {
   activeTool,
   callsFor,
   createMockTransport,
+  createMemorySessionScopeStore,
+  MOCK_CONNECTION_KEY,
   SEARCH_CAPABILITY_REVISION,
   turnResponse,
   userMessage,
@@ -40,7 +42,8 @@ test('executes shared authorization envelopes in real DSH before and after scope
     revision: (index ? 'b' : 'a').repeat(64),
   }))
   const accountFor = (metadata) => {
-    const key = metadata?.connectionKey ?? metadata?.connectionName
+    const key = metadata?.connectionKey
+    assert.equal(Object.hasOwn(metadata, 'connectionName'), false)
     const account = accounts.find((entry) => entry.connectionKey === key)
     assert.ok(account, 'real DSH dispatch must retain a fixed connection key')
     return account
@@ -94,11 +97,12 @@ test('executes shared authorization envelopes in real DSH before and after scope
     await ctx.plugin(SystemPrompt, {})
     await ctx.plugin(ToolRuntime, { mode: 'native' })
     await ctx.plugin(CommandRuntime, {})
-    await ctx.plugin(createAgentClientPlugin({ transport: mock.transport }), config)
+    await ctx.plugin(createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }), config)
     const runtime = ctx.get('bailingHubAgentClient')
     const agent = { id: 'real-dsh-multi-agent', session: { id: 'real-dsh-multi-session' } }
     agentScope = createScope(runtime.ctx, agent)
     agent.ctx = agentScope.ctx
+    await runtime.setSessionScope(agent.session.id, { connectionKeys: accounts.map((account) => account.connectionKey) })
     runtime.onInboxClaimed({
       agent, turn: 1,
       message: userMessage('real-dsh-multi-user', 'Update Store A, then find its read capability.'),
@@ -183,7 +187,7 @@ test('loads in the installed real DSH lifecycle and safely replaces the executin
         tools: [activeTool('employee_read')],
       }),
     })
-    await ctx.plugin(createAgentClientPlugin({ transport: mock.transport }), {
+    await ctx.plugin(createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }), {
       hubUrl: 'https://hub.example.com',
       clientAppId: 'dsh_client',
       workspace: 'demo',
@@ -212,6 +216,7 @@ test('loads in the installed real DSH lifecycle and safely replaces the executin
     })
     assert.equal(doctor.kind, 'success')
     assert.match(doctor.text, /DSH host contract: PASS/)
+    await runtime.setSessionScope(agent.session.id, { connectionKeys: [MOCK_CONNECTION_KEY] })
     runtime.onInboxClaimed({
       agent,
       turn: 1,

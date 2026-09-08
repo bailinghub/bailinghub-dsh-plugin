@@ -7,6 +7,9 @@ import {
   callsFor,
   createMockAgent,
   createMockHost,
+  createMemorySessionScopeStore,
+  selectSessionScope,
+  MOCK_CONNECTION_KEY,
   createMockTransport,
   turnResponse,
   userMessage,
@@ -24,7 +27,9 @@ const REVISION_A = 'a'.repeat(64)
 const REVISION_B = 'b'.repeat(64)
 
 function connectionKeyFor(metadata) {
-  return metadata?.connectionKey ?? metadata?.connectionName
+  assert.equal(typeof metadata?.connectionKey, 'string')
+  assert.equal(Object.hasOwn(metadata, 'connectionName'), false)
+  return metadata.connectionKey
 }
 
 function connection(connectionKey, connectionName, overrides = {}) {
@@ -89,7 +94,8 @@ function resultFor(input, state = 'executed', overrides = {}) {
   }
 }
 
-async function assemble(host, agent, turn, text = 'Read both stores and update only the requested one.') {
+async function assemble(host, agent, turn, text = 'Read both stores and update only the requested one.', connectionKeys = [KEY_A, KEY_B]) {
+  if (turn === 1) await selectSessionScope(host, agent, connectionKeys)
   host.emit('agent/inbox/claimed', {
     agent,
     turn,
@@ -243,7 +249,7 @@ function createFixture(options = {}) {
       return { schema: 'bailing.agent-run-completion.v1', run_id: runId, status: payload.status }
     },
   })
-  createAgentClientPlugin({
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(),
     transport: mock.transport,
     recovery: {
       pollIntervalMilliseconds: 1,
@@ -280,7 +286,7 @@ async function discoverRefs(fixture, prefix = 'discover') {
   return { a: byKey.get(KEY_A), b: byKey.get(KEY_B) }
 }
 
-test('discovers only authorized connections in the same binding and exposes no registry secrets', async () => {
+test('selects only explicit same-binding authorizations and exposes no registry secrets', async () => {
   const fixture = createFixture({ connections: [
     connection(KEY_A, 'Store A', {
       access_token: 'SECRET_ACCESS_A',
@@ -457,7 +463,7 @@ test('a changed Agent Session behind the same key is rejected instead of reusing
   assert.equal(callsFor(fixture.mock.calls, 'invoke').length, before)
 })
 
-test('revoking A after discovery fails closed without falling back to authorized B', async () => {
+test('revoking A invalidates the full selected scope without silently reducing it to B', async () => {
   const fixture = createFixture()
   await assemble(fixture.host, fixture.agent, 1)
   const refs = await discoverRefs(fixture)
@@ -468,11 +474,11 @@ test('revoking A after discovery fails closed without falling back to authorized
     execution(fixture.agent, 'revoked-session'),
   ))
   assert.equal(callsFor(fixture.mock.calls, 'invoke').length, before)
-  const b = await fixture.local.get('tenant_info').execute(
+  await assert.rejects(() => fixture.local.get('tenant_info').execute(
     { authorization_ref: refs.b, arguments: {} },
-    execution(fixture.agent, 'unaffected-b'),
-  )
-  assert.equal(b.result.text, 'STORE_B_RESULT')
+    execution(fixture.agent, 'blocked-b-in-invalid-scope'),
+  ), /SESSION_SCOPE_UNAVAILABLE/)
+  assert.equal(callsFor(fixture.mock.calls, 'invoke').length, before)
 })
 
 test('capability search updates only the selected target revision and can explicitly search all targets', async () => {
@@ -565,8 +571,8 @@ test('one authorized connection keeps the existing direct tool schema and result
   const host = createMockHost()
   const mock = createMockTransport()
   const client = createMockAgent('single-authorization-compatibility')
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, { ...config, connectionName: 'personal' })
-  await assemble(host, client.agent, 1, 'Update the permitted employee field.')
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, { ...config, connectionName: 'personal' })
+  await assemble(host, client.agent, 1, 'Update the permitted employee field.', [KEY_A])
   const definition = client.local.get('employee_update')
   assert.ok(definition)
   assert.equal(definition.parameters.properties.authorization_ref, undefined)
@@ -652,10 +658,10 @@ test('authorization status failures redact raw credential errors before they rea
     return true
   })
   assert.equal(callsFor(fixture.mock.calls, 'invoke').length, invokeCount)
-  const b = await fixture.local.get('tenant_info').execute(
+  await assert.rejects(() => fixture.local.get('tenant_info').execute(
     { authorization_ref: refs.b, arguments: {} }, execution(fixture.agent, 'b-after-a-status-failure'),
-  )
-  assert.equal(b.result.text, 'STORE_B_RESULT')
+  ), /SESSION_SCOPE_UNAVAILABLE/)
+  assert.equal(callsFor(fixture.mock.calls, 'invoke').length, invokeCount)
 })
 
 test('same-name tools with different governance are excluded from shared declarations', async (t) => {

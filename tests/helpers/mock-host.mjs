@@ -1,3 +1,12 @@
+export { createMemorySessionScopeStore } from '../../lib/session-scope-store.js'
+
+export const MOCK_CONNECTION_KEY = `conn_${'1'.repeat(32)}`
+export const MOCK_SESSION_ID = '123e4567-e89b-42d3-a456-426614179001'
+
+export async function selectSessionScope(host, agent, connectionKeys = [MOCK_CONNECTION_KEY]) {
+  await host.services.get('bailingHubAgentClient').setSessionScope(agent.session.id, { connectionKeys })
+}
+
 export function createMockHost() {
   const listeners = new Map()
   const commands = new Map()
@@ -188,6 +197,8 @@ export function createMockTransport(overrides = {}) {
     login: record('login', async () => ({ state: 'authorized' })),
     status: record('status', async () => ({
       state: 'authorized',
+      connectionKey: MOCK_CONNECTION_KEY,
+      sessionId: MOCK_SESSION_ID,
       workspace: 'demo',
       access_token: 'not-exposed',
     })),

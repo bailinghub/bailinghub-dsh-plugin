@@ -1,6 +1,7 @@
 # Privacy
 
-This bundle adds no telemetry and stores no BailingHub credentials or task payloads.
+This bundle adds no telemetry and stores no BailingHub credentials or task payloads. The
+unreleased candidate persists only the non-secret session-scope metadata described below.
 
 Task text submitted through the installed tools is sent to the BailingHub deployment chosen
 by the operator. DeepSeek Harness, the configured model provider, BailingHub, and the target
@@ -29,18 +30,28 @@ keys, business cookies, prompts, tool arguments, or business results.
 
 ## Unreleased same-system authorization selection
 
-The source candidate may include several independently authorized identities in one DSH
-conversation, restricted to the same Hub/client/workspace binding. The host snapshots eligible
-connection bindings and exposes only session-local authorization references, local display names,
-and availability as the selection directory; it does not expose the raw registry, credentials, connection keys, or
-Session inspection responses to the model. Local display names are user-controlled labels, not
-verified business identity claims.
+The source candidate includes only the authorization keys explicitly selected for a DSH
+conversation, restricted to the same Hub/client/workspace binding. Unset or empty scope means
+ordinary chat: no BailingHub run starts, no BailingHub business tool is registered, and the plugin
+does not send that conversation's user input to a business system. Logging in or selecting a
+registry default does not select a conversation scope. This does not change the data boundary of
+DSH, the configured model provider, or unrelated host tools.
 
-Each user turn is sent to a separate Core run under each captured authorization to obtain its
-instructions, governance, memory, and reference-only knowledge. The local Agent and its model
+The host snapshots the selected connection bindings and exposes only session-local authorization
+references, local display names, and availability as the selection directory. It does not expose
+the raw registry, credentials, connection keys, or Session inspection responses to the model.
+Local display names are user-controlled labels, not verified business identity claims.
+
+After the full selection is validated, each user turn is sent to a separate Core run under each
+selected authorization to obtain its instructions, governance, memory, and reference-only
+knowledge. The local Agent and its model
 provider therefore receive context from multiple authorized identities in the same conversation.
 Authorization labels preserve attribution; they do not create isolation from the local model.
 Use separate conversations when those identities' data must not share that boundary.
+The host must await and display scope confirmation before sending the first message. That first
+user message freezes the selection. A failed selection or any unavailable selected
+authorization pauses all BailingHub business access for the conversation, without switching to a
+default or silently retaining a subset.
 
 Each business call uses only its selected authorization. Recovery retains the original
 authorization and invocation. At completion, multi-authorization runs receive separate
@@ -53,5 +64,20 @@ The host checks the captured connection key, workspace, and original Agent Sessi
 transport operations without projecting those inspection fields into the model's directory.
 Invocation bindings are local to the running conversation; a new conversation or process restart
 does not recover unknown invocation ids from that map.
+
+The default file adapter saves scope schema/version, DSH session id, revision, lock/state, public
+Hub/client/workspace binding, and the selected connection keys, sanitized labels, workspace, and
+original Agent Session ids. These identifiers stay host-side; the snapshot contains no access or
+refresh token, browser credential, prompt, business argument/result, or invocation state. Files
+are stored under `$DSH_HOME/plugins/dsh-bailinghub/session-scopes` (`~/.dsh` is the default home),
+with hashed session filenames and, on POSIX, mode-0600 files and mode-0700 directories. They remain local until
+removed by the host/operator; the adapter does not upload them. An embedded host may inject its
+own durable store and retention policy. The explicit memory store is not persistent, and storage
+failure never causes an automatic switch to it.
+
+On reopening a conversation, `restoreSessionScope` rechecks the saved binding and original Agent
+Sessions. Missing or invalid old scope snapshots do not adopt current registry connections.
+Restoring that scope does not recover pending business invocations, approvals, completions, or
+tasks across a process restart.
 
 The public npm release remains `0.3.0`; installing it does not enable this candidate behavior.
