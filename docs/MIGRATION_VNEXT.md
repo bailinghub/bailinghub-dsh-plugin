@@ -6,7 +6,7 @@ Version 0.4.0 keeps the four public configuration fields and existing SDK-owned 
 It changes how a conversation gets business access: logging in or selecting a default no longer
 automatically enables it. A new conversation is ordinary chat until you select its scope.
 
-1. Ask the administrator to upgrade the Hub to Core 0.6.0. The plugin installs exact SDK 0.4.0.
+1. Ask the administrator to upgrade the Hub to Core 0.6.1. The plugin installs exact SDK 0.4.0.
 2. Before restarting, finish active business work and retry known pending run completions with
    `/bailinghub sync`. Do not assume a process restart resumes an invocation or approval.
 3. Upgrade the plugin and restart DSH:
@@ -39,7 +39,7 @@ the host/operator. There is no automatic retention cleanup.
 
 ### 0.3 用户升级摘要
 
-先由管理员升级 Core 0.6.0；结束当前业务任务并用 `/bailinghub sync` 收口待同步结尾记录，再安装
+先由管理员升级 Core 0.6.1；结束当前业务任务并用 `/bailinghub sync` 收口待同步结尾记录，再安装
 `dsh-bailinghub@0.4.0` 并重启 DSH。已有有效授权可继续使用，不必仅因插件升级重新授权。
 执行 `/bailinghub connections list` 后，**新建会话，在首条消息前**用
 `/bailinghub scope set <连接键> [<另一连接键> ...]` 选择账号，并等待 `/bailinghub scope`

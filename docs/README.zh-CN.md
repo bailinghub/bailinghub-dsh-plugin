@@ -21,7 +21,7 @@
 ## 安装与开始使用
 
 需要 Node.js `22.19.0+` 或 `24+`、pnpm，以及兼容的 DeepSeek Harness。管理员应先完成业务系统
-接入。配套版本为 **BailingHub Core 0.6.0 → BailingHub MCP/SDK 0.4.0 → 本插件 0.4.0**。
+接入。配套版本为 **BailingHub Core 0.6.1 → BailingHub MCP/SDK 0.4.0 → 本插件 0.4.0**。
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
@@ -63,7 +63,7 @@ dsh plugin --profile web add dsh-bailinghub@0.4.0
 
 ## 查看沟通过程与操作结果
 
-配合 Core 0.6.0 和 SDK 0.4.0，BailingHub 可以把可见的用户消息、助手回复、轮次，以及原业务
+配合 Core 0.6.1 和 SDK 0.4.0，BailingHub 可以把可见的用户消息、助手回复、轮次，以及原业务
 执行记录的关联放在同一份会话记录中。各份授权仍保留自己的业务调用记录，汇总回答不会复制到
 每个账号的记忆中。
 

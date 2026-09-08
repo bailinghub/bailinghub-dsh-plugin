@@ -12,7 +12,7 @@
   business access. Use `/bailinghub scope set <connection-key>...` and wait for confirmation before
   the first message; later selection changes require a new conversation. See the [migration guide](docs/MIGRATION_VNEXT.md).
 - Follow visible user/assistant messages, turn boundaries, and links to original business runs in
-  a separate conversation archive with Core 0.6.0. Multi-account runs keep their own call summaries;
+  a separate conversation archive with Core 0.6.1. Multi-account runs keep their own call summaries;
   the combined reply is not broadcast into each account's memory. Hidden reasoning is excluded.
 - Check `/bailinghub archive status` and retry `/bailinghub archive sync` after a failed upload or
   restart. Saved events retain their original identity; retries do not execute business actions again.

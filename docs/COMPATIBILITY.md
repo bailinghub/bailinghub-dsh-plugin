@@ -8,9 +8,12 @@
 | Node.js | `^22.19.0` or `>=24.0.0` |
 | DSH tool presentation | Native Tool Mode; Code Mode deliberately degraded |
 | Generic Agent Client SDK | Exact `bailinghub-mcp-server@0.4.0` via `./sdk` |
-| BailingHub Core | `bailinghub@0.6.0`; Agent Auth v1, Agent Client Runtime v1, and conversation audit v1 |
+| BailingHub Core | Recommended `bailinghub@0.6.1`; Agent Auth v1, Agent Client Runtime v1, and conversation audit v1 |
 | Visible archive acknowledgement | `bailing.agent-conversation-audit-ack.v1` |
 | Selected authorization group | One Hub + Client App + workspace; no cross-system or cross-route scope |
+
+Core `0.6.0` is the minimum API version for this contract. Use Core `0.6.1` for the
+recommended release pairing; the patch does not change these business APIs.
 
 Install only `dsh-bailinghub@0.4.0`; its ordinary dependency installs the exact SDK. A release
 requires a registry-generated lockfile and a clean package/profile check. Local source and

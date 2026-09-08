@@ -1,8 +1,8 @@
 # Agent Client Host Adapter Contract
 
 Status: native Agent Client contract for `dsh-bailinghub@0.4.0`, paired with
-`bailinghub-mcp-server@0.4.0` and BailingHub Core `0.6.0`. This contract is separate from the
-legacy static `0.1.x` path. Version 0.3.0 supported user-managed connections but did not include
+`bailinghub-mcp-server@0.4.0` and recommended BailingHub Core `0.6.1` (minimum API version
+`0.6.0`). This contract is separate from the legacy static `0.1.x` path. Version 0.3.0 supported user-managed connections but did not include
 explicit conversation scope, multi-authorization tool selection, or the visible conversation archive.
 
 ## Same-System Authorization Selection
@@ -184,9 +184,9 @@ Restoring a scope does **not** restore an invocation, approval, pending completi
 
 ### Independent visible conversation archive
 
-The visible archive requires SDK `0.4.0` and Core `0.6.0`; earlier `0.3.0` packages do not
-provide this contract. After a nonempty scope is frozen, the adapter captures claimed user text, every
-durable `assistant/message` text block, turn start/end, and verified original run links. It ignores
+The visible archive requires SDK `0.4.0` and Core APIs introduced in `0.6.0`; the recommended
+Core release is `0.6.1`. Earlier `0.3.0` SDK/plugin packages do not provide this contract.
+After a nonempty scope is frozen, the adapter captures claimed user text, every durable `assistant/message` text block, turn start/end, and verified original run links. It ignores
 `assistant/chunk`, hidden reasoning, attachments, raw provider requests, and arbitrary tool payloads.
 The archive is one record for the complete fixed authorization set; per-authorization run summaries
 are unchanged. It is not written into each member's memory.

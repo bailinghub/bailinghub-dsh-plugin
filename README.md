@@ -25,7 +25,7 @@ recommended by DeepSeek.
 
 You need Node.js `22.19.0+` or `24+`, pnpm, and a compatible DeepSeek Harness release. Your
 administrator must first connect the business system to BailingHub. The matched release set is
-**BailingHub Core 0.6.0 → BailingHub MCP/SDK 0.4.0 → this plugin 0.4.0**.
+**BailingHub Core 0.6.1 → BailingHub MCP/SDK 0.4.0 → this plugin 0.4.0**.
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
@@ -75,7 +75,7 @@ A confirmed revocation or identity change requires a new conversation with a val
 
 ## Follow the conversation and its actions
 
-With Core 0.6.0 and SDK 0.4.0, BailingHub can show the visible user and assistant messages, turn
+With Core 0.6.1 and SDK 0.4.0, BailingHub can show the visible user and assistant messages, turn
 boundaries, and links to the original business runs as one conversation record. Each authorization
 also keeps its own business-call record; the combined reply is not copied into every account's
 memory.

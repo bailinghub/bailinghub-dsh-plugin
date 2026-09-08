@@ -1,7 +1,7 @@
 # Get started with 0.4.0
 
 This guide is for users whose business system is already connected to BailingHub. Your
-administrator must prepare Core 0.6.0, a public Client App ID, a workspace, and the business
+administrator must prepare Core 0.6.1, a public Client App ID, a workspace, and the business
 browser-authorization entry first. You do not need to change business capability declarations.
 
 ## 1. Install and configure
@@ -89,7 +89,7 @@ connection does not change a conversation's scope.
 ## 4. Check results and the visible conversation
 
 Check the actual business result and its original invocation trail in BailingHub. With the matching
-Core 0.6.0, you can also follow visible user/assistant messages, turns, and the linked runs as one
+Core 0.6.1, you can also follow visible user/assistant messages, turns, and the linked runs as one
 conversation record. Multi-authorization runs keep their own call summaries separately.
 
 ```text

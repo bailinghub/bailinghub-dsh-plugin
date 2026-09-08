@@ -58,7 +58,7 @@ default or silently retaining a subset.
 Each business call uses only its selected authorization. Recovery retains the original
 authorization and invocation. At completion, multi-authorization runs receive separate
 deterministic summaries of their own governed calls, not the combined visible final answer or
-another authorization's results. SDK 0.4.0 with Core 0.6.0 also receives the combined visible
+another authorization's results. SDK 0.4.0 with Core 0.6.1 also receives the combined visible
 conversation through the independent archive boundary below. Single-authorization conversations
 retain the existing visible-answer completion flow.
 Hidden reasoning is never uploaded by the adapter.
@@ -89,7 +89,7 @@ tasks across a process restart.
 
 ## Visible conversation archive
 
-For a nonempty frozen scope, SDK 0.4.0 with Core 0.6.0 receives the claimed user messages,
+For a nonempty frozen scope, SDK 0.4.0 with Core 0.6.1 receives the claimed user messages,
 visible assistant text, turn boundaries, and original run links as one conversation audit owned
 by the complete selected authorization set. Visible text may itself contain personal or business
 data; the adapter does not claim to redact arbitrary secrets pasted into that text. It never adds
