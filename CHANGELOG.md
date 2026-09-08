@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Recover an offline-reopened locked conversation on the same runtime after connectivity returns.
+  Treat uncertain authorization probes as retryable closed gates, revalidate every original member,
+  and keep confirmed identity loss and storage conflicts blocked without changing persisted scope.
+  Concurrent business and archive calls wait for the current whole-scope proof.
+- Preserve known unsaved archive events and visible-history gaps during blocked uploads and late
+  network failures. Archive capability-discovery failures remain pending rather than storage errors.
+
 - Change the unreleased candidate to explicit per-conversation scope: unset or empty scope stays
   ordinary chat. Registered authorizations and the global default no longer automatically enable
   business tools or runs in a new candidate conversation.

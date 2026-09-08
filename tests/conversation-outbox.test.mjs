@@ -44,10 +44,10 @@ test('archive file preserves random identity, exact payload and frozen members a
     return ack(2)
   })).state, 'synced')
   assert.equal((await store.load('local-session')).clientArchiveId, record.clientArchiveId)
-  assert.equal((await stat(directory)).mode & 0o777, 0o700)
+  if (process.platform !== 'win32') assert.equal((await stat(directory)).mode & 0o777, 0o700)
   const files = await readdir(directory)
   assert.equal(files.length, 1)
-  assert.equal((await stat(join(directory, files[0]))).mode & 0o777, 0o600)
+  if (process.platform !== 'win32') assert.equal((await stat(join(directory, files[0]))).mode & 0o777, 0o600)
   assert.equal(JSON.parse(await readFile(join(directory, files[0]), 'utf8')).events.length, 2)
   const another = new ConversationOutbox({ store: createMemoryConversationArchiveStore() })
   await another.open('local-session', context())
@@ -135,6 +135,41 @@ test('remote unsupported and oversized messages remain pending without truncatio
     throw { status: 413 }
   })).state, 'pending')
   assert.equal((await store.load('local-session')).events[1].event.content.length, 64_001)
+})
+
+test('a late network failure cannot hide an unsaved visible event after a metadata-only save succeeds', async () => {
+  const memory = createMemoryConversationArchiveStore()
+  let rejectEvents = false
+  const store = {
+    load: memory.load,
+    async save(id, record, revision) {
+      if (rejectEvents && record.events.length > (await memory.load(id)).events.length) throw new Error('synthetic local save failure')
+      return memory.save(id, record, revision)
+    },
+  }
+  const outbox = new ConversationOutbox({ store })
+  await outbox.open('local-session', context())
+  await outbox.append('local-session', 'start', event('turn_start'))
+  let release, entered
+  const gate = new Promise((resolve) => { release = resolve })
+  const sending = new Promise((resolve) => { entered = resolve })
+  const pending = outbox.sync('local-session', async () => { entered(); await gate; throw new Error('synthetic network failure') })
+  await sending
+  rejectEvents = true
+  await assert.rejects(outbox.append('local-session', 'answer', event('assistant_message', { content: 'Synthetic final answer' })))
+  const before = await memory.load('local-session')
+  release()
+  const failed = await pending
+  assert.equal(failed.state, 'storage_error')
+  assert.equal(failed.unsavedEvents, 1)
+  const after = await memory.load('local-session')
+  assert.equal(after.acknowledged, before.acknowledged)
+  assert.deepEqual(after.events, before.events)
+  rejectEvents = false
+  assert.equal((await outbox.sync('local-session', async (input) => {
+    assert.deepEqual(input.events.map((item) => item.sequence), [1, 2])
+    return ack(2)
+  })).state, 'synced')
 })
 
 test('event order and run membership are validated before persistence', async (t) => {

@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
 
-import { createAgentClientPlugin, createFileConversationArchiveStore, createMemoryConversationArchiveStore } from '../lib/index.js'
+import { createAgentClientPlugin, createFileConversationArchiveStore, createFileSessionScopeStore, createMemoryConversationArchiveStore } from '../lib/index.js'
 import { baseAssembly, callsFor, createMemorySessionScopeStore, createMockAgent, createMockHost, createMockTransport, settle, turnResponse, userMessage } from './helpers/mock-host.mjs'
 
 const dshNodeModules = process.env.DSH_NODE_MODULES ?? resolve('node_modules')
@@ -152,13 +152,28 @@ test('missing persisted visible text and turn_end are reported as recovery_gap a
   f.emit('turn/end', { turn: 1, reason: { kind: 'completed' } })
   await settle()
   await f.host.dispose()
-  const reopened = fixture({ session: Session.create(f.session.id, f.session.events), scopeStore: f.scopeStore, archiveStore: disk })
+  let online = false
+  const reopened = fixture({
+    session: Session.create(f.session.id, f.session.events), scopeStore: f.scopeStore, archiveStore: disk,
+    transport: { status: async ({ connectionKey }) => {
+      if (!online) throw networkFailure()
+      return { state: 'authorized', connectionKey, workspace: 'demo', sessionId: IDS.get(connectionKey) }
+    } },
+  })
   t.after(() => reopened.host.dispose())
+  assert.equal((await reopened.runtime.getSessionArchiveStatus(reopened.session.id)).state, 'blocked')
+  online = true
+  assert.equal((await reopened.runtime.restoreSessionScope(reopened.session.id)).mode, 'business')
   const status = await reopened.runtime.getSessionArchiveStatus(reopened.session.id)
   assert.equal(status.state, 'recovery_gap')
   assert.equal(status.coverage, 'incomplete')
   assert.equal(status.missingVisibleEvents, 2)
   assert.equal(callsFor(reopened.mock.calls, 'startTurn').length, 0)
+  online = false
+  const temporarilyOffline = await reopened.runtime.getSessionArchiveStatus(reopened.session.id)
+  assert.equal(temporarilyOffline.state, 'recovery_gap', 'a known durable history gap must remain visible during an offline scope check')
+  assert.equal(temporarilyOffline.missingVisibleEvents, 2)
+  online = true
   assert.equal((await reopened.runtime.syncSessionArchive(reopened.session.id)).state, 'recovery_gap')
 })
 
@@ -252,4 +267,281 @@ test('candidate activation never claims previously unarchived conversation histo
   assert.equal(status.missingVisibleEvents, 4)
   assert.equal(callsFor(reopened.mock.calls, 'syncConversationArchive').length, 0)
   assert.equal(callsFor(reopened.mock.calls, 'startTurn').length, 0)
+})
+
+function networkFailure() {
+  return new TypeError('fetch failed', { cause: Object.assign(new Error('Synthetic loopback connection refused'), { code: 'ECONNREFUSED' }) })
+}
+
+async function completedDurableFixture(t) {
+  const directory = await mkdtemp(join(tmpdir(), 'bailinghub-archive-offline-reopen-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const scopeDirectory = join(directory, 'scopes')
+  const archiveDirectory = join(directory, 'archives')
+  const first = fixture({
+    scopeStore: createFileSessionScopeStore({ directory: scopeDirectory }),
+    archiveStore: createFileConversationArchiveStore({ directory: archiveDirectory }),
+    transport: { syncConversationArchive: async () => { throw networkFailure() } },
+  })
+  // The test retains both JavaScript runtimes in one process. Track the seed's
+  // automatic archive tasks so reopening cannot leave an old writer alive,
+  // unlike a real process restart. This does not delay or alter business calls.
+  const seedArchiveTasks = new Set()
+  const synchronize = first.runtime.syncSessionArchive.bind(first.runtime)
+  first.runtime.syncSessionArchive = (...args) => {
+    const task = synchronize(...args)
+    seedArchiveTasks.add(task)
+    void task.then(() => seedArchiveTasks.delete(task), () => seedArchiveTasks.delete(task))
+    return task
+  }
+  await begin(first, [A, B])
+  const tool = first.local.get('employee_update')
+  for (const [index, authorization_ref] of tool.parameters.properties.authorization_ref.enum.entries()) {
+    await tool.execute({ authorization_ref, arguments: { employee_id: `synthetic-employee-${index}` } }, {
+      agent: first.agent, callId: `offline-seed-call-${index}`, signal: new AbortController().signal,
+    })
+  }
+  assistant(first, 'offline-seed-final', 'Both authorized employee updates have completed.')
+  first.emit('turn/end', { turn: 1, reason: { kind: 'completed' } })
+  await settle()
+  assert.equal((await first.runtime.syncSessionArchive(first.session.id)).state, 'pending')
+  assert.equal(callsFor(first.mock.calls, 'startTurn').length, 2)
+  assert.equal(callsFor(first.mock.calls, 'invoke').length, 2)
+  assert.equal(callsFor(first.mock.calls, 'completeRun').length, 2)
+  await first.host.dispose()
+  await first.runtime.conversationOutbox.drain(first.session.id)
+  while (seedArchiveTasks.size) await Promise.allSettled([...seedArchiveTasks])
+  await first.runtime.conversationOutbox.drain(first.session.id)
+  const scope = await first.scopeStore.load(first.session.id)
+  const archive = await first.archiveStore.load(first.session.id)
+  assert.equal(scope.locked, true)
+  assert.deepEqual(scope.authorizations.map((item) => item.connectionKey), [A, B])
+  assert.equal(archive.acknowledged, 0)
+  assert.equal(archive.events.at(-1).event.kind, 'turn_end')
+  return { sessionId: first.session.id, history: first.session.events, scopeDirectory, archiveDirectory, scope, archive }
+}
+
+function reconnectingFixture(seed) {
+  const network = { online: false, revoked: new Set(), loseAcknowledgement: false }
+  const remoteEvents = new Map()
+  const uploads = []
+  const scopeWrites = []
+  const archiveWrites = []
+  const diskScope = createFileSessionScopeStore({ directory: seed.scopeDirectory })
+  const diskArchive = createFileConversationArchiveStore({ directory: seed.archiveDirectory })
+  const f = fixture({
+    session: Session.create(seed.sessionId, seed.history),
+    scopeStore: {
+      load: diskScope.load,
+      save: async (...args) => { scopeWrites.push(structuredClone(args)); return diskScope.save(...args) },
+    },
+    archiveStore: {
+      load: diskArchive.load,
+      save: async (...args) => { archiveWrites.push(structuredClone(args)); return diskArchive.save(...args) },
+    },
+    transport: {
+      status: async ({ connectionKey }) => {
+        assert.ok(IDS.has(connectionKey), 'recovery must inspect only an original selected connection')
+        if (!network.online) throw networkFailure()
+        return {
+          state: network.revoked.has(connectionKey) ? 'logged_out' : 'authorized',
+          connectionKey, workspace: 'demo', sessionId: IDS.get(connectionKey),
+        }
+      },
+      syncConversationArchive: async (envelope, options) => {
+        if (!network.online) throw networkFailure()
+        uploads.push(structuredClone({ envelope, options }))
+        assert.equal(envelope.clientArchiveId, seed.archive.clientArchiveId)
+        assert.equal(envelope.clientConversationId, seed.archive.context.clientConversationId)
+        assert.deepEqual(options.members, seed.archive.context.members)
+        for (const item of envelope.events) {
+          const existing = remoteEvents.get(item.sequence)
+          if (existing) assert.deepEqual(item, existing, 'an ambiguous retry must keep its exact event id and payload')
+          else remoteEvents.set(item.sequence, structuredClone(item))
+        }
+        if (network.loseAcknowledgement) {
+          network.loseAcknowledgement = false
+          throw networkFailure()
+        }
+        return acknowledgement(Math.max(...remoteEvents.keys(), 0))
+      },
+    },
+  })
+  return { ...f, network, remoteEvents, uploads, scopeWrites, archiveWrites }
+}
+
+function assertNoRecoveredBusinessCalls(f) {
+  for (const method of ['startTurn', 'invoke', 'resume', 'completeRun']) {
+    assert.equal(callsFor(f.mock.calls, method).length, 0, `archive recovery must not replay ${method}`)
+  }
+}
+
+test('offline reopening can restore the original file-backed scope and archive after reconnecting in the same runtime', async (t) => {
+  const seed = await completedDurableFixture(t)
+  const reopened = reconnectingFixture(seed)
+  t.after(() => reopened.host.dispose())
+  const runtime = reopened.runtime
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    assert.equal((await runtime.restoreSessionScope(seed.sessionId)).mode, 'blocked')
+    assert.equal((await runtime.getSessionScope(seed.sessionId)).mode, 'blocked')
+    assert.equal((await runtime.getSessionArchiveStatus(seed.sessionId)).state, 'blocked')
+    assert.equal((await runtime.syncSessionArchive(seed.sessionId)).state, 'blocked')
+    assert.deepEqual(await reopened.scopeStore.load(seed.sessionId), seed.scope)
+    assert.deepEqual(await reopened.archiveStore.load(seed.sessionId), seed.archive)
+    assertNoRecoveredBusinessCalls(reopened)
+  }
+  assert.equal(reopened.uploads.length, 0)
+  assert.deepEqual(reopened.scopeWrites, [])
+  assert.deepEqual(reopened.archiveWrites, [])
+
+  reopened.network.online = true
+  const restored = await runtime.restoreSessionScope(seed.sessionId)
+  assert.equal(restored.mode, 'business', 'a transient offline inspection must not permanently poison the original locked scope')
+  assert.equal(reopened.runtime, runtime)
+  assert.equal(restored.locked, true)
+  assert.deepEqual(restored.authorizations.map((item) => item.connectionKey), [A, B])
+  assert.equal((await runtime.getSessionArchiveStatus(seed.sessionId)).state, 'pending')
+  const synchronized = await runtime.syncSessionArchive(seed.sessionId)
+  assert.equal(synchronized.state, 'synced')
+  assert.equal(synchronized.coverage, 'available_host_history_checked')
+  assert.equal(synchronized.acknowledgedSequence, seed.archive.events.length)
+  assert.deepEqual(await reopened.scopeStore.load(seed.sessionId), seed.scope)
+  const saved = await reopened.archiveStore.load(seed.sessionId)
+  assert.equal(saved.clientArchiveId, seed.archive.clientArchiveId)
+  assert.deepEqual(saved.context, seed.archive.context)
+  assert.deepEqual(saved.events, seed.archive.events)
+  assert.equal(saved.acknowledged, saved.events.length)
+  assert.equal(saved.revision, seed.archive.revision + 1)
+  assert.equal(reopened.archiveWrites.length, 1)
+  assert.equal(reopened.archiveWrites[0][2], seed.archive.revision)
+  assert.equal(reopened.archiveWrites[0][1].revision, seed.archive.revision + 1)
+  assertNoRecoveredBusinessCalls(reopened)
+})
+
+test('offline archive recovery remains blocked if either original authorization is revoked during reconnect', async (t) => {
+  for (const revoked of [A, B]) await t.test(revoked === A ? 'Store A revoked' : 'Store B revoked', async (t) => {
+    const seed = await completedDurableFixture(t)
+    const reopened = reconnectingFixture(seed)
+    t.after(() => reopened.host.dispose())
+    assert.equal((await reopened.runtime.restoreSessionScope(seed.sessionId)).mode, 'blocked')
+    const offlineInspections = callsFor(reopened.mock.calls, 'status').length
+    reopened.network.online = true
+    reopened.network.revoked.add(revoked)
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      assert.equal((await reopened.runtime.restoreSessionScope(seed.sessionId)).mode, 'blocked')
+      assert.equal((await reopened.runtime.syncSessionArchive(seed.sessionId)).state, 'blocked')
+    }
+    assert.ok(callsFor(reopened.mock.calls, 'status').slice(offlineInspections).some((call) => call.args[0].connectionKey === revoked),
+      'reconnection must actually inspect the original revoked authorization, not stay blocked because of stale offline state')
+    assert.equal(reopened.uploads.length, 0)
+    assert.deepEqual(await reopened.scopeStore.load(seed.sessionId), seed.scope)
+    assert.deepEqual(await reopened.archiveStore.load(seed.sessionId), seed.archive)
+    assert.deepEqual(reopened.scopeWrites, [])
+    assert.deepEqual(reopened.archiveWrites, [])
+    assertNoRecoveredBusinessCalls(reopened)
+  })
+})
+
+test('reconnecting archive recovery retries a lost ACK with original events and no duplicate business execution', async (t) => {
+  const seed = await completedDurableFixture(t)
+  const reopened = reconnectingFixture(seed)
+  t.after(() => reopened.host.dispose())
+  assert.equal((await reopened.runtime.restoreSessionScope(seed.sessionId)).mode, 'blocked')
+  reopened.network.online = true
+  assert.equal((await reopened.runtime.restoreSessionScope(seed.sessionId)).mode, 'business')
+  reopened.network.loseAcknowledgement = true
+  const uncertain = await reopened.runtime.syncSessionArchive(seed.sessionId)
+  assert.equal(uncertain.state, 'pending')
+  const pending = await reopened.archiveStore.load(seed.sessionId)
+  assert.equal(pending.acknowledged, seed.archive.acknowledged)
+  assert.deepEqual(pending.events, seed.archive.events)
+  assert.equal(pending.clientArchiveId, seed.archive.clientArchiveId)
+  assert.equal(reopened.remoteEvents.size, seed.archive.events.length)
+  const recovered = await reopened.runtime.syncSessionArchive(seed.sessionId)
+  assert.equal(recovered.state, 'synced')
+  assert.equal(reopened.uploads.length, 2)
+  assert.deepEqual(reopened.uploads[1], reopened.uploads[0])
+  assert.equal(reopened.remoteEvents.size, seed.archive.events.length)
+  const saved = await reopened.archiveStore.load(seed.sessionId)
+  assert.deepEqual(saved.events, seed.archive.events)
+  assert.deepEqual(saved.context, seed.archive.context)
+  assert.equal(saved.acknowledged, seed.archive.events.length)
+  assert.equal(saved.revision, seed.archive.revision + 2)
+  assert.deepEqual(reopened.archiveWrites.map(([, record, expected]) => [expected, record.revision]), [
+    [seed.archive.revision, seed.archive.revision + 1],
+    [seed.archive.revision + 1, seed.archive.revision + 2],
+  ])
+  assert.deepEqual(await reopened.scopeStore.load(seed.sessionId), seed.scope)
+  assertNoRecoveredBusinessCalls(reopened)
+})
+
+test('archive sync alone can recheck an offline restored scope and upload its original durable events after reconnection', async (t) => {
+  const seed = await completedDurableFixture(t)
+  const reopened = reconnectingFixture(seed)
+  t.after(() => reopened.host.dispose())
+  assert.equal((await reopened.runtime.getSessionArchiveStatus(seed.sessionId)).state, 'blocked')
+  assert.equal((await reopened.runtime.syncSessionArchive(seed.sessionId)).state, 'blocked')
+  assert.deepEqual(await reopened.scopeStore.load(seed.sessionId), seed.scope)
+  reopened.network.online = true
+  // No replacement selection or explicit restore call is allowed here: the
+  // existing public archive API must retry inspection of its same locked scope.
+  assert.equal((await reopened.runtime.syncSessionArchive(seed.sessionId)).state, 'synced')
+  assert.equal((await reopened.runtime.getSessionScope(seed.sessionId)).mode, 'business')
+  assert.deepEqual(reopened.uploads[0].envelope.events, seed.archive.events.map((item) => item.event))
+  assert.deepEqual(await reopened.scopeStore.load(seed.sessionId), seed.scope)
+  assert.deepEqual(reopened.scopeWrites, [])
+  assertNoRecoveredBusinessCalls(reopened)
+})
+
+test('offline scope validation cannot hide existing unsaved archive events or their local storage error', async (t) => {
+  const store = createMemoryConversationArchiveStore()
+  let failSave = false
+  let online = true
+  const f = fixture({
+    archiveStore: { load: store.load, save: (...args) => failSave ? Promise.reject(new Error('Synthetic disk full')) : store.save(...args) },
+    transport: { status: async ({ connectionKey }) => {
+      if (!online) throw networkFailure()
+      return { state: 'authorized', connectionKey, workspace: 'demo', sessionId: IDS.get(connectionKey) }
+    } },
+  })
+  t.after(() => f.host.dispose())
+  await begin(f, [A])
+  await f.runtime.syncSessionArchive(f.session.id)
+  failSave = true
+  assistant(f, 'unsaved-local-answer', 'This visible answer has not been saved locally.')
+  f.emit('turn/end', { turn: 1, reason: { kind: 'completed' } })
+  await settle()
+  await f.runtime.conversationOutbox.drain(f.session.id)
+  const local = f.runtime.conversationOutbox.status(f.session.id)
+  assert.equal(local.state, 'storage_error')
+  assert.equal(local.unsavedEvents, 2)
+  online = false
+  for (const inspect of ['getSessionArchiveStatus', 'syncSessionArchive']) {
+    const unavailable = await f.runtime[inspect](f.session.id)
+    assert.ok(['storage_error', 'recovery_gap'].includes(unavailable.state), `${inspect} must preserve the existing local archive failure`)
+    if (unavailable.state === 'recovery_gap') assert.equal(unavailable.syncState, 'storage_error')
+    assert.equal(unavailable.unsavedEvents, 2)
+  }
+})
+
+test('a network-only archive preparation failure is not reported as a local storage error', async (t) => {
+  let preparationOnline = true
+  const f = fixture({ transport: {
+    supportsConversationArchive: async () => {
+      if (!preparationOnline) throw networkFailure()
+      return true
+    },
+  } })
+  t.after(() => f.host.dispose())
+  await begin(f, [A])
+  assert.equal((await f.runtime.syncSessionArchive(f.session.id)).state, 'synced')
+  const saved = await f.archiveStore.load(f.session.id)
+  preparationOnline = false
+  for (const inspect of ['getSessionArchiveStatus', 'syncSessionArchive']) {
+    const offline = await f.runtime[inspect](f.session.id)
+    assert.notEqual(offline.state, 'storage_error', 'a failed network/capability check does not prove a local write failure')
+    assert.deepEqual(await f.archiveStore.load(f.session.id), saved)
+  }
+  preparationOnline = true
+  assert.equal((await f.runtime.syncSessionArchive(f.session.id)).state, 'synced')
 })

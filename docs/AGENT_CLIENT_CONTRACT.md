@@ -143,6 +143,15 @@ without probing its previously selected SDK connections. A never-started draft r
 `locked: false`: the host must explicitly call `setSessionScope` again and show success before
 sending. It must not silently reactivate the saved draft selection.
 
+If a locked conversation is reopened offline, its business gate stays closed. A timeout,
+connection failure, or incomplete authorization response is not proof of revocation: retry
+`restoreSessionScope`, `getSessionScope`, or `syncSessionArchive` on the **same runtime and Session**
+after connectivity returns. All original members must pass validation before business access or
+archive upload resumes. Concurrent callers wait for the same in-flight whole-scope validation.
+Retries preserve the original keys, Agent Sessions, binding, member set, and persisted scope revision.
+Confirmed revocation, identity/binding replacement, corrupt storage, or a CAS conflict remains
+blocked; retries never select a default, remaining subset, or replacement Session.
+
 An old conversation without a valid snapshot stays blocked; missing or corrupt state must not
 adopt today's registry default or discovered authorizations. Trusted history containing only
 configuration or metadata still permits draft selection. Actual user-message or turn history
@@ -219,6 +228,10 @@ missing user/assistant text or turn boundaries report `recovery_gap` / `coverage
 if the saved prefix is synchronized. Hosts without durable history report `coverage: unverified`.
 This check does not reconstruct missing business run ids. Network failure leaves durable events
 retryable; a local write failure can leave only an in-memory pending event until storage recovers.
+While scope validation or transport availability prevents upload, a known `storage_error` or
+`recovery_gap` remains visible with the existing unsaved-event count and coverage. An optional
+`availability` field describes the additional upload restriction; it does not clear the local error.
+Capability-discovery network failures report `pending`, not a fabricated local storage failure.
 If the process ends before that write succeeds, the host-history check reports the detectable gap;
 there is no atomic transaction between DSH's event log, this outbox, and Core. It does not promise
 recovery of absent host history, hidden content, or durable business task execution.
