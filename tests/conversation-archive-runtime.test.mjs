@@ -545,3 +545,37 @@ test('a network-only archive preparation failure is not reported as a local stor
   preparationOnline = true
   assert.equal((await f.runtime.syncSessionArchive(f.session.id)).state, 'synced')
 })
+
+test('archive status stays blocked when an original authorization is revoked during asynchronous capability discovery', async (t) => {
+  let pauseDiscovery = false
+  let revoked = false
+  let releaseDiscovery
+  let discoveryStarted
+  const discovery = new Promise((resolve) => { releaseDiscovery = resolve })
+  const started = new Promise((resolve) => { discoveryStarted = resolve })
+  const f = fixture({ transport: {
+    status: async ({ connectionKey }) => ({
+      state: revoked ? 'logged_out' : 'authorized', connectionKey, workspace: 'demo', sessionId: IDS.get(connectionKey),
+    }),
+    supportsConversationArchive: async () => {
+      if (pauseDiscovery) { discoveryStarted(); await discovery }
+      return true
+    },
+  } })
+  t.after(() => { releaseDiscovery(); return f.host.dispose() })
+  await begin(f, [A])
+  assert.equal((await f.runtime.syncSessionArchive(f.session.id)).state, 'synced')
+  const saved = await f.archiveStore.load(f.session.id)
+  const uploadedBefore = callsFor(f.mock.calls, 'syncConversationArchive').length
+  pauseDiscovery = true
+  const inspecting = f.runtime.getSessionArchiveStatus(f.session.id)
+  await started
+  revoked = true
+  assert.equal((await f.runtime.restoreSessionScope(f.session.id)).mode, 'blocked')
+  releaseDiscovery()
+  const status = await inspecting
+  assert.equal(status.state, 'blocked', 'a completed capability probe must not supersede confirmed revocation')
+  assert.equal((await f.runtime.getSessionScope(f.session.id)).mode, 'blocked')
+  assert.equal(callsFor(f.mock.calls, 'syncConversationArchive').length, uploadedBefore)
+  assert.deepEqual(await f.archiveStore.load(f.session.id), saved)
+})
