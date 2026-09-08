@@ -4,6 +4,10 @@ This guide is for someone whose organization has already connected a business sy
 BailingHub. If that integration does not exist yet, the BailingHub administrator and business
 developer must prepare it before an end user installs this plugin.
 
+This guide installs public `0.3.0`, which selects one connection per conversation. Same-system
+authorization selection is an [unreleased source candidate](../README.md#unreleased-source-candidate-one-system-multiple-authorizations),
+not a feature of that npm release.
+
 ## What to ask your administrator for
 
 Ask for these four public connection values:

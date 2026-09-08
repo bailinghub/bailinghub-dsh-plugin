@@ -24,6 +24,8 @@ recommended by DeepSeek.
 
 > **Current stable line:** `dsh-bailinghub@0.3.0` uses the native Agent Client flow documented
 > below. Public `0.1.1` remains available only as the explicit static MCP compatibility path.
+> The same-system authorization selection described below is an **unreleased source candidate**;
+> installing public `0.3.0` does not enable it.
 
 For the shortest end-user path, follow the [three-minute getting started guide](docs/GETTING_STARTED.md).
 
@@ -155,9 +157,10 @@ command and adopts its current connection's public metadata; a missing or unavai
 safely falls back to the four bootstrap fields. Quote a connection name when it contains spaces.
 After `connections use`, run `/bailinghub login` if that binding is not authorized yet.
 
-Connection selection is a user-only slash command and is never exposed as a model tool. It affects
-only Agent sessions created afterward; existing sessions remain pinned to their original
-connection and workspace. `/bailinghub use <workspace>` remains a different operation: it succeeds
+Connection management and default selection are user-only slash commands, not model tools. They
+affect only Agent sessions created afterward. Public `0.3.0` pins each session to one connection;
+the unreleased candidate captures the same-binding authorizations described below.
+`/bailinghub use <workspace>` remains a different operation: it succeeds
 only when the current Agent Session already authorizes that workspace.
 
 After removing the selected connection, the adapter reads the SDK registry and adopts the remaining
@@ -188,17 +191,78 @@ original invocation after approval; it must never create a replacement business 
 DSH Code Mode is deliberately degraded in this release because it cannot safely present the
 current-turn dynamic schemas. Use native tool mode for governed business actions.
 
+## Unreleased source candidate: one system, multiple authorizations
+
+The candidate lets one conversation use multiple independently authorized identities for the
+same `Hub + clientAppId + workspace`. For example, the Agent can call the same reporting tool
+once with Store A's authorization and once with Store B's, then compare the results without a
+manual connection switch. Different Hubs, client applications, and workspaces are outside this
+increment; no business-side capability declaration change is required.
+Business integrations continue authorizing each identity through the existing SDK flow. The first
+consumer of this change is the DSH plugin source candidate.
+Account labels come from existing local `connectionName` values, not from decoding tokens or a
+new Core display-name field. Create clearly named connections and authorize the corresponding
+identities separately on the original business page. Names such as `default` and `default-2` do
+not tell the model which one is Store A or B; it must not guess that mapping.
+
+A new conversation captures eligible connections from the SDK registry and gives the model a
+directory of session-local `authorization_ref` values, local display names, and availability.
+A name helps the user recognize a connection; it does not prove a store, tenant, or identity. Choose clear names
+and confirm ambiguous targets. Adding an authorization or changing a name takes effect in a new
+conversation. The directory captures connection bindings, not credentials or continuing access:
+each call still needs a valid authorization and the business system's permission checks.
+The multi-authorization path activates automatically when at least two eligible connections are
+captured; otherwise the existing single-connection path remains in use.
+
+Matching business-tool declarations are registered once. In a conversation with multiple
+authorizations, the model supplies a host selector outside the unchanged business arguments:
+
+```json
+{
+  "authorization_ref": "<reference from this conversation>",
+  "arguments": { "date": "2026-09-08" }
+}
+```
+
+The adapter resolves that reference to its captured SDK connection. It never asks the model to
+supply a credential, raw connection key, route, or acting identity. A single-authorization
+conversation retains the original business-argument shape. The total active business-tool budget
+remains 12; the adapter does not merge conflicting descriptions, schemas, or governance for a
+same-name tool.
+Identical declarations do not grant identical permissions: availability is checked for the chosen
+authorization.
+Capability search may select one `authorization_ref`; omitting it searches all authorizations in
+the conversation.
+
+Each user turn starts a separate Core run for each captured authorization, so the model receives
+the applicable instructions and context before choosing an action. Those sections and tool
+results retain their authorization labels. The visible user input reaches each of those runs;
+do not use one conversation for identities whose context must remain separate from the local
+Agent. Recovery uses the original invocation's authorization and run, even after another action
+uses a different authorization. An expired or revoked authorization does not trigger a fallback
+to another connection. Before transport operations, the adapter checks the captured connection
+key, workspace, and original Agent Session id. A replacement Agent Session requires a new
+conversation. Invocation bindings support recovery across turns in the same live conversation;
+they are not persisted for recovery after a process restart or in a new conversation.
+
+The combined final answer stays in DSH. Each Core run receives a deterministic summary of only
+its own governed calls, rather than the cross-authorization final answer. See the
+[candidate contract](docs/AGENT_CLIENT_CONTRACT.md#unreleased-same-system-authorization-selection)
+and [privacy boundary](PRIVACY.md#unreleased-same-system-authorization-selection).
+
 ## Security and privacy boundary
 
-- The model cannot choose a Hub URL, workspace, local connection, business identity, credential,
-  approval result, or capability revision through tool arguments.
+- The model cannot supply a Hub URL, workspace, raw connection key, business identity, credential,
+  approval result, or capability revision through tool arguments. The unreleased candidate permits
+  only a host-issued authorization reference from the conversation's directory.
 - The SDK stores credentials in macOS Keychain. On Windows it protects credential files under
   LocalAppData with CurrentUser DPAPI; unavailable Windows PowerShell or DPAPI fails closed without
   a plaintext fallback. Linux and other POSIX systems require an explicit secure file-store opt-in.
 - BailingHub revalidates identity, scope, approval, idempotency, and invocation state on every
   governed call. The downstream business system still performs final authorization.
-- The adapter sends visible user input, governed tool arguments/results, and the visible final
-  answer required by the Agent Client contracts. It never uploads hidden reasoning chunks.
+- The adapter sends visible user input and governed tool arguments/results. Public `0.3.0` sends
+  the visible final answer; the candidate uses separate call summaries when multiple authorizations
+  share a conversation. It never uploads hidden reasoning chunks.
 - This plugin governs only the BailingHub tools it registers. It does not intercept unrelated DSH
   tools or model-provider traffic.
 

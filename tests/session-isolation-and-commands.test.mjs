@@ -516,13 +516,16 @@ test('a failed registry refresh after removing a non-current connection preserve
     rawInput: 'connections remove secondary',
   })
   const status = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
+  assert.equal(listCount, 2)
   const fresh = createMockAgent('remove-non-current-fresh')
   await assemble(host, fresh.agent, 1, 'Keep using the current connection')
 
   assert.equal(removed.kind, 'success')
   assert.doesNotMatch(removed.text, /private post-remove registry failure/)
   assert.equal(status.kind, 'success')
-  assert.equal(listCount, 2)
+  // A new conversation refreshes its authorization directory after user commands.
+  // Failure still preserves the unchanged default instead of selecting another account.
+  assert.equal(listCount, 3)
   assert.equal(callsFor(mock.calls, 'status')[0].args[0].connectionName, 'personal')
   const [start] = callsFor(mock.calls, 'startTurn')
   assert.equal(start.args[1].connectionName, 'personal')

@@ -49,3 +49,35 @@ Agent Session credentials use macOS Keychain or Windows CurrentUser DPAPI-protec
 LocalAppData. Windows PowerShell or DPAPI unavailability fails closed without a plaintext fallback.
 Linux and other POSIX hosts must explicitly enable the SDK's isolated mode-0600 file store. The
 plugin never receives the credential value and never writes one into Cordis configuration.
+
+## Unreleased same-system authorization selection
+
+The source candidate lets the model select a session-local `authorization_ref` from the current
+conversation's directory. This is a constrained per-call selector, not a connection-management
+tool or authority to supply a Hub, route, raw connection key, credential, or business identity.
+The captured bindings must share the selected Hub/client/workspace; other bindings are excluded.
+The adapter never implements selection by changing the SDK's global current connection.
+
+Local connection names are untrusted display data. They do not prove tenant identity, widen an
+authorization, or replace the business system's final permission checks. The directory is a
+binding snapshot, not a credential snapshot: expired, removed, or revoked access must fail
+without silently selecting another authorization. New authorizations and alias changes require
+a new conversation.
+The host checks the fixed connection key, workspace, and original Agent Session id before
+transport operations. An Agent Session replacement also requires a new conversation, even if
+the local alias or connection key remains unchanged.
+
+Matching declarations share one typed tool. Conflicting same-name descriptions, schemas, or
+governance are not merged for execution, and a shared declaration cannot confer another identity's permissions.
+Each invocation binds its chosen authorization, Core run, and capability revision. Recovery
+accepts only an invocation known to this conversation and resolves its original binding; the
+model cannot provide a replacement authorization. Changing a default connection cannot retarget
+an existing call.
+This invocation map lasts only for the live conversation: later turns can recover its original
+calls, while new conversations and process restarts must reject unknown invocation ids.
+
+The candidate keeps authorization-specific instructions and context labeled, and synchronizes
+only each authorization's own deterministic call summary. It does not broadcast a combined final
+answer to every run. Visible user input and context do share the local conversation boundary;
+see [Privacy](PRIVACY.md#unreleased-same-system-authorization-selection). This candidate is not
+part of the published `0.3.0` package.

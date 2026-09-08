@@ -1,8 +1,83 @@
 # Agent Client Host Adapter Contract
 
-Status: public native Agent Client contract for `dsh-bailinghub@0.3.0`. This contract is not part
-of the legacy public `0.1.x` line. The multi-connection lifecycle described below is stable with
-BailingHub Core `0.5.1` and `bailinghub-mcp-server@0.3.0`.
+Status: public native Agent Client baseline for `dsh-bailinghub@0.3.0`, plus the explicitly
+unreleased source-candidate extension below. This contract is not part of the legacy public
+`0.1.x` line. Public `0.3.0` supports user-managed connections with Core `0.5.1` and
+`bailinghub-mcp-server@0.3.0`; it does not include model selection among authorizations. The
+remaining sections describe the baseline except where the candidate section states a change.
+
+## Unreleased Same-System Authorization Selection
+
+This increment supports multiple independently authorized identities for one public
+`Hub + clientAppId + workspace` binding in one DSH conversation. It does not combine different
+systems or routes, alter business capability declarations, or change Core authorization rules.
+It is a source candidate with no new npm release or version claim.
+
+At session creation, the adapter captures eligible same-binding connections from the SDK
+registry. At least two eligible connections activate this path; fewer preserve the original
+single-connection behavior and tool schemas. The model receives a projected directory containing
+session-local `authorization_ref` values, local display names, and availability, not raw connection
+keys, credentials, Agent Session metadata,
+or permission to supply arbitrary route or identity values. A local name is untrusted display
+data, not proof of a tenant or store. The model must resolve ambiguous user intent before acting;
+available authorization is not a request to act on every listed identity.
+Labels use existing local `connectionName` metadata, not token-derived business names or a new
+Core identity-display field. Generic aliases such as `default` and `default-2` do not establish
+an A/B business mapping; the user must supply clear labels while the business authorization page
+continues to determine the trusted identity.
+
+The directory's references resolve to captured SDK connection bindings. Calls do not change or
+re-resolve the global current connection. New authorizations and renamed aliases take effect in
+new sessions. Capturing a binding does not freeze credentials or bypass refresh, expiry,
+revocation, or downstream authorization checks; unavailable original access must not fall back
+to another identity.
+Before transport operations, `status({ connectionKey })` must report the captured connection key,
+workspace, and the original authorized Agent Session id. The first valid check captures that id;
+a later replacement requires a new conversation. These inspection fields stay host-side. The
+candidate passes `connectionKey` and `workspace` as explicit SDK host metadata instead of
+resolving a mutable alias or default.
+
+For each direct user turn, the adapter starts one Core run per captured authorization before
+assembling the model request. Instructions, governance, knowledge, memory, and tool results carry
+authorization labels. The user input is sent to each of those runs. Separate run state preserves
+attribution; all injected context still shares the local Agent/model boundary described in
+[Privacy](../PRIVACY.md#unreleased-same-system-authorization-selection).
+
+Business definitions with the same name, description, input schema, and governance are registered
+once.
+Conflicting declarations are not merged for execution. Availability remains specific to each
+authorization, and the conversation's total active business-tool limit remains 12. In a
+multi-authorization session, each shared definition wraps its unchanged business schema:
+
+```json
+{
+  "authorization_ref": "<host-issued reference from this session>",
+  "arguments": { "<business parameter>": "<value>" }
+}
+```
+
+The selector is host metadata; it is not forwarded as a business argument or new Core HTTP
+field. A single-authorization session keeps the original unwrapped business schema.
+`search_business_capabilities` accepts an optional `authorization_ref` using the same reference
+boundary; omission searches all captured authorizations. Its responses update the selected
+authorizations' capability revisions and definitions before rebuilding
+the shared tool view. It cannot import a different binding into the conversation.
+
+Invocation state captures the selected authorization, Core run, capability revision, tool, and
+arguments. A replay with a different selector or payload fails closed. Recovery accepts only an
+invocation known to this conversation and uses the original binding; it accepts no replacement
+authorization selector. Pending approval and unknown dispatch outcomes follow the same
+exact-invocation recovery rules as the baseline. Removing or selecting another default must not
+retarget an existing invocation.
+The local invocation map survives later turns of the same live conversation. It is not persisted
+across process restarts or copied into new conversations, and unknown invocation ids fail closed.
+This increment does not provide durable task recovery across those boundaries.
+
+On multi-authorization completion, the adapter freezes one deterministic summary of each run's
+own governed calls and synchronizes that run separately. It does not send the combined visible
+assistant answer, another authorization's results, or hidden reasoning to every run. The combined
+answer remains local to DSH. Single-authorization completion keeps the existing visible-answer
+behavior. Connection add/use/remove remain user-only commands, not model tools.
 
 ## Host Configuration
 
@@ -163,10 +238,11 @@ The adapter listens to durable `session/event` values:
 
 ## Tool Invocation and Recovery
 
-Every active Core tool becomes an agent-scoped DSH definition. Its invocation id is a stable
-64-character lowercase SHA-256 digest of the session, run, DSH call id, and Core tool name. It
-calls the SDK `invoke` DTO without letting the model choose the run, capability revision, route,
-or identity.
+In the public baseline, every active Core tool becomes an agent-scoped DSH definition. Its
+invocation id is a stable 64-character lowercase SHA-256 digest of the session, run, DSH call id,
+and Core tool name. It
+calls the SDK `invoke` DTO without letting the model supply the run, capability revision, route,
+or arbitrary identity. The candidate's constrained authorization selector is described above.
 
 An SDK error with `disposition === 'accepted_unknown'` starts recovery with the exact invocation
 id; it never repeats the business-tool `invoke`. Likewise, `awaiting_approval`, `in_progress`, and
@@ -207,8 +283,9 @@ DSH sessions remain pinned as described below.
 
 Multi-connection add/use/remove is exposed only through the `/bailinghub connections` user
 command. It is never registered as a model tool. Selecting a connection changes defaults for new
-Agent sessions only; existing states keep their captured connection and workspace. Removing a
-connection is rejected while any run is active or has an unsynchronized completion. The SDK then
+Agent sessions only; existing states keep their captured bindings. In public `0.3.0` this is one
+connection and workspace; in the candidate it is the same-binding authorization directory.
+Removing a connection is rejected while any run is active or has an unsynchronized completion. The SDK then
 revokes only that instance's remote Agent Session before removing its local credentials and
 registry metadata; a revoke failure preserves both. Repeating add with the same name and public
 binding selects the existing instance; reusing a name for different public metadata fails.

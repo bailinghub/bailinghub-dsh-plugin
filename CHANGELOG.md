@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Add a source candidate for one DSH conversation to select among independently authorized
+  identities sharing one Hub/client/workspace binding, without changing the global connection.
+- Register matching typed business tools once, with a host-issued `authorization_ref` selector
+  outside the original business arguments in multi-authorization conversations. Preserve the
+  original argument shape for single-authorization conversations and the 12-tool total budget.
+- Keep per-authorization context, permission checks, run state, and exact-invocation recovery
+  across turns of the same live conversation; pin the original Agent Session before transport,
+  reject conflicting same-name declarations and never retarget a pending operation.
+- Synchronize separate deterministic call summaries for multi-authorization runs while keeping
+  the combined final answer in DSH. Document the user-input and context-sharing boundary.
+- Keep public `dsh-bailinghub@0.3.0` as the stable release; this candidate has not been published.
+
 ## 0.3.0 - 2026-09-01
 
 - Add `/bailinghub doctor` for credential-safe host-contract, configuration, SDK, authorization,

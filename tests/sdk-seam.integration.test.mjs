@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
@@ -31,6 +32,213 @@ function jsonResponse(value) {
     headers: { 'content-type': 'application/json' },
   })
 }
+
+test('routes multiple authorizations through the installed SDK and loopback HTTP without mixing sessions', { timeout: 10_000 }, async (t) => {
+  const sdk = await import(moduleUrl(sdkDist))
+  const now = Date.now()
+  const requests = []
+  const serverErrors = []
+  const invocations = new Map()
+  const accounts = ['A', 'B'].map((label, index) => ({
+    label,
+    connectionKey: `conn_${String(index + 1).repeat(32)}`,
+    sessionId: `123e4567-e89b-42d3-a456-42661417900${index + 1}`,
+    runId: `123e4567-e89b-42d3-a456-42661417800${index + 1}`,
+    revision: (index ? 'b' : 'a').repeat(64),
+    // Synthetic credentials exist only in these in-memory SDK stores.
+    accessToken: `sdk-loopback-${label}-access`,
+    refreshToken: `sdk-loopback-${label}-refresh`,
+  }))
+  const server = createServer(async (request, response) => {
+    try {
+      const account = accounts.find((entry) => request.headers.authorization === `Bearer ${entry.accessToken}`)
+      assert.ok(account, 'every SDK request must carry one registered account bearer')
+      const chunks = []
+      for await (const chunk of request) chunks.push(chunk)
+      const rawBody = Buffer.concat(chunks).toString()
+      const body = rawBody ? JSON.parse(rawBody) : undefined
+      const path = new URL(request.url, 'http://127.0.0.1').pathname
+      requests.push({ account: account.label, path, method: request.method, body })
+      let result
+      if (path === '/agent-auth/v1/session') {
+        assert.equal(request.method, 'GET')
+        result = {
+          session_id: account.sessionId,
+          client_app_id: 'dsh_client',
+          device_label: 'loopback integration fixture',
+          principal: { subject: `fixture-${account.label}` },
+          on_behalf_of: `fixture-${account.label}`,
+          allowed_routes: ['demo'],
+          created_at: new Date(now).toISOString(),
+          expires_at: new Date(now + 3_600_000).toISOString(),
+          refresh_expires_at: new Date(now + 86_400_000).toISOString(),
+        }
+      } else if (path === '/agent-api/v1/workspaces/demo/turns') {
+        assert.equal(request.method, 'POST')
+        assert.match(body.client_conversation_id, /^dsh\.conversation\.[0-9a-f]{32}$/u)
+        assert.match(body.client_turn_id, /^dsh\./u)
+        assert.match(body.user_message_id, /^dsh\./u)
+        assert.equal(body.user_input, 'Update employee 42 in both authorized stores.')
+        result = turnResponse({ runId: account.runId, capabilityRevision: account.revision })
+      } else if (path === '/agent-api/v1/tool-invocations') {
+        assert.equal(request.method, 'POST')
+        assert.equal(body.route, 'demo')
+        assert.equal(body.agent_run_id, account.runId)
+        assert.equal(body.capability_revision, account.revision)
+        assert.equal(body.tool, 'employee_update')
+        assert.deepEqual(body.arguments, { employee_id: `${account.label}-42` })
+        assert.equal(Object.hasOwn(body.arguments, 'authorization_ref'), false)
+        invocations.set(body.invocation_id, account.label)
+        const pending = account.label === 'A'
+        result = {
+          schema_version: 'bailing.agent-tool-invocation.v1',
+          invocation_id: body.invocation_id,
+          route: 'demo',
+          tool: body.tool,
+          state: pending ? 'awaiting_approval' : 'executed',
+          ok: !pending,
+          auto_retry_allowed: false,
+          text: pending ? 'Awaiting Store A approval.' : 'STORE_B_ONLY_RESULT',
+          ...(pending ? { approval_id: 42 } : {}),
+        }
+      } else if (/^\/agent-api\/v1\/tool-invocations\/[0-9a-f]{64}\/resume$/u.test(path)) {
+        const invocationId = path.split('/').at(-2)
+        assert.equal(request.method, 'POST')
+        assert.equal(body, undefined)
+        assert.equal(account.label, 'A')
+        assert.equal(invocations.get(invocationId), account.label)
+        result = {
+          schema_version: 'bailing.agent-tool-invocation.v1',
+          invocation_id: invocationId,
+          route: 'demo',
+          tool: 'employee_update',
+          state: 'executed',
+          ok: true,
+          auto_retry_allowed: false,
+          text: 'STORE_A_ONLY_RESULT',
+        }
+      } else if (path === `/agent-api/v1/runs/${account.runId}/complete`) {
+        assert.equal(request.method, 'POST')
+        assert.equal(body.status, 'completed')
+        assert.match(body.assistant_message_id, /^dsh\./u)
+        assert.match(body.content, new RegExp(`STORE_${account.label}_ONLY_RESULT`, 'u'))
+        assert.equal(body.content.includes(`STORE_${account.label === 'A' ? 'B' : 'A'}_ONLY_RESULT`), false)
+        assert.equal(body.content.includes('COMBINED_LOCAL_REPLY'), false)
+        result = { schema: 'bailing.agent-run-completion.v1', run_id: account.runId, status: body.status }
+      } else {
+        assert.fail(`unexpected SDK request ${request.method} ${path}`)
+      }
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify(result))
+    } catch (error) {
+      serverErrors.push(error)
+      response.writeHead(500, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ error: 'fixture_assertion_failed' }))
+    }
+  })
+  await new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', resolve)
+  })
+  t.after(async () => {
+    server.closeAllConnections()
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
+  })
+  const hubUrl = `http://127.0.0.1:${server.address().port}`
+  const profiles = accounts.map((account) => ({
+    connectionKey: account.connectionKey,
+    alias: `Store ${account.label}`,
+    baseUrl: hubUrl,
+    clientAppId: 'dsh_client',
+    workspace: 'demo',
+    allowInsecureHttp: true,
+    createdAt: new Date(now).toISOString(),
+    updatedAt: new Date(now).toISOString(),
+  }))
+  const stores = new Map(accounts.map((account) => [account.connectionKey, new sdk.MemoryCredentialStore({
+    schema_version: 1,
+    base_url: hubUrl,
+    client_app_id: 'dsh_client',
+    route: 'demo',
+    session_id: account.sessionId,
+    access_token: account.accessToken,
+    refresh_token: account.refreshToken,
+    access_expires_at: new Date(now + 3_600_000).toISOString(),
+    refresh_expires_at: new Date(now + 86_400_000).toISOString(),
+  })]))
+  let currentProfile = profiles[0]
+  const connectionStore = {
+    registry: {
+      get: async (key) => profiles.find((profile) => profile.connectionKey === key),
+      getByAlias: async (alias) => profiles.find((profile) => profile.alias === alias),
+      list: async () => profiles,
+      current: async () => currentProfile,
+    },
+    credentialStore: (key) => stores.get(key),
+    load: async (key) => stores.get(key).load(),
+  }
+  const config = { hubUrl, clientAppId: 'dsh_client', workspace: 'demo', connectionName: 'Store A' }
+  const transport = sdk.createAgentClientTransport({ ...config, allowInsecureHttp: true }, {
+    connectionStore,
+    now: () => now,
+  })
+  const host = createMockHost()
+  t.after(() => host.dispose())
+  createAgentClientPlugin({ transport, recovery: { pollIntervalMilliseconds: 1 } }).apply(host.ctx, config)
+  const { agent, local } = createMockAgent('sdk-multiple-authorizations')
+  host.emit('agent/inbox/claimed', {
+    agent, turn: 1,
+    message: userMessage('sdk-multi-user', 'Update employee 42 in both authorized stores.'),
+  })
+  const assembly = await host.waterfall('system-prompt/assemble', baseAssembly(), {
+    agent, signal: new AbortController().signal,
+  }, async () => baseAssembly())
+  const directoryLine = assembly.sections.flatMap((section) => section.text.split('\n'))
+    .find((line) => line.startsWith('Authorization directory: '))
+  assert.ok(directoryLine, serverErrors.map(String).join('\n'))
+  const refs = Object.fromEntries(JSON.parse(directoryLine.slice('Authorization directory: '.length))
+    .map((entry) => [entry.label, entry.authorization_ref]))
+  assert.equal(assembly.tools.filter((tool) => tool.name === 'employee_update').length, 1)
+  assert.equal(Object.keys(refs).length, 2)
+  for (const account of accounts) {
+    assert.equal(JSON.stringify(assembly).includes(account.accessToken), false)
+    assert.equal(JSON.stringify(assembly).includes(account.refreshToken), false)
+  }
+  // A process-wide selection change must not alter the captured catalog or calls.
+  currentProfile = profiles[1]
+  for (const account of accounts) {
+    const result = await local.get('employee_update').execute({
+      authorization_ref: refs[`Store ${account.label}`],
+      arguments: { employee_id: `${account.label}-42` },
+    }, { agent, callId: `sdk-multi-${account.label}`, signal: new AbortController().signal })
+    const decoded = result
+    assert.equal(decoded.authorization_ref, refs[`Store ${account.label}`])
+    assert.equal(decoded.authorization_label, `Store ${account.label}`)
+    assert.equal(decoded.result.state, 'executed', serverErrors.map(String).join('\n'))
+  }
+  host.emit('session/event', agent.session, {
+    type: 'assistant/message',
+    data: { turn: 1, message: { id: 'sdk-multi-final', role: 'assistant',
+      content: [{ type: 'text', text: 'COMBINED_LOCAL_REPLY' }] } },
+  })
+  host.emit('session/event', agent.session, {
+    type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } },
+  })
+  const deadline = Date.now() + 2_000
+  while (requests.filter((request) => request.path.endsWith('/complete')).length < 2 && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+  assert.deepEqual(serverErrors, [])
+  for (const account of accounts) {
+    const own = requests.filter((request) => request.account === account.label)
+    assert.ok(own.filter((request) => request.path === '/agent-auth/v1/session').length >= 3)
+    assert.equal(own.filter((request) => request.path.endsWith('/turns')).length, 1)
+    assert.equal(own.filter((request) => request.path === '/agent-api/v1/tool-invocations').length, 1)
+    assert.equal(own.filter((request) => request.path.endsWith('/complete')).length, 1)
+    assert.equal(own.filter((request) => request.path.endsWith('/resume')).length, account.label === 'A' ? 1 : 0)
+  }
+  assert.equal(invocations.size, 2)
+})
 
 test('matches the real generic SDK facade argument and HTTP DTO contract', async () => {
   const sdk = await import(moduleUrl(sdkDist))
