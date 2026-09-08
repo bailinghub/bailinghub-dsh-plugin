@@ -1,6 +1,48 @@
 # Compatibility
 
-## Native Agent Client 0.3.0
+## Native Agent Client 0.4.0
+
+| Component | Release pairing / requirement |
+| --- | --- |
+| DeepSeek Harness | `0.1.1-rc.2`; real Session, Cordis lifecycle, commands, prompt assembly, and ToolRuntime regression coverage |
+| Node.js | `^22.19.0` or `>=24.0.0` |
+| DSH tool presentation | Native Tool Mode; Code Mode deliberately degraded |
+| Generic Agent Client SDK | Exact `bailinghub-mcp-server@0.4.0` via `./sdk` |
+| BailingHub Core | `bailinghub@0.6.0`; Agent Auth v1, Agent Client Runtime v1, and conversation audit v1 |
+| Visible archive acknowledgement | `bailing.agent-conversation-audit-ack.v1` |
+| Selected authorization group | One Hub + Client App + workspace; no cross-system or cross-route scope |
+
+Install only `dsh-bailinghub@0.4.0`; its ordinary dependency installs the exact SDK. A release
+requires a registry-generated lockfile and a clean package/profile check. Local source and
+synthetic HTTP verification are compatibility evidence, not evidence of an organization's
+production use. The older 0.3 baseline is retained below for existing users, not as a claim that
+0.3 includes 0.4 features.
+
+New conversations need explicit scope selection before the first message. Custom hosts must await
+and display selection, preserve the stable conversation id, and restore the original scope before
+sending on reopen. Missing started-session snapshots stay blocked. Saved drafts require fresh
+confirmation. Scope restoration and archive synchronization do not recover business invocations,
+approvals, or task execution after a process restart.
+
+Temporary network failure during reopening is retryable on the same runtime under the complete
+original scope. Confirmed revocation, replaced identity, or storage/CAS conflict stays blocked.
+Archived event ids and payloads remain stable on retry; known local write errors and detectable
+history gaps cannot be hidden by a connectivity failure.
+
+The archive transport seam is optional for injected older SDKs. They report `unsupported` while
+existing business methods remain usable. An older Core may leave durable events pending or
+unsupported; that degradation does not establish full compatibility with this release. Empty scope
+starts no business run or archive operation. No model can select a new credential or bypass the
+full selected group.
+
+Local scope and outbox files use private POSIX permissions and atomic/CAS persistence. The outbox
+contains plaintext visible task text, persists after acknowledgement, and has no automatic
+retention cleanup. See [Privacy](../PRIVACY.md) and the [host contract](AGENT_CLIENT_CONTRACT.md).
+
+The CI matrix checks Ubuntu and Windows with Node.js 22.19.0 and 24. Live business/browser
+acceptance still belongs to each deployment; the matrix is not a universal deployment claim.
+
+## Historical native Agent Client 0.3.0
 
 | Component | Verified version |
 | --- | --- |
@@ -80,7 +122,7 @@ Public `dsh-bailinghub@0.1.1` remains a configuration-only bundle. It starts the
 operator-configured Hub URL, route-scoped Client Token, and route. It does not establish an Agent
 Session, receive a dynamic capability catalog, or move orchestration into local DSH.
 
-The 0.3 line must not mutate the published 0.1 package or reinterpret its configuration. A new
+The native line must not mutate the published 0.1 package or reinterpret its configuration. A new
 BailingHub Core release is compatible only after a separate clean legacy profile proves that the
 0.1.1 `/run` and `/jobs/{job_id}` flow still works.
 
@@ -88,9 +130,11 @@ BailingHub Core release is compatible only after a separate clean legacy profile
 
 Compatibility requires independent evidence for both paths:
 
-1. Native 0.3: clean install of only the exact plugin package, browser authorization, workspace
+1. Native 0.4: clean install of only the exact plugin package, browser authorization, workspace
    discovery, same-identity replacement, different-identity isolation, read, permitted mutation,
-   approval/resume, visible completion, and Hub trajectory.
+   approval/resume, visible completion, and Hub trajectory. Additionally verify explicit single/multiple
+   scope selection, full-set archive authorization, offline reopen/retry, revocation, and no business
+   replay after a lost archive acknowledgement.
 2. Legacy 0.1.1: clean static profile, fixed Client Token route, one submit, and same-job follow-up
    through the unchanged public Client API.
 

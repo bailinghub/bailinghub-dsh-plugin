@@ -1,121 +1,126 @@
-# Get started in three minutes
+# Get started with 0.4.0
 
-This guide is for someone whose organization has already connected a business system to
-BailingHub. If that integration does not exist yet, the BailingHub administrator and business
-developer must prepare it before an end user installs this plugin.
+This guide is for users whose business system is already connected to BailingHub. Your
+administrator must prepare Core 0.6.0, a public Client App ID, a workspace, and the business
+browser-authorization entry first. You do not need to change business capability declarations.
 
-This guide installs public `0.3.0`, which selects one connection per conversation. Same-system
-authorization selection is an [unreleased source candidate](../README.md#unreleased-source-candidate-one-system-multiple-authorizations),
-not a feature of that npm release.
+## 1. Install and configure
 
-## What to ask your administrator for
-
-Ask for these four public connection values:
-
-```text
-Hub URL
-Client App ID
-Workspace
-Connection Name
-```
-
-They identify the BailingHub application and starting workspace. They are not credentials. Do not
-ask the administrator to send you a Client Token, Tool Provider secret, business password, model
-API key, authorization code, browser session cookie, business URL, or tenant-specific login URL.
-
-## 1. Install the plugin
-
-Install the exact public version into the DSH Web profile:
+Use Node.js `22.19.0+` or `24+` and the compatible DSH version:
 
 ```bash
-dsh plugin --profile web add dsh-bailinghub@0.3.0
+npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
+dsh plugin --profile web add dsh-bailinghub@0.4.0
 ```
 
-The plugin installs the matching BailingHub SDK automatically.
-
-## 2. Enter the four connection values
-
-Use the DSH plugin settings page or these environment names:
+The plugin installs SDK 0.4.0 automatically. Enter the four public values in DSH plugin settings,
+or use their environment names. The example values below are placeholders:
 
 ```bash
 export BAILINGHUB_HUB_URL='https://hub.example.com'
 export BAILINGHUB_CLIENT_APP_ID='example-agent-client'
-export BAILINGHUB_WORKSPACE='employee_assistant'
-export BAILINGHUB_CONNECTION_NAME='default'
+export BAILINGHUB_WORKSPACE='order_assistant'
+export BAILINGHUB_CONNECTION_NAME='Store A'
+dsh --profile web --dump-config
+dsh web
 ```
 
-The values above are placeholders. Use the public values from your own BailingHub administrator.
-Never paste credentials into the Cordis patch or a chat message.
+Use your administrator's Hub URL, Client App ID, and workspace. `Connection Name` is your local
+label. None of these fields is a credential. Never put passwords, Client Tokens, signing secrets,
+model keys, or business API/authorization URLs into the plugin settings or chat.
 
-## 3. Authorize in the browser
+## 2. Authorize each account
 
-Start DSH and run:
+In DSH, authorize the first account:
 
 ```text
 /bailinghub login
+/bailinghub doctor
 /bailinghub status
-/bailinghub workspaces
 ```
 
-`login` opens the one business-side authorization entry configured for the Client App. Sign in or
-switch account there, select a tenant there when the business system asks, and check the resulting
-business identity and requested workspace before approving. Authorization uses the business
-system's own login; it does not send the business password or business URL to the plugin.
+The browser opens the original business authorization page. Sign in or switch accounts there,
+select the intended store/tenant when asked, and check the actual identity before approving.
+The business page determines the identity; the local label `Store A` does not.
 
-`Connection Name` is only a local selector. If the same trusted business identity authorizes the
-same Hub/client/workspace binding again, the SDK replaces the older local connection. A different
-trusted identity remains separate. When the selected name already belongs to the old identity,
-the SDK preserves it and assigns the new identity an available alias such as `default-2`; the new
-alias becomes current. Run `/bailinghub connections list` to see both and
-`/bailinghub connections use <name-or-key>` to switch. If login says cleanup is required, the new
-connection is already authorized, but an existing connection may still need inspection or
-removal: do not authorize again; list connections and remove the reported old entry.
+For another account in the **same system and workspace**, register a clearly named connection,
+using the same three administrator-provided values, then authorize it separately:
 
-## 4. Confirm the conversation scope, then try a business request
+```text
+/bailinghub connections add "Store B" https://hub.example.com example-agent-client order_assistant
+/bailinghub login
+/bailinghub connections list
+```
 
-For public `0.3.0`, a new conversation uses its selected connection. The **unreleased source
-candidate changes this default**: unset scope or `/bailinghub scope none` means ordinary chat,
-with no BailingHub business tools or runs. When testing that candidate, before the first user
-message run:
+Confirm Store B on the business page. If you approve the same trusted identity again, the SDK
+replaces its old connection and Session instead of creating a second identity. If an existing
+name returns a different identity, the original connection remains and the new identity receives
+an available alias. Names such as `default-2` do not prove which store was authorized. Check the
+mapping before use. If login reports cleanup required, the new connection is already authorized;
+inspect and remove the reported old entry rather than authorizing again.
+
+## 3. Choose this conversation's business scope
+
+Start a **new conversation before sending any message**, then run:
 
 ```text
 /bailinghub connections list
-/bailinghub scope set <connection-key> [<another-connection-key> ...]
+/bailinghub scope set <store-a-connection-key> <store-b-connection-key>
 /bailinghub scope
 ```
 
-Use fixed keys from the list, not aliases. Select only the accounts this conversation needs;
-multiple accounts must share the same Hub/client/workspace. Wait for successful scope confirmation
-before sending. The first user message freezes the scope, so changing accounts or switching from
-ordinary chat requires a new conversation. A selection/check failure pauses business access for
-the whole scope, without using the default or a remaining subset. Embedded hosts without native
-commands must integrate the [scope API](AGENT_CLIENT_CONTRACT.md#host-owned-session-scope-api).
-
-In that new conversation, ask for one read-only action that the selected system exposes, for
-example:
+Copy the fixed connection keys from the list; the scope command does not accept names. Select
+one key for one account, or several for the same Hub/Client App/workspace. Wait for the successful
+confirmation before sending. For example, when the reporting capability is available:
 
 ```text
-Find the demonstration employee EMP-001 and summarize the visible fields.
+Compare today's sales at Store A and Store B. Show each store separately.
 ```
 
-Then try one reversible permitted update in a dedicated development workspace. The exact requests
-depend on the capabilities your business system has exposed. An operation that requires approval
-must continue through the existing approval flow; an operation outside the current identity's
-permissions must remain unavailable.
+The Agent chooses which selected authorization to use for each call. The system still decides
+which data and actions that authorization permits. Test a read first, then a reversible permitted
+update in a development workspace. Approval-required work follows the original approval flow.
 
-## 5. Confirm the result in BailingHub
+Without a selection, or with `/bailinghub scope none`, the conversation is ordinary chat and
+starts no BailingHub business runs. The first message freezes this choice. Start a new conversation
+to change accounts or enable business access after ordinary chat. Changing the registry's default
+connection does not change a conversation's scope.
 
-The BailingHub console should show the corresponding conversation, Agent Run, governed tool calls,
-approval state, and final result. Do not treat a successful installation alone as proof that a
-business action ran.
-For a candidate scope containing multiple authorizations, each run receives only its own call
-summary. A matching candidate SDK/Core separately archives the visible conversation for the full
-frozen authorization set. Inspect `/bailinghub archive status` and retry uploads with
-`/bailinghub archive sync`; pending uploads or `recovery_gap` are separate from business results.
-An older SDK reports `unsupported`. Reopening a saved conversation restores only its
-confirmed scope after validation. Missing or invalid old snapshots block business access, and
-scope restoration does not recover pending invocations or approvals after a process restart.
+## 4. Check results and the visible conversation
 
-If setup fails, include the DSH version, plugin version, operating system, the command that failed,
-and redacted error text in a GitHub Issue. Never attach tokens, private URLs, personal information,
-authorization codes, or production payloads.
+Check the actual business result and its original invocation trail in BailingHub. With the matching
+Core 0.6.0, you can also follow visible user/assistant messages, turns, and the linked runs as one
+conversation record. Multi-authorization runs keep their own call summaries separately.
+
+```text
+/bailinghub archive status
+/bailinghub archive sync
+```
+
+The first command shows upload status; the second retries the saved record. It never repeats a
+business action. `synced` means saved events were acknowledged, not that an action succeeded.
+`pending` means upload is unfinished; `blocked` means the original authorizations cannot currently
+permit it; `unsupported` means the SDK or Hub lacks the archive contract. `storage_error` or
+`recovery_gap` means capture itself may be incomplete. Missing host history is unverified.
+
+## 5. Reconnect or reopen
+
+A saved business conversation restores its original selected accounts only after they all pass
+validation. If it was reopened offline, reconnect and run `/bailinghub archive sync` or
+`/bailinghub scope` in that same conversation. Temporary uncertainty can recover; a revoked or
+replaced authorization, corrupt snapshot, or storage conflict remains blocked for the whole scope.
+There is no automatic fallback to another account.
+
+Restoring scope and retrying uploads does **not** restore unfinished business invocations or
+approvals after a process restart. A never-started saved draft needs selection again. An older
+started conversation with no valid scope snapshot must be left as history; begin a new one.
+Use `/bailinghub sync` only to retry a pending run completion in the still-running conversation.
+
+All selected accounts' context shares the local model conversation. The private local archive
+contains plaintext visible task text and stays on disk until manually removed; it does not capture
+hidden reasoning, attachments, or all past history. Read [Privacy](../PRIVACY.md), and use separate
+conversations when account data must remain separate. Do not paste secrets into visible messages.
+
+If setup fails, include versions, operating system, failed command, and redacted error text in a
+[GitHub Issue](https://github.com/bailinghub/bailinghub-dsh-plugin/issues). Never attach credentials,
+private URLs, authorization codes, personal data, or production payloads.

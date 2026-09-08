@@ -1,19 +1,17 @@
 # Agent Client Host Adapter Contract
 
-Status: public native Agent Client baseline for `dsh-bailinghub@0.3.0`, plus the explicitly
-unreleased source-candidate extension below. This contract is not part of the legacy public
-`0.1.x` line. Public `0.3.0` supports user-managed connections with Core `0.5.1` and
-`bailinghub-mcp-server@0.3.0`; it does not include model selection among authorizations. The
-remaining sections describe the baseline except where the candidate section states a change.
+Status: native Agent Client contract for `dsh-bailinghub@0.4.0`, paired with
+`bailinghub-mcp-server@0.4.0` and BailingHub Core `0.6.0`. This contract is separate from the
+legacy static `0.1.x` path. Version 0.3.0 supported user-managed connections but did not include
+explicit conversation scope, multi-authorization tool selection, or the visible conversation archive.
 
-## Unreleased Same-System Authorization Selection
+## Same-System Authorization Selection
 
 This increment supports multiple independently authorized identities for one public
 `Hub + clientAppId + workspace` binding in one DSH conversation. It does not combine different
 systems or routes, alter business capability declarations, or change Core authorization rules.
-It is a source candidate with no new npm release or version claim.
 
-This candidate changes the default: a new conversation with no selected scope, or an explicitly
+Version 0.4.0 changes the default: a new conversation with no selected scope, or an explicitly
 empty `connectionKeys: []`, is ordinary chat. It starts no BailingHub run and exposes no BailingHub
 business tools. Browser authorization, the registry's current connection, and the four bootstrap
 fields do not select a conversation's scope. There is no automatic discovery-and-enable fallback.
@@ -46,7 +44,7 @@ authorization is missing, invalid, replaced, or cannot be checked, business acce
 conversation pauses. It neither falls back to a default nor silently shrinks to the remaining
 authorizations. A new conversation can explicitly select the still-valid subset. These inspection
 fields stay host-side. The
-candidate passes `connectionKey` and `workspace` as explicit SDK host metadata instead of
+adapter passes `connectionKey` and `workspace` as explicit SDK host metadata instead of
 resolving a mutable alias or default.
 
 The full selection is validated before any selected system receives the turn. For each direct
@@ -54,7 +52,7 @@ user turn, the adapter starts one Core run per selected authorization before
 assembling the model request. Instructions, governance, knowledge, memory, and tool results carry
 authorization labels. The user input is sent to each of those runs. Separate run state preserves
 attribution; all injected context still shares the local Agent/model boundary described in
-[Privacy](../PRIVACY.md#unreleased-same-system-authorization-selection).
+[Privacy](../PRIVACY.md#same-system-authorization-selection).
 
 Business definitions with the same name, description, input schema, and governance are registered
 once.
@@ -186,8 +184,8 @@ Restoring a scope does **not** restore an invocation, approval, pending completi
 
 ### Independent visible conversation archive
 
-This additional candidate requires matching SDK and Core support; public npm `0.3.0` does not
-provide it. After a nonempty scope is frozen, the adapter captures claimed user text, every
+The visible archive requires SDK `0.4.0` and Core `0.6.0`; earlier `0.3.0` packages do not
+provide this contract. After a nonempty scope is frozen, the adapter captures claimed user text, every
 durable `assistant/message` text block, turn start/end, and verified original run links. It ignores
 `assistant/chunk`, hidden reasoning, attachments, raw provider requests, and arbitrary tool payloads.
 The archive is one record for the complete fixed authorization set; per-authorization run summaries
@@ -222,7 +220,7 @@ without replaying `startTurn`, `invoke`, `resume`, or `completeRun`. An older SD
 `unsupported` without accessing the outbox directory; an unavailable/older Core leaves saved events
 pending or unsupported for retry. Empty scope does not load a transport or create an archive.
 
-Capture begins with candidate-enabled business turns. Previously unarchived history is not silently
+Capture begins with business turns enabled under this archive contract. Previously unarchived history is not silently
 claimed as complete. Status compares saved visible events against the available DSH `session.events`:
 missing user/assistant text or turn boundaries report `recovery_gap` / `coverage: incomplete`, even
 if the saved prefix is synchronized. Hosts without durable history report `coverage: unverified`.
@@ -248,8 +246,8 @@ connectionName
 ```
 
 `hubUrl`, `clientAppId`, and `workspace` identify a public Hub-side application/workspace binding.
-`connectionName` selects a local SDK connection for connection-management commands; in the
-candidate it does not select the conversation scope. It is not an account, tenant, or
+`connectionName` selects a local SDK connection for connection-management commands; it does not
+select the conversation scope. It is not an account, tenant, or
 identity claim. The Hub Client App resolves to one stable business authorization endpoint; no
 business endpoint, authorization endpoint, token, secret, or business credential belongs in this
 config. The business authorization page owns sign-in, account switching, tenant selection, and
@@ -267,7 +265,7 @@ connectionsUse(connectionNameOrKey)
 connectionsRemove(connectionNameOrKey)
 
 login({ hubUrl, clientAppId, workspace, route, connectionName })
-status({ connectionName })
+status({ connectionKey }) // conversation checks; management may use connectionName
 logout({ connectionName })
 workspaces({ connectionName })
 use({ workspace, route, connectionName })
@@ -283,7 +281,7 @@ startTurn({
 
 searchCapabilities({ query, limit?, runId? })
 invoke({ invocationId, capabilityRevision, agentRunId, tool, arguments })
-resume(invocationId, {}, { workspace, connectionName, signal? })
+resume(invocationId, {}, { workspace, connectionKey, signal? })
 completeRun(runId, {
   assistantMessageId,
   content,
@@ -294,9 +292,11 @@ completeRun(runId, {
 })
 ```
 
-The adapter may pass a second host metadata argument (`workspace`, `connectionName`, and an
-`AbortSignal`) to turn/tool methods. The framework-neutral SDK DTO is always the first argument;
-an SDK implementation that does not consume host metadata may ignore it.
+The adapter passes host metadata (`workspace`, fixed `connectionKey`, and optional `signal`)
+separately from the business DTO to turn/tool methods, and as the third argument to completion
+and resume. The transport must honor that exact selection; it must never ignore it or substitute
+a mutable alias/default. Connection-management commands may use `connectionName`. The optional
+archive seam and its complete frozen member selection are specified above.
 
 ## Browser Identity and Local Reconciliation
 
@@ -375,7 +375,7 @@ agent/inbox/claimed
   -> model request
 ```
 
-The adapter captures only a claimed message whose `source.kind` is `user`. In the candidate, the
+The adapter captures only a claimed message whose `source.kind` is `user`. The
 first `user/message` event freezes scope; the inbox claim is a fallback if that event is absent.
 The assembly gate permits business work only for the saved selection.
 When inspecting attached or restored history, only `user/message` with `source.kind: 'user'` or
@@ -404,11 +404,11 @@ The adapter listens to durable `session/event` values:
 
 ## Tool Invocation and Recovery
 
-In the public baseline, every active Core tool becomes an agent-scoped DSH definition. Its
+Every active Core tool becomes an agent-scoped DSH definition. Its
 invocation id is a stable 64-character lowercase SHA-256 digest of the session, run, DSH call id,
 and Core tool name. It
 calls the SDK `invoke` DTO without letting the model supply the run, capability revision, route,
-or arbitrary identity. The candidate's constrained authorization selector is described above.
+or arbitrary identity. The constrained authorization selector is described above.
 
 An SDK error with `disposition === 'accepted_unknown'` starts recovery with the exact invocation
 id; it never repeats the business-tool `invoke`. Likewise, `awaiting_approval`, `in_progress`, and
@@ -449,8 +449,7 @@ DSH sessions remain pinned as described below.
 
 Multi-connection add/use/remove is exposed only through the `/bailinghub connections` user
 command. It is never registered as a model tool. Selecting a connection changes registry defaults;
-existing states keep their captured bindings. Public `0.3.0` uses that default for new Agent
-sessions and pins one connection and workspace. In the candidate, defaults affect connection management only;
+existing states keep their captured bindings. Defaults affect connection management only;
 the host-owned scope API alone selects the conversation's authorization directory.
 Removing a connection is rejected while any run is active or has an unsynchronized completion. The SDK then
 revokes only that instance's remote Agent Session before removing its local credentials and
@@ -469,7 +468,7 @@ adapter reads `connectionsList()` and adopts the public
 metadata matching `currentConnectionKey`. Invalid, missing, or unavailable registry data leaves the
 bootstrap defaults in place and must not remove or block unrelated host tools. The lookup is not a
 model tool, and restoring or later selecting a default never mutates an already-created session.
-These registry bootstrap rules do not grant business scope in the candidate, even to a new
+These registry bootstrap rules do not grant business scope, even to a new
 conversation. A failed scope load or selection never uses the bootstrap fields as a fallback.
 
 The completion request is restricted to:
@@ -477,7 +476,7 @@ The completion request is restricted to:
 ```json
 {
   "assistant_message_id": "stable alias",
-  "content": "visible final text",
+  "content": "visible final text for one authorization, or that run's deterministic call summary for a multi-authorization scope",
   "status": "completed | failed | cancelled",
   "model": "optional",
   "runtime": "optional",

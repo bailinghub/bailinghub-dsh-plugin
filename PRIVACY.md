@@ -1,6 +1,6 @@
 # Privacy
 
-This bundle adds no telemetry and stores no BailingHub credentials. The unreleased candidate
+This bundle adds no telemetry and stores no BailingHub credentials. Version 0.4.0
 persists session-scope metadata and, when the SDK supports conversation archives, a separate
 private outbox containing visible task text as described below.
 
@@ -12,13 +12,14 @@ using personal, confidential, or regulated data.
 Do not include tokens, private URLs, personal information, or production payloads in public
 issues, screenshots, or compatibility reports.
 
-## Native Agent Client 0.3.0
+## Native Agent Client 0.4.0
 
-The native 0.3.0 plugin sends each direct human user turn to BailingHub Core and receives
-model-visible instructions, memory, reference-only knowledge, governance, and active tool schemas.
-Business tool arguments and governed results cross the same boundary. At completion it sends only
-the hash-aliased assistant message id, visible final text, legal status, optional model/runtime
-labels, and numeric public usage. It ignores `assistant/chunk` and never uploads hidden reasoning.
+After explicit nonempty scope selection, the native 0.4.0 plugin sends each direct human user turn
+to BailingHub Core and receives model-visible instructions, memory, reference-only knowledge, governance, and active tool schemas.
+Business tool arguments and governed results cross the same boundary. At completion it sends a
+hash-aliased message id, legal status, optional model/runtime labels, and numeric public usage. A single-authorization run receives the visible final answer;
+multi-authorization runs receive only their own deterministic call summaries. It ignores
+`assistant/chunk` and never uploads hidden reasoning.
 
 Browser authorization, refresh, and credential storage remain SDK-owned; this adapter stores no
 BailingHub credential. The SDK uses macOS Keychain, Windows CurrentUser DPAPI, or an explicitly
@@ -29,9 +30,9 @@ The multi-connection registry contains public connection name, Hub URL, client a
 timestamps, and current-selection state. It does not contain access tokens, refresh tokens, model
 keys, business cookies, prompts, tool arguments, or business results.
 
-## Unreleased same-system authorization selection
+## Same-system authorization selection
 
-The source candidate includes only the authorization keys explicitly selected for a DSH
+Version 0.4.0 includes only the authorization keys explicitly selected for a DSH
 conversation, restricted to the same Hub/client/workspace binding. Unset or empty scope means
 ordinary chat: no BailingHub run starts, no BailingHub business tool is registered, and the plugin
 does not send that conversation's user input to a business system. Logging in or selecting a
@@ -57,8 +58,9 @@ default or silently retaining a subset.
 Each business call uses only its selected authorization. Recovery retains the original
 authorization and invocation. At completion, multi-authorization runs receive separate
 deterministic summaries of their own governed calls, not the combined visible final answer or
-another authorization's results. A matching candidate SDK/Core also receives the combined visible
-conversation through the independent archive boundary below. Single-authorization conversations retain the existing visible-answer completion flow.
+another authorization's results. SDK 0.4.0 with Core 0.6.0 also receives the combined visible
+conversation through the independent archive boundary below. Single-authorization conversations
+retain the existing visible-answer completion flow.
 Hidden reasoning is never uploaded by the adapter.
 
 The host checks the captured connection key, workspace, and original Agent Session id before
@@ -85,11 +87,9 @@ scope snapshots on started conversations do not adopt current registry connectio
 Restoring that scope does not recover pending business invocations, approvals, completions, or
 tasks across a process restart.
 
-The public npm release remains `0.3.0`; installing it does not enable this candidate behavior.
+## Visible conversation archive
 
-## Unreleased visible conversation archive
-
-For a nonempty frozen scope, a matching candidate SDK/Core receives the claimed user messages,
+For a nonempty frozen scope, SDK 0.4.0 with Core 0.6.0 receives the claimed user messages,
 visible assistant text, turn boundaries, and original run links as one conversation audit owned
 by the complete selected authorization set. Visible text may itself contain personal or business
 data; the adapter does not claim to redact arbitrary secrets pasted into that text. It never adds
@@ -114,3 +114,9 @@ reported as `recovery_gap`; unavailable host history is marked unverified. Previ
 messages, attachments, and hidden content are not claimed as a complete transcript. The archive
 does not restore business invocation or approval execution after restart. An older SDK reports
 unsupported without creating an outbox, and business calls remain available.
+
+An offline reopen keeps the original frozen scope closed until every member can be revalidated.
+A later retry on the same runtime may recover a temporary network failure, but cannot recover
+confirmed revocation, replacement identity, or a storage conflict. Archive status retains known
+unsaved events and history gaps while upload is blocked. Revocation confirmed during asynchronous
+archive capability discovery or opening is rechecked before reporting availability or uploading.

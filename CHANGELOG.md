@@ -1,53 +1,51 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 - 2026-09-08
 
-- Recover an offline-reopened locked conversation on the same runtime after connectivity returns.
-  Treat uncertain authorization probes as retryable closed gates, revalidate every original member,
-  and keep confirmed identity loss and storage conflicts blocked without changing persisted scope.
-  Concurrent business and archive calls wait for the current whole-scope proof.
-- Preserve known unsaved archive events and visible-history gaps during blocked uploads and late
-  network failures. Archive capability-discovery failures remain pending rather than storage errors.
+### For users
 
-- Change the unreleased candidate to explicit per-conversation scope: unset or empty scope stays
-  ordinary chat. Registered authorizations and the global default no longer automatically enable
-  business tools or runs in a new candidate conversation.
-- Add host `setSessionScope`, `getSessionScope`, and `restoreSessionScope` APIs, plus user-only
-  `/bailinghub scope`, `scope none`, and `scope set <connection-key>...` commands. Validate selected
-  keys before sending business input and freeze scope on the first `user/message` event, with
-  the inbox claim as a fallback for drivers that do not emit it.
-  Hosts must await and display successful selection before sending; scope changes require a new
-  conversation after the first message.
-- Persist non-secret scope snapshots with revision compare-and-swap, cross-process locking, and
-  atomic files under the DSH home. Permit injected stores and an explicit non-persistent memory
-  adapter. Missing or invalid old snapshots, failed selection, or any unavailable selected
-  authorization block the whole business scope without a default or subset fallback.
-- Require explicit reconfirmation of every unlocked scope draft loaded into a new runtime,
-  without probing its old authorizations. This also blocks a stale draft when the first
-  replacement-marker write failed. Valid locked conversations still restore their original scope.
-- Recognize started conversations from actual user-sourced messages or turn-start events, not
-  `firstLiveSeq` or metadata alone. Preserve selection for metadata-only drafts and distinguish
-  seeded/previous history from the current first message without changing the scope schema or API.
-- Allow explicitly selected, independently authorized identities sharing one Hub/client/workspace
-  binding in one conversation, without changing the global connection.
-- Register matching typed business tools once, with a host-issued `authorization_ref` selector
-  outside the original business arguments in multi-authorization conversations. Preserve the
-  original argument shape for single-authorization conversations and the 12-tool total budget.
-- Keep per-authorization context, permission checks, run state, and exact-invocation recovery
-  across turns of the same live conversation; pin the original Agent Session before transport,
-  reject conflicting same-name declarations and never retarget a pending operation.
-  Scope restoration across a process restart does not restore invocations, approvals, or tasks.
-- Synchronize separate deterministic call summaries for multi-authorization runs. A matching
-  candidate SDK/Core additionally archives one visible conversation for the full frozen member
-  set, without broadcasting the combined answer into each member's memory or collecting reasoning.
-- Persist a separate private visible-event outbox with a random archive identity, stable event ids,
-  original run links, and acknowledgement cursor. Add host archive status/sync APIs and user-only
-  `/bailinghub archive status|sync`; archive retry after restart never replays business actions.
-  Keep older SDKs usable with explicit unsupported status. Detect visible-history gaps after local
-  write failure/restart instead of claiming complete capture; hosts without history remain unverified.
-- Keep a cancelled turn ended when its original `startTurn` response arrives late: retain its audit
-  link without reactivating business tools, dispatching remaining members, or replacing a newer turn.
-- Keep public `dsh-bailinghub@0.3.0` as the stable release; this candidate has not been published.
+- Use independently authorized accounts for the same system in one conversation. Select Store A,
+  Store B, or both before the first message; the Agent chooses the correct authorization for each
+  available business tool without changing the global connection. Existing permissions and approvals
+  still apply. Different Hubs, Client Apps, and workspaces are outside this release.
+- **New conversations now default to ordinary chat.** Login and connection defaults no longer enable
+  business access. Use `/bailinghub scope set <connection-key>...` and wait for confirmation before
+  the first message; later selection changes require a new conversation. See the [migration guide](docs/MIGRATION_VNEXT.md).
+- Follow visible user/assistant messages, turn boundaries, and links to original business runs in
+  a separate conversation archive with Core 0.6.0. Multi-account runs keep their own call summaries;
+  the combined reply is not broadcast into each account's memory. Hidden reasoning is excluded.
+- Check `/bailinghub archive status` and retry `/bailinghub archive sync` after a failed upload or
+  restart. Saved events retain their original identity; retries do not execute business actions again.
+- Recover the original saved scope after an offline reopen on the same runtime once connectivity
+  returns and every original authorization is valid. Revocation, identity replacement, and storage
+  conflicts still block the whole scope. Scope restoration does not restore unfinished invocations,
+  approvals, or tasks after a process restart.
+
+### Reliability and integration
+
+- Persist non-secret scope snapshots and a separate private visible-text outbox with revision checks,
+  cross-process locks, and atomic file replacement. Expose host selection, restore, archive status,
+  and archive sync APIs. Reopened unlocked drafts require explicit confirmation; started conversations
+  without valid locked scope cannot adopt current defaults. Metadata alone does not lock a draft.
+- Share matching typed business tools once. Multi-authorization calls use a host-issued reference
+  outside the unchanged business arguments; single-authorization arguments remain unchanged. Keep
+  the 12-tool total budget, reject conflicting declarations, and retain original invocation bindings
+  across turns of the same live conversation.
+- Preserve stable archive event ids, original run links, and acknowledgement cursors through ambiguous
+  network retries. Report detectable missing history as `recovery_gap`, and unavailable history as
+  unverified. Local write failures and unsaved events remain visible while uploads are blocked.
+  Archive capability network failures report pending, not a false storage error.
+- Recheck the original scope after asynchronous archive capability discovery and opening, so a
+  revocation confirmed during that work cannot return a misleading synchronized status or allow upload.
+  Concurrent business and archive callers wait for the current whole-scope validation.
+- Keep cancelled turns ended when their original run response arrives late. Retain only the original
+  audit link, without reactivating tools, dispatching remaining members, or replacing a newer turn.
+- Pin exact `bailinghub-mcp-server@0.4.0`. Injected older SDKs retain business operations with an
+  explicit unsupported archive status. Keep the separate public `0.1.1` static MCP path unchanged.
+
+The archive stores plaintext visible task text locally, including acknowledged events, until the
+host/operator removes it. It does not export all past conversations or attachments. Review
+[Privacy](PRIVACY.md) before enabling business scope; release verification is not production adoption.
 
 ## 0.3.0 - 2026-09-01
 

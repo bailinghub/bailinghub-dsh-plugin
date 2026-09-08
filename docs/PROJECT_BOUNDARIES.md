@@ -23,8 +23,9 @@ community integration, not an official DeepSeek plugin or partnership.
 
 ## Public native line (0.2.0 onward)
 
-Version 0.2.0 introduced this dependency path. Version 0.3.0 keeps it separate from the public
-static MCP path and adds the stable multi-connection lifecycle:
+Version 0.2.0 introduced this dependency path; 0.3.0 added the named connection lifecycle.
+Version 0.4.0 adds explicit same-system conversation scope and visible conversation archiving.
+All remain separate from the public static MCP path:
 
 ```text
 DeepSeek Harness local Agent

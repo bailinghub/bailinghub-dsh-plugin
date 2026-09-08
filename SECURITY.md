@@ -19,9 +19,9 @@ configuration and are never model tool arguments.
 
 Non-loopback HTTP is denied by default. Do not enable insecure HTTP on an untrusted network.
 
-## Native 0.3.0 boundary
+## Native 0.4.0 boundary
 
-The native 0.3.0 plugin accepts only `hubUrl`, `clientAppId`, `workspace`, and
+The native 0.4.0 plugin accepts only `hubUrl`, `clientAppId`, `workspace`, and
 `connectionName`. The generic SDK owns browser authorization, refresh, and secure credential
 storage; business endpoints and final authorization remain Core/business-system concerns. The
 Hub Client App owns one business authorization entry. That business page, not the plugin or model,
@@ -41,7 +41,7 @@ falsely report a complete logout.
 Tools are Agent/run scoped. Message ids are replaced by Core-safe hash aliases, invocation ids are
 stable 64-character digests, and an `accepted_unknown` outcome must resume that exact invocation
 instead of creating a replacement. Completion retries are bounded and reuse one frozen,
-visible-only payload. Version 0.3.0 installs `bailinghub-mcp-server@0.3.0` as an exact ordinary
+visible-only payload. Version 0.4.0 installs `bailinghub-mcp-server@0.4.0` as an exact ordinary
 dependency and resolves its `./sdk` export. It does not depend on ambient modules, an optional
 peer, a range, a dist-tag, or a local path. Public `0.1.1` does not provide that facade.
 
@@ -50,9 +50,9 @@ LocalAppData. Windows PowerShell or DPAPI unavailability fails closed without a 
 Linux and other POSIX hosts must explicitly enable the SDK's isolated mode-0600 file store. The
 plugin never receives the credential value and never writes one into Cordis configuration.
 
-## Unreleased same-system authorization selection
+## Same-system authorization selection
 
-The source candidate lets the model select a session-local `authorization_ref` from the current
+Version 0.4.0 lets the model select a session-local `authorization_ref` from the current
 conversation's directory. This is a constrained per-call selector, not a connection-management
 tool or authority to supply a Hub, route, raw connection key, credential, or business identity.
 The host must first explicitly select fixed connection keys for this conversation through
@@ -113,11 +113,10 @@ records must not be exposed as model-controlled storage or allow an untrusted ca
 another conversation's id. This plugin does not secure unrelated host filesystem tools; the host
 must enforce that access boundary.
 
-The candidate keeps authorization-specific instructions and context labeled, and each run receives
+The adapter keeps authorization-specific instructions and context labeled, and each run receives
 only its authorization's deterministic call summary. It does not broadcast a combined final
 answer to every run. Visible user input and context do share the local conversation boundary;
-see [Privacy](PRIVACY.md#unreleased-same-system-authorization-selection). This candidate is not
-part of the published `0.3.0` package.
+see [Privacy](PRIVACY.md#same-system-authorization-selection).
 
 The independent conversation-audit extension sends visible text for the complete frozen member
 set through an optional SDK API. A durable random archive UUID supplies correlation, not authority:
@@ -134,3 +133,11 @@ stable on ambiguous network retries. Local I/O failure can leave an unpersisted 
 DSH history is compared after reopening, and missing events produce `recovery_gap`, not a claim
 of a complete transcript. Hosts without history must show unverified coverage. This boundary is
 not a distributed transaction or durable business-task recovery mechanism.
+
+Transient transport failures do not prove that an original authorization was revoked. Scope
+get/restore and archive retry may revalidate all original members on the same runtime, while
+keeping business access and uploads closed until validation succeeds. Concurrent callers share
+that validation. Confirmed revocation/replacement and storage/CAS conflicts remain terminally
+blocked, with no default or subset fallback. The gate is rechecked after asynchronous archive
+capability discovery and outbox opening; a late result cannot erase a confirmed revocation.
+Known local storage errors and capture gaps remain visible even while network or scope checks block upload.
