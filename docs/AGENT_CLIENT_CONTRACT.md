@@ -89,7 +89,7 @@ This increment does not provide durable task recovery across those boundaries.
 On multi-authorization completion, the adapter freezes one deterministic summary of each run's
 own governed calls and synchronizes that run separately. It does not send the combined visible
 assistant answer, another authorization's results, or hidden reasoning to every run. The combined
-answer remains local to DSH. Single-authorization completion keeps the existing visible-answer
+answer is instead eligible for the separate conversation audit below. Single-authorization completion keeps the existing visible-answer
 behavior. Connection add/use/remove remain user-only commands, not model tools.
 
 ### Host-owned session scope API
@@ -174,6 +174,54 @@ The snapshot contains only the scope schema, DSH session id, revision, state/loc
 and selected connection keys, sanitized labels, workspace, and original Agent Session ids. It
 contains no credentials, tokens, prompts, business arguments/results, or invocation state.
 Restoring a scope does **not** restore an invocation, approval, pending completion, or task.
+
+### Independent visible conversation archive
+
+This additional candidate requires matching SDK and Core support; public npm `0.3.0` does not
+provide it. After a nonempty scope is frozen, the adapter captures claimed user text, every
+durable `assistant/message` text block, turn start/end, and verified original run links. It ignores
+`assistant/chunk`, hidden reasoning, attachments, raw provider requests, and arbitrary tool payloads.
+The archive is one record for the complete fixed authorization set; per-authorization run summaries
+are unchanged. It is not written into each member's memory.
+
+The optional SDK seam is `syncConversationArchive(envelope, { members })`. `envelope` contains a
+durable random UUID `clientArchiveId`, the same `clientConversationId` used by `startTurn`, and
+ordered `events`. Each event has a stable UUID `event_id`, contiguous `sequence` starting at one,
+the original `client_turn_id`, and `kind`: `turn_start`, `user_message`, `assistant_message`,
+`run_link`, or `turn_end`. Messages contain `content`; a run link contains the original `run_id`
+and `member_session_id`; turn end contains `completed`, `failed`, or `cancelled` status. A late
+original run response may attach its link to an already ended turn. It never reactivates its
+business tools, dispatches that cancelled turn's remaining members, or replaces a newer active turn.
+The SDK receives host-only member records `{ connectionKey, workspace, expectedSessionId, label }`,
+checks every original authorization, and owns HTTP batching and credential use. The first frozen
+member is the writer. Neither the old hash alias nor a random archive UUID confers read/write access.
+
+`createAgentClientPlugin({ archiveStore })` accepts an independent CAS store with `load`/`save`,
+using the same revision semantics as the scope store but a distinct schema and directory.
+`createFileConversationArchiveStore({ directory? })` defaults to
+`$DSH_HOME/plugins/dsh-bailinghub/conversation-outbox`, with private file permissions, atomic writes,
+and a 32 MiB local record bound. `createMemoryConversationArchiveStore()` is explicitly volatile.
+Outboxes retain the frozen membership, random identity, visible events, event hashes/ids, and
+acknowledged cursor. They contain task text; they are not credential stores. The SDK rejects a
+message above 64,000 characters; the adapter does not silently truncate it or discard pending text.
+Core's conversation/event quotas and the local bound can leave synchronization pending.
+
+Host APIs `getSessionArchiveStatus(sessionId)` and `syncSessionArchive(sessionId)` and the user-only
+`/bailinghub archive status|sync` commands expose synchronization separately from business state.
+Persisted pending events can be retried after reopening under the original valid frozen scope,
+without replaying `startTurn`, `invoke`, `resume`, or `completeRun`. An older SDK reports
+`unsupported` without accessing the outbox directory; an unavailable/older Core leaves saved events
+pending or unsupported for retry. Empty scope does not load a transport or create an archive.
+
+Capture begins with candidate-enabled business turns. Previously unarchived history is not silently
+claimed as complete. Status compares saved visible events against the available DSH `session.events`:
+missing user/assistant text or turn boundaries report `recovery_gap` / `coverage: incomplete`, even
+if the saved prefix is synchronized. Hosts without durable history report `coverage: unverified`.
+This check does not reconstruct missing business run ids. Network failure leaves durable events
+retryable; a local write failure can leave only an in-memory pending event until storage recovers.
+If the process ends before that write succeeds, the host-history check reports the detectable gap;
+there is no atomic transaction between DSH's event log, this outbox, and Core. It does not promise
+recovery of absent host history, hidden content, or durable business task execution.
 
 ## Host Configuration
 

@@ -97,7 +97,9 @@ Hub/client/workspace。等待范围设置成功回显后再发送消息。第一
 
 BailingHub 控制台应当能看到同一条可见会话、Agent Run、业务工具调用、审批状态与最终结果。
 只有插件安装成功，还不能证明业务操作已经真正完成。
-候选版本选择多份授权时，各 run 只收到自身调用摘要，汇总回答留在 DSH。重开已有会话时，只能
+候选版本选择多份授权时，各 run 只收到自身调用摘要；匹配的候选 SDK/Core 会为完整固定授权集合
+另存可见会话。用 `/bailinghub archive status` 查看、`/bailinghub archive sync` 补传；待同步或
+`recovery_gap` 与业务成败分开显示。旧 SDK 显示 `unsupported`。重开已有会话时，只能
 在验证后恢复已确认的范围；旧快照缺失或无效时暂停业务访问。范围恢复不等于进程重启后恢复
 原 invocation 或待处理审批。
 

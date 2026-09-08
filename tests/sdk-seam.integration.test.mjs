@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
 
-import { createAgentClientPlugin } from '../lib/index.js'
+import { createAgentClientPlugin, createMemoryConversationArchiveStore } from '../lib/index.js'
 import {
   activeTool,
   baseAssembly,
@@ -128,6 +128,12 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
         assert.equal(body.content.includes(`STORE_${account.label === 'A' ? 'B' : 'A'}_ONLY_RESULT`), false)
         assert.equal(body.content.includes('COMBINED_LOCAL_REPLY'), false)
         result = { schema: 'bailing.agent-run-completion.v1', run_id: account.runId, status: body.status }
+      } else if (path.startsWith('/agent-api/v1/conversation-audits')) {
+        // This fixture represents the baseline Core without the optional audit
+        // endpoint. Candidate SDKs may probe it; business evidence is unchanged.
+        response.writeHead(404, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ error: { code: 'conversation_audit_not_found', message: 'Not supported by this baseline fixture' } }))
+        return
       } else {
         assert.fail(`unexpected SDK request ${request.method} ${path}`)
       }
@@ -187,7 +193,7 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
   })
   const host = createMockHost()
   t.after(() => host.dispose())
-  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport, recovery: { pollIntervalMilliseconds: 1 } }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), archiveStore: createMemoryConversationArchiveStore(), transport, recovery: { pollIntervalMilliseconds: 1 } }).apply(host.ctx, config)
   const { agent, local } = createMockAgent('sdk-multiple-authorizations')
   await selectSessionScope(host, agent, accounts.map((account) => account.connectionKey))
   host.emit('agent/inbox/claimed', {
@@ -359,7 +365,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
     connectionName: profile.alias,
   }, { connectionStore, fetchImpl, now: () => now })
   const host = createMockHost()
-  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(),
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), archiveStore: createMemoryConversationArchiveStore(),
     transport,
     recovery: { pollIntervalMilliseconds: 1 },
   }).apply(host.ctx, {
@@ -420,7 +426,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
   await settle()
 
   assert.equal(requests.every((request) => request.authorized), true)
-  const businessRequests = requests.filter((request) => request.path.startsWith('/agent-api/'))
+  const businessRequests = requests.filter((request) => request.path.startsWith('/agent-api/') && !request.path.startsWith('/agent-api/v1/conversation-audits'))
   assert.ok(requests.some((request) => request.path === '/agent-auth/v1/session'))
   assert.deepEqual(businessRequests.map((request) => request.path), [
     '/agent-api/v1/workspaces/demo/turns',
@@ -487,7 +493,7 @@ test('drives the installed SDK connection lifecycle through DSH user commands', 
       },
     })
     const host = createMockHost()
-    createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport }).apply(host.ctx, {
+    createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), archiveStore: createMemoryConversationArchiveStore(), transport }).apply(host.ctx, {
       hubUrl: 'https://hub.example.com',
       clientAppId: 'dsh_client',
       workspace: 'demo',

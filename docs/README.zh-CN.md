@@ -243,8 +243,15 @@ run，即使中间使用了另一份授权，也不会改变恢复目标。授�
 业务访问，不会采用当前 registry 默认连接。范围恢复不等于恢复原
 invocation、审批或未完成任务。嵌入宿主可注入持久化 `scopeStore`；显式内存适配器不提供重启恢复。
 
-跨授权汇总的最终回答留在 DSH；各 Core run 只接收自身业务调用的确定性摘要，不接收包含其他
-授权结果的汇总回答。详见[候选契约](AGENT_CLIENT_CONTRACT.md#unreleased-same-system-authorization-selection)
+各 Core run 仍只接收自身业务调用的确定性摘要。使用匹配的候选 SDK 与 Core 后，完整固定授权集合
+另有一份独立会话审计，保存可见用户/助手文本、轮次边界和原 run 关联；不会把汇总回答广播到每份
+授权的记忆，也不会采集隐藏思考。
+
+候选在本地保存私有待上传记录与随机归档身份。上传失败可在重启后用 `/bailinghub archive sync`
+补传，`/bailinghub archive status` 查看独立同步状态；归档成功不等于业务成功。若对照宿主历史发现
+本地落盘缺失或旧消息未归档，会明确显示 `recovery_gap`；宿主不提供历史时覆盖度为 `unverified`。
+采集从候选启用后的选定业务会话开始，只包括可见文本，不代表已导出附件、隐藏思考或全部历史会话。
+旧 SDK 明确显示 `unsupported`，已有业务调用继续工作。详见[候选契约](AGENT_CLIENT_CONTRACT.md#unreleased-same-system-authorization-selection)
 与[隐私边界](../PRIVACY.md#unreleased-same-system-authorization-selection)。
 
 ## 安全与隐私边界
@@ -257,7 +264,7 @@ invocation、审批或未完成任务。嵌入宿主可注入持久化 `scopeSto
 - BailingHub 对每次治理调用重新校验身份、scope、审批、幂等与调用状态，业务系统仍执行
   最终权限判断；
 - 适配器会发送可见用户输入与受治理工具参数/结果。公开 `0.3.0` 发送可见最终回复；候选在
-  多授权会话中改为分别发送各自调用摘要，不会上传隐藏思考片段；
+  多授权会话中分别发送各自调用摘要，并由匹配的候选 SDK/Core 独立归档完整授权集合的可见文本，不会上传隐藏思考片段；
 - 本插件只治理它注册的 BailingHub 工具，不会拦截 DSH 其他工具或模型提供方流量。
 
 生产使用前请阅读[安全策略](../SECURITY.md)、[隐私说明](../PRIVACY.md)、

@@ -109,7 +109,10 @@ The BailingHub console should show the corresponding conversation, Agent Run, go
 approval state, and final result. Do not treat a successful installation alone as proof that a
 business action ran.
 For a candidate scope containing multiple authorizations, each run receives only its own call
-summary; the combined answer remains in DSH. Reopening a saved conversation restores only its
+summary. A matching candidate SDK/Core separately archives the visible conversation for the full
+frozen authorization set. Inspect `/bailinghub archive status` and retry uploads with
+`/bailinghub archive sync`; pending uploads or `recovery_gap` are separate from business results.
+An older SDK reports `unsupported`. Reopening a saved conversation restores only its
 confirmed scope after validation. Missing or invalid old snapshots block business access, and
 scope restoration does not recover pending invocations or approvals after a process restart.
 

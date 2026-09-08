@@ -1,7 +1,8 @@
 # Privacy
 
-This bundle adds no telemetry and stores no BailingHub credentials or task payloads. The
-unreleased candidate persists only the non-secret session-scope metadata described below.
+This bundle adds no telemetry and stores no BailingHub credentials. The unreleased candidate
+persists session-scope metadata and, when the SDK supports conversation archives, a separate
+private outbox containing visible task text as described below.
 
 Task text submitted through the installed tools is sent to the BailingHub deployment chosen
 by the operator. DeepSeek Harness, the configured model provider, BailingHub, and the target
@@ -56,8 +57,8 @@ default or silently retaining a subset.
 Each business call uses only its selected authorization. Recovery retains the original
 authorization and invocation. At completion, multi-authorization runs receive separate
 deterministic summaries of their own governed calls, not the combined visible final answer or
-another authorization's results. The combined answer remains in DSH and its model-provider
-boundary. Single-authorization conversations retain the existing visible-answer completion flow.
+another authorization's results. A matching candidate SDK/Core also receives the combined visible
+conversation through the independent archive boundary below. Single-authorization conversations retain the existing visible-answer completion flow.
 Hidden reasoning is never uploaded by the adapter.
 
 The host checks the captured connection key, workspace, and original Agent Session id before
@@ -85,3 +86,31 @@ Restoring that scope does not recover pending business invocations, approvals, c
 tasks across a process restart.
 
 The public npm release remains `0.3.0`; installing it does not enable this candidate behavior.
+
+## Unreleased visible conversation archive
+
+For a nonempty frozen scope, a matching candidate SDK/Core receives the claimed user messages,
+visible assistant text, turn boundaries, and original run links as one conversation audit owned
+by the complete selected authorization set. Visible text may itself contain personal or business
+data; the adapter does not claim to redact arbitrary secrets pasted into that text. It never adds
+SDK credentials, hidden reasoning, raw provider requests, attachments, or arbitrary tool payloads.
+The combined conversation is not broadcast to each authorization's memory. Empty scope remains
+outside this archive boundary. Review the whole selected group's data-sharing permission before
+sending the first message.
+If an original run response arrives after cancellation, only its audit link is retained for that
+ended turn; it does not reactivate business tools, dispatch remaining members, or replace a newer turn.
+
+The independent outbox lives under `$DSH_HOME/plugins/dsh-bailinghub/conversation-outbox` by default.
+It contains a random persistent archive id, frozen public bindings/original Session ids, visible
+events, hashes, and synchronization cursor. POSIX directories use `0700` and files `0600`; text is
+not encrypted by this adapter. Outboxes remain on disk, including acknowledged events, until the
+host/operator removes them. Hosts may inject a different durable store and retention policy;
+there is no automatic retention cleanup or deletion of the separate Hub audit. Removing a local
+outbox loses retry identity/history and must not be treated as deleting the remote record.
+
+Network failures preserve successfully written events for later upload. Local write failures do
+not prove durable capture. Reopened DSH history is checked for detectable missing visible events,
+reported as `recovery_gap`; unavailable host history is marked unverified. Previously unarchived
+messages, attachments, and hidden content are not claimed as a complete transcript. The archive
+does not restore business invocation or approval execution after restart. An older SDK reports
+unsupported without creating an outbox, and business calls remain available.

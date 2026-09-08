@@ -30,8 +30,16 @@
   across turns of the same live conversation; pin the original Agent Session before transport,
   reject conflicting same-name declarations and never retarget a pending operation.
   Scope restoration across a process restart does not restore invocations, approvals, or tasks.
-- Synchronize separate deterministic call summaries for multi-authorization runs while keeping
-  the combined final answer in DSH. Document the user-input and context-sharing boundary.
+- Synchronize separate deterministic call summaries for multi-authorization runs. A matching
+  candidate SDK/Core additionally archives one visible conversation for the full frozen member
+  set, without broadcasting the combined answer into each member's memory or collecting reasoning.
+- Persist a separate private visible-event outbox with a random archive identity, stable event ids,
+  original run links, and acknowledgement cursor. Add host archive status/sync APIs and user-only
+  `/bailinghub archive status|sync`; archive retry after restart never replays business actions.
+  Keep older SDKs usable with explicit unsupported status. Detect visible-history gaps after local
+  write failure/restart instead of claiming complete capture; hosts without history remain unverified.
+- Keep a cancelled turn ended when its original `startTurn` response arrives late: retain its audit
+  link without reactivating business tools, dispatching remaining members, or replacing a newer turn.
 - Keep public `dsh-bailinghub@0.3.0` as the stable release; this candidate has not been published.
 
 ## 0.3.0 - 2026-09-01

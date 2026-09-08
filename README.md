@@ -284,8 +284,18 @@ they do not adopt current registry connections.
 Scope restoration does not recover previous invocations, approvals, or pending tasks. Embedded
 hosts can inject a durable `scopeStore`; the explicit memory adapter is not persistent.
 
-The combined final answer stays in DSH. Each Core run receives a deterministic summary of only
-its own governed calls, rather than the cross-authorization final answer. See the
+Each Core run receives a deterministic summary of only its own governed calls. With the matching
+candidate SDK and Core, a separate conversation audit also receives the visible user/assistant
+text, turn boundaries, and links to those original runs for the full frozen authorization set.
+It does not broadcast the combined answer into each authorization's memory or upload hidden reasoning.
+
+The candidate keeps a private durable outbox and a random archive identity, so a failed upload
+can be retried after restart with `/bailinghub archive sync`; `/bailinghub archive status` shows
+its separate status. A synced archive does not mean a business action succeeded. Missing local
+writes or older unarchived DSH history report `recovery_gap` when detected against the host history;
+hosts without that history report unverified coverage. This is visible-text capture from candidate
+activation, not an export of attachments, hidden reasoning, or all past conversations.
+An older SDK reports `unsupported` without changing business calls. See the
 [candidate contract](docs/AGENT_CLIENT_CONTRACT.md#unreleased-same-system-authorization-selection)
 and [privacy boundary](PRIVACY.md#unreleased-same-system-authorization-selection).
 

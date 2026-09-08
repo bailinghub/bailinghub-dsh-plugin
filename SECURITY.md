@@ -88,7 +88,7 @@ an existing call.
 This invocation map lasts only for the live conversation: later turns can recover its original
 calls, while new conversations and process restarts must reject unknown invocation ids.
 
-Only non-secret scope metadata is durable. The default file store uses SHA-256 session filenames,
+Only non-secret scope metadata belongs in the scope store. Its default file store uses SHA-256 session filenames,
 mode-0600 files and mode-0700 directories on POSIX, bounded reads, rejection of symlinks/non-regular files,
 revision compare-and-swap, a cross-process lock, and atomic replacement. Lock timeout reports a
 conflict without deleting another process's lock. Corrupt data and I/O failure fail closed; they
@@ -113,8 +113,24 @@ records must not be exposed as model-controlled storage or allow an untrusted ca
 another conversation's id. This plugin does not secure unrelated host filesystem tools; the host
 must enforce that access boundary.
 
-The candidate keeps authorization-specific instructions and context labeled, and synchronizes
-only each authorization's own deterministic call summary. It does not broadcast a combined final
+The candidate keeps authorization-specific instructions and context labeled, and each run receives
+only its authorization's deterministic call summary. It does not broadcast a combined final
 answer to every run. Visible user input and context do share the local conversation boundary;
 see [Privacy](PRIVACY.md#unreleased-same-system-authorization-selection). This candidate is not
 part of the published `0.3.0` package.
+
+The independent conversation-audit extension sends visible text for the complete frozen member
+set through an optional SDK API. A durable random archive UUID supplies correlation, not authority:
+the SDK/Core must validate every original member before confirming or appending, and Core owns the
+aggregate read permission. Never expose mixed free text to a reader authorized for only one member
+by assuming it can be safely redacted. The original run id and member Session bind run links;
+archive synchronization cannot create or resume a business action. Late links remain attached to
+their original turn.
+
+The separate private outbox contains plaintext visible task text and must be protected from
+untrusted host/model filesystem tools. It has bounded reads, no-follow regular-file checks,
+CAS/lock/atomic-write semantics, and no credential or scope-store fallback. Payloads and ids remain
+stable on ambiguous network retries. Local I/O failure can leave an unpersisted event: available
+DSH history is compared after reopening, and missing events produce `recovery_gap`, not a claim
+of a complete transcript. Hosts without history must show unverified coverage. This boundary is
+not a distributed transaction or durable business-task recovery mechanism.
