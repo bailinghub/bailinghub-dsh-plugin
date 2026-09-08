@@ -1,6 +1,6 @@
 {
   "name": "dsh-bailinghub",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Let a local DeepSeek Harness Agent use BailingHub to query data, update records, and run permitted actions in your online store, SaaS, or other admin system.",
   "license": "MIT",
   "type": "module",
@@ -62,7 +62,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.1",
-    "bailinghub-mcp-server": "0.3.0"
+    "bailinghub-mcp-server": "0.4.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",

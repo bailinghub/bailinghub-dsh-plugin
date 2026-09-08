@@ -26,13 +26,13 @@ its package, or silently reinterpret its Client Token and Hub-orchestrated seman
 
 ## Public manifest gates
 
-The stable `0.3.0` manifest is publishable and must retain all of these properties:
+The stable `0.4.0` manifest is publishable and must retain all of these properties:
 
 ```text
-version: 0.3.0
+version: 0.4.0
 publishConfig.access: public
 publishConfig.provenance: true
-dependency: bailinghub-mcp-server@0.3.0 (exact ordinary dependency)
+dependency: bailinghub-mcp-server@0.4.0 (exact ordinary dependency)
 ```
 
 For every public prerelease or stable version:
@@ -41,8 +41,11 @@ For every public prerelease or stable version:
 2. Place one exact compatible `bailinghub-mcp-server` version in ordinary `dependencies`.
 3. Keep the SDK out of `peerDependencies`, `peerDependenciesMeta`, and
    `optionalDependencies`.
-4. Regenerate `package-lock.json`; both its root dependency and resolved package version must equal
-   the exact manifest value.
+4. After SDK 0.4.0 is publicly installable, regenerate `package-lock.json` from the registry; both
+   its root dependency and resolved package version must equal the exact manifest value. Never
+   invent registry integrity metadata or commit a local tarball dependency. Before that point, a
+   local exact SDK tarball can validate source behavior, but is not the final release lock or
+   clean-registry-install evidence.
 5. Keep all install hooks absent. The package must not download code through `preinstall`,
    `install`, `postinstall`, or `prepare`.
 6. Keep local paths, private deployment URLs, credentials, and business-specific identifiers out
@@ -164,13 +167,16 @@ In the isolated DSH Web profile:
    access or refresh tokens.
 5. Run `/bailinghub workspaces`; optionally switch to another already-authorized workspace using
    `/bailinghub use <workspace>` before opening a new session.
-6. Start a new conversation and perform one read-only query.
+6. Start a new conversation and explicitly select its fixed connection key before the first
+   message. Wait for scope confirmation, then perform one read-only query. Separately prove an
+   unselected or empty-scope conversation starts no business run or archive.
 7. Perform one permitted mutation whose ACC governance does not require approval.
 8. Exercise one approval-required or pending invocation and prove DSH resumes the exact original
    invocation id instead of repeating `invoke`.
-9. Confirm BailingHub contains the same conversation, run, user message, visible final assistant
-   response, legal completion status, public usage, and tool trajectory without hidden reasoning or
-   raw credential material.
+9. Confirm BailingHub contains the same conversation, run, visible messages, legal completion
+   status, public usage, and tool trajectory without hidden reasoning or raw credential material.
+   With multiple authorizations, inspect each run's own call summary and the separate full-member
+   visible conversation archive; a single-member reader cannot access mixed text.
 10. Exercise `/bailinghub sync` only for a deliberately pending completion and prove it reuses the
    frozen completion payload.
 11. Add a new connection name on the same public binding, authorize the same trusted identity, and
@@ -179,7 +185,14 @@ In the isolated DSH Web profile:
     start login from an existing alias and return a different trusted identity: confirm the old
     alias and Session remain, the new identity receives a non-conflicting alias that becomes
     current, and `connections list|use` can select either one.
-12. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
+12. Explicitly select both independently authorized identities in one new conversation and verify
+    matching tools select the correct original authorization per call. Scope changes after the first
+    message require a new conversation; invalid members must not shrink the group or select defaults.
+13. Reopen a saved locked conversation offline, then reconnect in the same runtime. Verify scope
+    restoration and archive retry preserve the original members, identity, events, and acknowledgements.
+    A lost upload acknowledgement must retry the same events without duplicating business actions.
+    Confirmed revocation and storage conflicts remain blocked; known capture gaps remain visible.
+14. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
 
 Native Code Mode must degrade rather than expose stale or unsafe dynamic schemas. Run the live
 business checks in Native Tool Mode.
@@ -205,8 +218,8 @@ does not prove legacy compatibility.
 
 1. Merge only a clean release commit after CI and all acceptance evidence pass.
 2. Create an annotated immutable `v<version>` tag on that exact commit and push only the tag.
-3. Confirm the `Publish` workflow passes `check:release-tag`, project verification, package audit,
-   and npm Trusted Publisher authentication.
+3. Confirm the `Publish` workflow passes `check:release-tag`, project verification and
+   npm Trusted Publisher authentication. The audit above is a separate pre-tag gate.
 4. For a prerelease, confirm npm uses the approved non-`latest` dist-tag. Stop if the workflow would
    change `latest` unintentionally.
 5. Verify the exact npm version, `gitHead`, integrity, and provenance independently.

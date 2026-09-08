@@ -8,6 +8,9 @@ import {
   callsFor,
   createMockAgent,
   createMockHost,
+  createMemorySessionScopeStore,
+  selectSessionScope,
+  MOCK_CONNECTION_KEY,
   createMockTransport,
   userMessage,
 } from './helpers/mock-host.mjs'
@@ -44,9 +47,11 @@ async function waitFor(check, timeoutMilliseconds = 1_500) {
 test('keeps connection, conversation, run, and active definitions isolated per Agent session', async () => {
   const host = createMockHost()
   const mock = createMockTransport()
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
   const first = createMockAgent('first')
   const second = createMockAgent('second')
+  await selectSessionScope(host, first.agent, [MOCK_CONNECTION_KEY])
+  await selectSessionScope(host, second.agent, [MOCK_CONNECTION_KEY])
 
   await Promise.all([
     assemble(host, first.agent, 1, 'First request'),
@@ -75,7 +80,7 @@ test('keeps connection, conversation, run, and active definitions isolated per A
 test('registers a real DSH command entrypoint including a credential-safe doctor', async () => {
   const host = createMockHost()
   const mock = createMockTransport()
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
 
   const command = host.commands.get('bailinghub')
   assert.ok(command)
@@ -117,7 +122,7 @@ test('reports cleanup-required login as authorized with an explicit no-reauthori
       warning: 'Authorization succeeded, but an earlier Session still needs cleanup.',
     }),
   })
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
 
   const result = await host.commands.get('bailinghub').handler({ rawInput: 'login' })
 
@@ -141,36 +146,46 @@ test('keeps different-identity aliases visible and user-selectable after same-al
     state: 'authorized',
   })
   const mock = createMockTransport({
+    status: async ({ connectionKey }) => {
+      const sessions = new Map([
+        [MOCK_CONNECTION_KEY, '123e4567-e89b-42d3-a456-426614179001'],
+        [`conn_${'2'.repeat(32)}`, '123e4567-e89b-42d3-a456-426614179002'],
+      ])
+      assert.ok(sessions.has(connectionKey), 'status must inspect an existing selected identity')
+      return { state: 'authorized', connectionKey, workspace: 'demo', sessionId: sessions.get(connectionKey) }
+    },
     login: async () => ({
       state: 'authorized',
       connectionName: 'personal-2',
-      connectionKey: 'conn_identity_2',
+      connectionKey: `conn_${'2'.repeat(32)}`,
       identityReconciliation: 'distinct',
       cleanupRequired: false,
     }),
     connectionsList: async () => ({
-      currentConnectionKey: 'conn_identity_2',
+      currentConnectionKey: `conn_${'2'.repeat(32)}`,
       connections: [
-        connection('personal', 'conn_identity_1', false),
-        connection('personal-2', 'conn_identity_2', true),
+        connection('personal', `conn_${'1'.repeat(32)}`, false),
+        connection('personal-2', `conn_${'2'.repeat(32)}`, true),
       ],
     }),
     connectionsUse: async (selector) => ({
       state: 'selected',
       connection: selector === 'personal'
-        ? connection('personal', 'conn_identity_1', true)
-        : connection('personal-2', 'conn_identity_2', true),
+        ? connection('personal', `conn_${'1'.repeat(32)}`, true)
+        : connection('personal-2', `conn_${'2'.repeat(32)}`, true),
     }),
   })
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
   const command = host.commands.get('bailinghub')
 
   const login = await command.handler({ rawInput: 'login' })
   const newIdentity = createMockAgent('different-identity-current')
+  await selectSessionScope(host, newIdentity.agent, [`conn_${'2'.repeat(32)}`])
   await assemble(host, newIdentity.agent, 1, 'Use the newly authorized identity')
   const listed = await command.handler({ rawInput: 'connections list' })
   const selected = await command.handler({ rawInput: 'connections use personal' })
   const originalIdentity = createMockAgent('different-identity-original')
+  await selectSessionScope(host, originalIdentity.agent, [MOCK_CONNECTION_KEY])
   await assemble(host, originalIdentity.agent, 1, 'Switch back to the original identity')
 
   assert.equal(login.kind, 'success')
@@ -181,8 +196,8 @@ test('keeps different-identity aliases visible and user-selectable after same-al
   assert.equal(selected.kind, 'success')
   assert.equal(callsFor(mock.calls, 'connectionsUse')[0].args[0], 'personal')
   const starts = callsFor(mock.calls, 'startTurn')
-  assert.equal(starts[0].args[1].connectionName, 'personal-2')
-  assert.equal(starts[1].args[1].connectionName, 'personal')
+  assert.equal(starts[0].args[1].connectionKey, `conn_${'2'.repeat(32)}`)
+  assert.equal(starts[1].args[1].connectionKey, MOCK_CONNECTION_KEY)
 })
 
 test('parses quoted connection names and exposes user-only connection lifecycle commands', async () => {
@@ -194,7 +209,7 @@ test('parses quoted connection names and exposes user-only connection lifecycle 
 
   const host = createMockHost()
   const mock = createMockTransport()
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
   const command = host.commands.get('bailinghub')
 
   for (const rawInput of [
@@ -216,11 +231,12 @@ test('parses quoted connection names and exposes user-only connection lifecycle 
   assert.equal(callsFor(mock.calls, 'connectionsRemove')[0].args[0], 'second hub')
 })
 
-test('connection switching affects only new Agent sessions while existing sessions stay pinned', async () => {
+test('connection switching grants no scope to new sessions and never moves selected sessions', async () => {
   const host = createMockHost()
   const mock = createMockTransport()
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
   const first = createMockAgent('connection-first')
+  await selectSessionScope(host, first.agent, [MOCK_CONNECTION_KEY])
   await assemble(host, first.agent, 1, 'First request')
 
   const switched = await host.commands.get('bailinghub').handler({ rawInput: 'connections use second' })
@@ -230,15 +246,13 @@ test('connection switching affects only new Agent sessions while existing sessio
   await assemble(host, first.agent, 2, 'First connection again')
 
   const starts = callsFor(mock.calls, 'startTurn')
-  assert.equal(starts[0].args[1].connectionName, 'personal')
-  assert.equal(starts[0].args[1].workspace, 'demo')
-  assert.equal(starts[1].args[1].connectionName, 'second')
-  assert.equal(starts[1].args[1].workspace, 'staff')
-  assert.equal(starts[2].args[1].connectionName, 'personal')
-  assert.equal(starts[2].args[1].workspace, 'demo')
+  assert.equal(starts.length, 2)
+  assert.ok(starts.every((call) => call.args[1].connectionKey === MOCK_CONNECTION_KEY))
+  assert.ok(starts.every((call) => call.args[1].workspace === 'demo'))
+  assert.equal(second.local.size, 0)
 })
 
-test('restores the SDK registry current connection before the first new Agent session', async () => {
+test('unselected sessions never load the SDK or adopt its persisted default', async () => {
   const host = createMockHost()
   const currentConnectionKey = `conn_${'2'.repeat(32)}`
   const mock = createMockTransport({
@@ -256,7 +270,7 @@ test('restores the SDK registry current connection before the first new Agent se
     }),
   })
   let transportBootstrap
-  createAgentClientPlugin({
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(),
     transportFactory: (bootstrap) => {
       transportBootstrap = { ...bootstrap }
       return mock.transport
@@ -266,14 +280,9 @@ test('restores the SDK registry current connection before the first new Agent se
   const restored = createMockAgent('restored-current')
   const restoredAssembly = await assemble(host, restored.agent, 1, 'Use the persisted current connection')
 
-  assert.deepEqual(transportBootstrap, config)
-  assert.equal(callsFor(mock.calls, 'connectionsList').length, 1)
-  assert.equal(callsFor(mock.calls, 'startTurn')[0].args[1].connectionName, 'restored')
-  assert.equal(callsFor(mock.calls, 'startTurn')[0].args[1].workspace, 'restored_workspace')
-  assert.equal(
-    restoredAssembly.tools.some((tool) => /connection|workspace/i.test(tool.name)),
-    false,
-  )
+  assert.equal(transportBootstrap, undefined)
+  assert.equal(mock.calls.length, 0)
+  assert.equal(restoredAssembly.tools.length, 0)
 
   const switched = await host.commands.get('bailinghub').handler({ rawInput: 'connections use second' })
   assert.equal(switched.kind, 'success')
@@ -281,11 +290,10 @@ test('restores the SDK registry current connection before the first new Agent se
   await assemble(host, second.agent, 1, 'Use the explicitly selected connection')
   await assemble(host, restored.agent, 2, 'Keep the original restored connection')
 
-  const starts = callsFor(mock.calls, 'startTurn')
-  assert.equal(starts[1].args[1].connectionName, 'second')
-  assert.equal(starts[1].args[1].workspace, 'staff')
-  assert.equal(starts[2].args[1].connectionName, 'restored')
-  assert.equal(starts[2].args[1].workspace, 'restored_workspace')
+  assert.deepEqual(transportBootstrap, config)
+  assert.equal(callsFor(mock.calls, 'startTurn').length, 0)
+  assert.equal(second.local.size, 0)
+  assert.equal(restored.local.size, 0)
 })
 
 test('restores the SDK registry current connection before the first user command', async () => {
@@ -306,7 +314,7 @@ test('restores the SDK registry current connection before the first user command
     }),
     status: async () => ({ state: 'authorized', workspace: 'command_workspace' }),
   })
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
 
   const result = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
 
@@ -315,14 +323,14 @@ test('restores the SDK registry current connection before the first user command
   assert.equal(callsFor(mock.calls, 'status')[0].args[0].connectionName, 'command-current')
 })
 
-test('falls back to bootstrap fields when registry restore fails without blocking other tools', async () => {
+test('ordinary chat skips a failing registry while explicit commands retain bootstrap fallback', async () => {
   const host = createMockHost()
   const mock = createMockTransport({
     connectionsList: async () => {
       throw new Error('private registry failure')
     },
   })
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
   const { agent } = createMockAgent('registry-fallback')
   const localTool = {
     name: 'local_file_read',
@@ -344,9 +352,7 @@ test('falls back to bootstrap fields when registry restore fails without blockin
   )
 
   assert.ok(assembly.tools.some((tool) => tool.name === 'local_file_read'))
-  const [start] = callsFor(mock.calls, 'startTurn')
-  assert.equal(start.args[1].connectionName, 'personal')
-  assert.equal(start.args[1].workspace, 'demo')
+  assert.equal(mock.calls.length, 0)
   const status = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
   assert.equal(status.kind, 'success')
   assert.equal(callsFor(mock.calls, 'connectionsList').length, 1)
@@ -354,7 +360,7 @@ test('falls back to bootstrap fields when registry restore fails without blockin
   assert.doesNotMatch(status.text, /private registry failure/)
 })
 
-test('removing the current connection adopts the registry fallback without moving existing sessions', async () => {
+test('removing the current connection updates command defaults without granting session scope', async () => {
   const host = createMockHost()
   const removedConnectionKey = `conn_${'4'.repeat(32)}`
   const fallbackConnectionKey = `conn_${'5'.repeat(32)}`
@@ -394,7 +400,7 @@ test('removing the current connection adopts the registry fallback without movin
       currentConnectionKey: fallbackConnectionKey,
     }),
   })
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
 
   const existing = createMockAgent('remove-current-existing')
   const empty = baseAssembly()
@@ -423,14 +429,12 @@ test('removing the current connection adopts the registry fallback without movin
   const fresh = createMockAgent('remove-current-fresh')
   await assemble(host, fresh.agent, 1, 'Use the fallback connection')
   await assemble(host, existing.agent, 1, 'Keep the captured connection')
-  const starts = callsFor(mock.calls, 'startTurn')
-  assert.equal(starts[0].args[1].connectionName, fallbackConnectionKey)
-  assert.equal(starts[0].args[1].workspace, 'fallback_workspace')
-  assert.equal(starts[1].args[1].connectionName, removedConnectionKey)
-  assert.equal(starts[1].args[1].workspace, 'removed_workspace')
+  assert.equal(callsFor(mock.calls, 'startTurn').length, 0)
+  assert.equal(existing.local.size, 0)
+  assert.equal(fresh.local.size, 0)
 })
 
-test('removing the last connection leaves new sessions explicitly unconfigured', async () => {
+test('removing the last connection leaves business access disabled for unselected sessions', async () => {
   const host = createMockHost()
   const removedConnectionKey = `conn_${'6'.repeat(32)}`
   let listCount = 0
@@ -460,7 +464,7 @@ test('removing the last connection leaves new sessions explicitly unconfigured',
       currentConnectionKey: null,
     }),
   })
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
 
   const removed = await host.commands.get('bailinghub').handler({ rawInput: 'connections remove last' })
   const status = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
@@ -476,7 +480,7 @@ test('removing the last connection leaves new sessions explicitly unconfigured',
   assert.equal(callsFor(mock.calls, 'startTurn').length, 0)
   assert.match(
     assembly.sections.find((section) => section.name === 'bailinghub:agent-client-profile').text,
-    /configuration required/,
+    /ordinary chat; no business authorizations selected/,
   )
 })
 
@@ -510,29 +514,29 @@ test('a failed registry refresh after removing a non-current connection preserve
       currentConnectionKey,
     }),
   })
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
 
   const removed = await host.commands.get('bailinghub').handler({
     rawInput: 'connections remove secondary',
   })
   const status = await host.commands.get('bailinghub').handler({ rawInput: 'status' })
+  assert.equal(listCount, 2)
   const fresh = createMockAgent('remove-non-current-fresh')
   await assemble(host, fresh.agent, 1, 'Keep using the current connection')
 
   assert.equal(removed.kind, 'success')
   assert.doesNotMatch(removed.text, /private post-remove registry failure/)
   assert.equal(status.kind, 'success')
+  // A fresh unselected conversation does not perform another registry lookup.
   assert.equal(listCount, 2)
   assert.equal(callsFor(mock.calls, 'status')[0].args[0].connectionName, 'personal')
-  const [start] = callsFor(mock.calls, 'startTurn')
-  assert.equal(start.args[1].connectionName, 'personal')
-  assert.equal(start.args[1].workspace, 'demo')
+  assert.equal(callsFor(mock.calls, 'startTurn').length, 0)
 })
 
 test('doctor stops before SDK load when configuration is invalid', async () => {
   const host = createMockHost()
   let transportRequested = false
-  createAgentClientPlugin({
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(),
     transportFactory: () => {
       transportRequested = true
       throw new Error('private transport failure')
@@ -560,7 +564,7 @@ test('doctor reports logged-out isolation without probing authorized workspaces'
       throw new Error('must not probe workspaces before authorization')
     },
   })
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
 
   const result = await host.commands.get('bailinghub').handler({ rawInput: 'doctor' })
   assert.equal(result.kind, 'error')
@@ -584,8 +588,9 @@ test('keeps an immutable pending completion and lets the sync command replay it'
       }
     },
   })
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
   const { agent } = createMockAgent('completion-retry')
+  await selectSessionScope(host, agent, [MOCK_CONNECTION_KEY])
   await assemble(host, agent, 1, 'Update employee 42')
 
   host.emit('session/event', agent.session, {
@@ -627,10 +632,10 @@ test('keeps an immutable pending completion and lets the sync command replay it'
   assert.doesNotMatch(JSON.stringify(allPayloads[3]), /reasoning|unsafe upstream/)
 })
 
-test('degrades an unconfigured turn without loading the SDK or leaking tools', async () => {
+test('unconfigured ordinary chat keeps business access disabled without loading the SDK', async () => {
   const host = createMockHost()
   let transportRequested = false
-  const runtime = createAgentClientPlugin({
+  const runtime = createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(),
     transportFactory: () => {
       transportRequested = true
       throw new Error('should not load')
@@ -649,14 +654,14 @@ test('degrades an unconfigured turn without loading the SDK or leaking tools', a
   assert.equal(assembly.tools.length, 0)
   assert.match(
     assembly.sections.find((section) => section.name === 'bailinghub:agent-client-profile').text,
-    /configuration required/,
+    /ordinary chat; no business authorizations selected/,
   )
 })
 
 test('does not upload non-user injected messages as new Core turns', async () => {
   const host = createMockHost()
   const mock = createMockTransport()
-  createAgentClientPlugin({ transport: mock.transport }).apply(host.ctx, config)
+  createAgentClientPlugin({ scopeStore: createMemorySessionScopeStore(), transport: mock.transport }).apply(host.ctx, config)
   const { agent } = createMockAgent('synthetic')
   host.emit('agent/inbox/claimed', {
     agent,
