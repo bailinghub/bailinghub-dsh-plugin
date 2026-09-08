@@ -93,14 +93,20 @@ mode-0600 files and mode-0700 directories on POSIX, bounded reads, rejection of 
 revision compare-and-swap, a cross-process lock, and atomic replacement. Lock timeout reports a
 conflict without deleting another process's lock. Corrupt data and I/O failure fail closed; they
 are never interpreted as an absent selection or a reason to use memory storage. Before validating
-a replacement scope, a durable `needs_selection` record prevents the previous broader scope from
-reappearing after a failed selection and restart.
+a replacement scope, the coordinator attempts to persist `needs_selection`. Failure of that first
+write can leave the previous draft on disk. Every unlocked snapshot loaded into a new runtime is
+therefore blocked pending explicit selection, without checking its previous SDK authorizations;
+restart safety does not assume that the failed write replaced the old record.
 
 The host may inject a store with the same CAS semantics; the provided memory adapter is explicitly
-non-persistent. `restoreSessionScope` verifies the stored keys, binding, and original Agent Session
-ids, and keeps old conversations without valid snapshots blocked. It restores scope only, not
-invocations, approvals, pending completions, or task execution. A new conversation is required to
-choose different authorizations. No token, credential, prompt, or business payload belongs in the
+non-persistent. `restoreSessionScope` restores only a valid locked selection after verifying its
+keys, binding, and original Agent Session ids. Unlocked drafts require explicit selection again;
+started conversations without valid locked scope stay blocked. History containing only metadata,
+configuration, or seed markers does not prove that a conversation started. The lifecycle check
+requires an actual user-sourced `user/message` or `turn/start` and uses seed/observation boundaries
+to distinguish prior history from a new first message. It restores scope only, not invocations,
+approvals, pending completions, or task execution. A new conversation is required to change an
+already-started scope. No token, credential, prompt, or business payload belongs in the
 scope snapshot.
 The trusted host owns stable, unique conversation ids and the store namespace. Scope APIs and
 records must not be exposed as model-controlled storage or allow an untrusted caller to select

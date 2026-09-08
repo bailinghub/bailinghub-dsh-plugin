@@ -15,6 +15,12 @@
   atomic files under the DSH home. Permit injected stores and an explicit non-persistent memory
   adapter. Missing or invalid old snapshots, failed selection, or any unavailable selected
   authorization block the whole business scope without a default or subset fallback.
+- Require explicit reconfirmation of every unlocked scope draft loaded into a new runtime,
+  without probing its old authorizations. This also blocks a stale draft when the first
+  replacement-marker write failed. Valid locked conversations still restore their original scope.
+- Recognize started conversations from actual user-sourced messages or turn-start events, not
+  `firstLiveSeq` or metadata alone. Preserve selection for metadata-only drafts and distinguish
+  seeded/previous history from the current first message without changing the scope schema or API.
 - Allow explicitly selected, independently authorized identities sharing one Hub/client/workspace
   binding in one conversation, without changing the global connection.
 - Register matching typed business tools once, with a host-issued `authorization_ref` selector

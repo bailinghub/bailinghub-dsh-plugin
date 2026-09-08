@@ -274,8 +274,13 @@ they are not persisted for recovery after a process restart or in a new conversa
 
 The default adapter persists a non-secret scope snapshot under the DSH home using revision checks,
 a cross-process lock, and atomic file replacement. A host reopening a conversation must await
-`restoreSessionScope(sessionId)` and display its state before sending. Missing or invalid snapshots
-on old conversations block business access; they do not adopt current registry connections.
+`restoreSessionScope(sessionId)` and display its state before sending. A valid locked snapshot
+restores the original scope after validation. An unlocked saved draft always needs a fresh
+explicit selection; it does not re-enable or check its old authorizations automatically. This
+also applies if a failed replacement left the previous draft on disk. Configuration or metadata
+history alone does not make a draft started or locked, so it can still be selected before its
+first user message. Missing or invalid snapshots on started conversations block business access;
+they do not adopt current registry connections.
 Scope restoration does not recover previous invocations, approvals, or pending tasks. Embedded
 hosts can inject a durable `scopeStore`; the explicit memory adapter is not persistent.
 

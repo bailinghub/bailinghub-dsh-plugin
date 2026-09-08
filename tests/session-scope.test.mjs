@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 
 import { createAgentClientPlugin } from '../lib/index.js'
-import { createMemorySessionScopeStore } from '../lib/session-scope-store.js'
+import { createFileSessionScopeStore, createMemorySessionScopeStore } from '../lib/session-scope-store.js'
 import {
   activeTool, baseAssembly, callsFor, createMockAgent, createMockHost,
   createMockTransport, turnResponse, userMessage,
@@ -589,9 +592,12 @@ test('native scope selection freezes at the first claim without probing the reje
   assertOnlyAuthorizations(fixture, [KEY_A])
 })
 
-test('native scope commands cannot add authorizations to existing host history before the first assembly', async () => {
+test('native scope commands cannot add authorizations to actual user history before the first assembly', async () => {
   const fixture = createFixture({ id: 'existing-history-before-runtime-state' })
   fixture.agent.session.firstLiveSeq = 8
+  fixture.agent.session.events = [{
+    seq: 0, type: 'user/message', data: userMessage('historical-user-message', 'This conversation already started.'),
+  }]
   const result = await fixture.host.commands.get('bailinghub').handler({
     rawInput: `scope set ${KEY_A}`, agent: fixture.agent,
   })
@@ -708,3 +714,125 @@ test('disposing a created session releases its observed reference without a busi
   assert.equal(fixture.runtime.statesBySessionId.has(fixture.sessionId), false)
   assert.deepEqual(fixture.calls, [])
 })
+
+for (const firstRead of ['getSessionScope', 'restoreSessionScope']) {
+  test(`a failed first tombstone save cannot resurrect file-backed A through ${firstRead} after rebuilding`, async (t) => {
+    const directory = await mkdtemp(join(tmpdir(), 'bailing-scope-replacement-'))
+    const storeDirectory = join(directory, 'scopes')
+    const fileStore = createFileSessionScopeStore({ directory: storeDirectory })
+    const fixtures = []
+    t.after(async () => {
+      await Promise.all(fixtures.map((fixture) => fixture.host.dispose()))
+      await rm(directory, { recursive: true, force: true })
+    })
+    let failNextSave = false
+    let failedSaves = 0
+    const first = createFixture({ id: `failed-file-replacement-${firstRead}`, scopeStore: {
+      load: (sessionId) => fileStore.load(sessionId),
+      save: async (sessionId, record, expectedRevision) => {
+        if (failNextSave) {
+          failNextSave = false
+          failedSaves += 1
+          assert.equal(record.state, 'needs_selection', 'the first replacement write must invalidate the earlier draft')
+          throw new Error('The first replacement tombstone could not be written')
+        }
+        return fileStore.save(sessionId, record, expectedRevision)
+      },
+    } })
+    fixtures.push(first)
+    const selectedA = await first.runtime.setSessionScope(first.sessionId, { connectionKeys: [KEY_A] })
+    const originalOnDisk = await fileStore.load(first.sessionId)
+    assert.equal(originalOnDisk.state, 'ready')
+    assert.equal(originalOnDisk.locked, false)
+    assert.deepEqual(originalOnDisk.authorizations.map((item) => item.connectionKey), [KEY_A])
+    const callsBeforeFailure = first.calls.length
+    failNextSave = true
+    await assert.rejects(first.runtime.setSessionScope(first.sessionId, {
+      connectionKeys: [KEY_B], expectedRevision: selectedA.revision,
+    }))
+    assert.equal(failedSaves, 1)
+    assert.deepEqual(await fileStore.load(first.sessionId), originalOnDisk, 'the old A snapshot really remains on disk')
+    assertScope(await first.runtime.getSessionScope(first.sessionId), first, [], 'needs_selection', 'blocked')
+    assert.equal(first.calls.length, callsBeforeFailure, 'failed persistence must not inspect B or reuse A')
+    await first.host.dispose()
+
+    const reopened = createFixture({
+      id: `failed-file-replacement-${firstRead}`, server: first.server,
+      scopeStore: createFileSessionScopeStore({ directory: storeDirectory }),
+    })
+    fixtures.push(reopened)
+    reopened.agent.session.events = []
+    reopened.host.emit('session/created', reopened.agent.session)
+    const reads = [firstRead, firstRead === 'getSessionScope' ? 'restoreSessionScope' : 'getSessionScope']
+    let unconfirmed
+    for (const method of reads) {
+      unconfirmed = await reopened.runtime[method](reopened.sessionId)
+      assertScope(unconfirmed, reopened, [], 'needs_selection', 'blocked')
+      assert.equal(unconfirmed.locked, false)
+      assert.equal(unconfirmed.revision, selectedA.revision)
+      assert.deepEqual(reopened.calls, [], `${method} must not revalidate the stale A draft`)
+    }
+
+    const confirmedB = await reopened.runtime.setSessionScope(reopened.sessionId, {
+      connectionKeys: [KEY_B], expectedRevision: unconfirmed.revision,
+    })
+    assertScope(confirmedB, reopened, [KEY_B])
+    assert.equal(confirmedB.locked, false)
+    await assemble(reopened)
+    const tool = reopened.local.get('employee_update')
+    const result = await tool.execute(toolInput(tool, confirmedB.authorizations[0].authorizationRef), exec(reopened, 'reconfirmed-file-b'))
+    assert.equal(resultBody(result).state, 'executed')
+    await finish(reopened)
+    assert.equal(callsFor(reopened.calls, 'startTurn').length, 1)
+    assertOnlyAuthorizations(reopened, [KEY_B])
+  })
+}
+
+for (const firstRead of ['getSessionScope', 'restoreSessionScope']) {
+  test(`configuration-only draft history remains reselectable after ${firstRead} and starts its first real turn`, async () => {
+    const first = createFixture({ id: `configuration-only-draft-${firstRead}` })
+    await first.runtime.setSessionScope(first.sessionId, { connectionKeys: [KEY_A] })
+    noBusinessCalls(first)
+    await first.host.dispose()
+
+    const reopened = createFixture({
+      id: `configuration-only-draft-${firstRead}`, scopeStore: first.scopeStore, server: first.server,
+    })
+    reopened.agent.session.firstLiveSeq = 1
+    reopened.agent.session.events = [
+      { seq: 0, type: 'plan/mode', data: { mode: 'plan' } },
+      { seq: 1, type: 'session/end-seed', data: {} },
+    ]
+    reopened.host.emit('session/created', reopened.agent.session)
+    const reads = [firstRead, firstRead === 'getSessionScope' ? 'restoreSessionScope' : 'getSessionScope']
+    let unconfirmed
+    for (const method of reads) {
+      unconfirmed = await reopened.runtime[method](reopened.sessionId)
+      assertScope(unconfirmed, reopened, [], 'needs_selection', 'blocked')
+      assert.equal(unconfirmed.locked, false, 'configuration seed events do not prove a user message was sent')
+      assert.deepEqual(reopened.calls, [])
+    }
+    const selected = await reopened.runtime.setSessionScope(reopened.sessionId, {
+      connectionKeys: [KEY_B], expectedRevision: unconfirmed.revision,
+    })
+    assertScope(selected, reopened, [KEY_B])
+    assert.equal(selected.locked, false)
+
+    const liveUserEvent = {
+      seq: 2, type: 'user/message', data: userMessage('draft-first-live-user', 'Use the confirmed Store B.'),
+    }
+    reopened.agent.session.events.push(liveUserEvent)
+    reopened.host.emit('session/event', reopened.agent.session, liveUserEvent)
+    await assemble(reopened)
+    const locked = await reopened.runtime.getSessionScope(reopened.sessionId)
+    assertScope(locked, reopened, [KEY_B])
+    assert.equal(locked.locked, true)
+    assert.equal(callsFor(reopened.calls, 'startTurn').length, 1)
+    const tool = reopened.local.get('employee_update')
+    const result = await tool.execute(toolInput(tool, selected.authorizations[0].authorizationRef), exec(reopened, 'first-real-draft-turn'))
+    assert.equal(resultBody(result).state, 'executed')
+    await finish(reopened)
+    assertOnlyAuthorizations(reopened, [KEY_B])
+    await reopened.host.dispose()
+  })
+}

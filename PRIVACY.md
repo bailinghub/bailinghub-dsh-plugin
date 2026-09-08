@@ -75,8 +75,12 @@ removed by the host/operator; the adapter does not upload them. An embedded host
 own durable store and retention policy. The explicit memory store is not persistent, and storage
 failure never causes an automatic switch to it.
 
-On reopening a conversation, `restoreSessionScope` rechecks the saved binding and original Agent
-Sessions. Missing or invalid old scope snapshots do not adopt current registry connections.
+On reopening a conversation, only a valid locked scope is restored after its binding and original
+Agent Sessions are rechecked. A stored unlocked draft needs explicit scope confirmation again;
+loading it does not query its old authorizations or send them user input. A failed replacement
+write can leave that draft on disk, but it still cannot reactivate automatically in a new runtime.
+Configuration or metadata history alone does not lock a never-started draft. Missing or invalid
+scope snapshots on started conversations do not adopt current registry connections.
 Restoring that scope does not recover pending business invocations, approvals, completions, or
 tasks across a process restart.
 

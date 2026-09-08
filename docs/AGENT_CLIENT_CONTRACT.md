@@ -135,12 +135,20 @@ client choose another conversation's id, edit scope records, or control the stor
 The store and its access policy belong to the host. The model sees only the projected reference,
 label, and availability directory; raw connection keys and scope storage are not model APIs.
 
-Reopening an existing conversation must call `restoreSessionScope` before sending. It restores
-the saved keys and verifies the original binding and Agent Sessions. An old conversation without
-a valid snapshot stays blocked; missing or corrupt state must not adopt today's registry default
-or discovered authorizations. `locked` selections remain locked. The UI should offer a new
-conversation to change the scope. Embedded hosts without the native commands or a scope-selection
-UI must integrate these APIs; `connections use` is not a substitute.
+Reopening an existing conversation must call `restoreSessionScope` before sending. A valid
+`locked: true` snapshot restores its original scope after the saved binding and Agent Sessions
+are checked; it remains locked. A stored `locked: false` snapshot is only a draft, even if its
+stored state says `ready`. Loading it into a new runtime returns `needs_selection` / `blocked`
+without probing its previously selected SDK connections. A never-started draft remains
+`locked: false`: the host must explicitly call `setSessionScope` again and show success before
+sending. It must not silently reactivate the saved draft selection.
+
+An old conversation without a valid snapshot stays blocked; missing or corrupt state must not
+adopt today's registry default or discovered authorizations. Trusted history containing only
+configuration or metadata still permits draft selection. Actual user-message or turn history
+requires the original locked scope; changing that scope requires a new conversation. Embedded
+hosts without the native commands or a scope-selection UI must integrate these APIs;
+`connections use` is not a substitute.
 
 ### Scope persistence seam
 
@@ -148,8 +156,11 @@ UI must integrate these APIs; `connections use` is not a substitute.
 `save(sessionId, record, expectedRevision)`. `load` returns a validated record or `null` for absence;
 errors and corrupt records are not absence. `save` compares the stored revision atomically:
 `null` means the record must not exist, the first revision is `1`, and each update increments it.
-Before validating a replacement selection, the coordinator saves a `needs_selection` record so
-a failed replacement cannot resurrect the previous scope after restart.
+Before validating a replacement selection, the coordinator attempts to save a `needs_selection`
+record. If that first write fails, the previous draft can remain on disk; the write is not
+reported as successful. Restart safety also depends on the draft rule above: every loaded
+unlocked snapshot requires explicit confirmation, so a stale saved selection never becomes
+`ready` automatically, even when its replacement marker could not be written.
 
 The default `createFileSessionScopeStore()` saves non-secret JSON under
 `$DSH_HOME/plugins/dsh-bailinghub/session-scopes`, using `~/.dsh` when `DSH_HOME` is unset. Session
@@ -306,6 +317,11 @@ agent/inbox/claimed
 The adapter captures only a claimed message whose `source.kind` is `user`. In the candidate, the
 first `user/message` event freezes scope; the inbox claim is a fallback if that event is absent.
 The assembly gate permits business work only for the saved selection.
+When inspecting attached or restored history, only `user/message` with `source.kind: 'user'` or
+`turn/start` proves that a conversation has started. Configuration events, metadata, and
+`session/end-seed` alone do not freeze a draft. `firstLiveSeq` is a seed-history boundary, never
+proof of a started conversation by itself. The adapter separates the previously observed or
+seeded prefix from new events so the current first message is not mistaken for an older turn.
 On the authoritative
 `system-prompt/assemble` waterfall, it calls `startTurn`, registers the returned definitions
 through `agent.ctx.tools.register()`, and also adds their schemas to the already-sampled current
