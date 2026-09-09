@@ -1,5 +1,71 @@
 # Agent Client Host Adapter Contract
 
+## Unreleased cross-system extension
+
+This source candidate extends the released baseline below. It requires the matching SDK and
+Core candidates; unchanged package version metadata does not identify the feature. Existing
+same-system behavior, signatures and v1 records remain supported.
+
+The host selects fixed connection keys from one normalized Hub. Different Client Apps or
+workspaces form different capability sources. Each target must have a distinct original Agent
+Session; two selected routes sharing a Session are rejected. A scope never expands to another Hub,
+registry default, newly added connection, or surviving subset after one member is lost.
+
+Cross-system scope uses persisted `bailing.agent-session-scope.v2` with shared `binding: { hubUrl }`
+and `authorizations` containing `{ connectionKey, sessionId, label, workspace, clientAppId }`.
+The host view keeps `bailing.agent-session-scope.v1` and adds `targetMode: "multi_system"` and
+per-authorization `clientAppId`/`systemRef`. Existing `authorizationRef`, key and lifecycle fields
+retain their meaning. System references are opaque identifiers for capability sources; labels
+remain local user-controlled data, not business identity or object mappings.
+
+Selection/restoration verifies the whole original group and calls SDK
+`getConversationArchiveCapabilities({ members })`. Support requires
+`schema: "bailing.agent-conversation-audit-capabilities.v1"`, `cross_binding_members: true`
+and `member_bindings: "session-client-route.v1"`. Missing support produces
+`CROSS_SYSTEM_SCOPE_UNSUPPORTED` and no cross-system business run. Temporary discovery failures
+remain retryable under the original selection; confirmed authorization replacement remains blocked.
+
+Initial prompt assembly registers the target directory, capability search and known-invocation
+recovery tools, without starting any business run. In this mode `search_business_capabilities`
+requires `{ authorization_ref, query, limit? }`. Its bounded query (up to 500 characters) is the
+task projection passed as `userInput` to that target's first `startTurn` in the current turn.
+The original visible user text stays in the independent archive. Subsequent searches reuse that
+target's run. Omission/unknown target fails before dispatch; another selected target is not
+started merely because its authorization is available. Authorization and archive membership checks
+may still inspect the full original set.
+
+Tools are grouped only by capability-source binding and complete declaration. Host-issued
+`bh_...` aliases keep same-named tools from different sources separate, even with identical schemas.
+Each alias enumerates only its own `authorization_ref` values and wraps unchanged business
+`arguments`. The server receives the original tool name. Revisions, invocation IDs, argument
+snapshots and original target bindings remain fixed on replay. The SDK receives host-only
+`expectedBinding: { hubUrl, clientAppId, workspace, sessionId }` together with an explicit key
+on status and all business calls. Model arguments cannot replace these fields.
+Explicit search prioritizes that target's results inside the existing twelve-tool budget;
+same-named capabilities on earlier targets cannot permanently crowd it out.
+
+Recovery accepts only a known original invocation. When needed in a later live turn, it opens
+only that original target's run with a recovery-specific input and resumes the original invocation;
+it does not call the business action again. It does not restore invocation state after process restart.
+Cancellation and superseding turns cannot register tools or dispatch a new write from a late start.
+Each cross-system turn owns an AbortSignal combined with the host's signal. SDK dispatch checks
+that signal after local IO and before HTTP; an in-flight write with an unknown outcome keeps its
+original invocation identity. Completion summaries and archive upload are separate from business
+dispatch cancellation and may still synchronize after a turn ends.
+
+Cross-system archives use `bailing.agent-conversation-outbox.v2`. Context binding is `{ hubUrl }`;
+each member retains `{ connectionKey, hubUrl, clientAppId, workspace, expectedSessionId, label }`.
+Event/ACK schemas, random archive identity, source hashes, ordering, local capture-gap reporting
+and CAS semantics remain unchanged. The SDK uses explicit cross-binding create v2 and each
+member's own credential to confirm; the Core verifies each original app/route/Session and run link.
+The full transcript remains available only through the management audit read boundary.
+
+Query minimization, object mapping and step planning are Agent responsibilities. The runtime
+enforces target/tool/invocation authority; it does not establish a deterministic dependency DAG,
+cross-system transaction, automatic rollback or field-level data-transfer policy. Business systems
+continue owning their capabilities, permission checks, approvals and data semantics. See the
+[user and host guide](CROSS_SYSTEM_CONVERSATIONS.md).
+
 Status: native Agent Client contract for `dsh-bailinghub@0.4.0`, paired with
 `bailinghub-mcp-server@0.4.0` and recommended BailingHub Core `0.6.1` (minimum API version
 `0.6.0`). This contract is separate from the legacy static `0.1.x` path. Version 0.3.0 supported user-managed connections but did not include
@@ -125,8 +191,9 @@ frozen scope unchanged. The host must open a new conversation, not treat that re
 successful selection of the requested keys. Revision values may advance more than once
 during selection; always use the returned value for the next compare-and-swap request.
 
-Each returned `authorizations` entry has exactly the public host-facing fields
-`{ authorizationRef, connectionKey, label, workspace }`. The selection accepts at most 64 unique
+Each same-system `authorizations` entry has the public host-facing fields
+`{ authorizationRef, connectionKey, label, workspace }`; cross-system candidate entries add the
+fields documented above. The selection accepts at most 64 unique
 connection keys. The trusted host owns `sessionId`: it must remain stable when reopening the same
 conversation and be unique within that store's namespace. Do not let the model or an untrusted
 client choose another conversation's id, edit scope records, or control the storage namespace.

@@ -1,5 +1,21 @@
 # Compatibility
 
+## Unreleased cross-system candidate
+
+Requires matching candidate Core, SDK and DSH sources; the released version numbers below are
+not evidence of this feature. Core must advertise
+`cross_binding_members: true` and `member_bindings: "session-client-route.v1"` through
+`bailing.agent-conversation-audit-capabilities.v1`, with its additive target-member migration ready.
+The SDK must implement `getConversationArchiveCapabilities` and the `expectedBinding` dispatch guard.
+Cross-system selection refuses missing support before creating any business run. Existing
+same-system scope and archive interfaces continue using their v1 behavior.
+
+One Hub may contain different Client Apps and workspaces; every target must have a distinct
+original Agent Session. Multiple routes sharing a single Agent Session and cross-Hub conversations
+are outside this candidate. Hosts using custom stores must preserve scope/outbox v2 records with
+their original bindings and CAS revisions; do not convert v2 into v1 or reconstruct missing state.
+See [the candidate guide](CROSS_SYSTEM_CONVERSATIONS.md) for usage and limits.
+
 ## Native Agent Client 0.4.0
 
 | Component | Release pairing / requirement |

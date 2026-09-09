@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased - cross-system conversation candidate
+
+- Select authorized targets from different applications or workspaces on one Hub in the same
+  conversation. The Agent discovers each target's capabilities only when needed; unrelated
+  targets do not automatically receive the full user turn or load their context.
+- Keep same-named capabilities from different systems separate. Each call and recovery retains
+  its original connection, application, workspace, Session, run and invocation.
+- Keep one visible conversation archive with independently verified target members. Persist
+  cross-system scope/outbox v2 while retaining same-system v1 snapshots and APIs.
+- Require explicit SDK/Core capability support for cross-system scope. Older combinations
+  refuse the new mode while retaining existing same-system behavior.
+- This is a source candidate, with unchanged package version metadata. Use the exact candidate
+  sources and package hashes. It is not a public release or a durable multi-system workflow engine.
+
 ## 0.4.0 - 2026-09-08
 
 ### For users

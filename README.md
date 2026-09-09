@@ -2,6 +2,11 @@
 
 [简体中文](docs/README.zh-CN.md) | English
 
+> **Unreleased source candidate:** this checkout adds one conversation across different business
+> systems on the same Hub. It requires matching Core, SDK and plugin candidates; installing the
+> published 0.4.0 packages alone does not enable it. See [cross-system conversations](docs/CROSS_SYSTEM_CONVERSATIONS.md).
+> The published-release instructions below describe the existing same-system baseline.
+
 Ask your local DeepSeek Harness Agent to work with a business system connected to BailingHub:
 find records, update allowed fields, and follow the system's existing approval rules.
 BailingHub records which authorization was used and what each business action returned.

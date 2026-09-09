@@ -1,5 +1,30 @@
 # Privacy
 
+## Unreleased cross-system candidate
+
+The candidate's cross-system mode is opt-in through an explicit selected target set on one Hub.
+Before business execution, the original members and the Hub's capability support are verified.
+The Agent initially receives only a directory of authorization references, local labels, opaque
+system references and workspace names. A target starts its run only after an explicit capability
+search or recovery selecting that target. The search query becomes that target's task input;
+the full original user message is retained in the independent conversation archive instead of
+automatically being sent to every target's run. Other selected targets may receive authorization
+checks and archive membership confirmation, but no automatic business context request.
+
+Query text is model-authored. Minimal disclosure is instructed, not an automatic redaction or
+field-level data-flow policy: the local model can see all activated target context and the visible
+conversation. Only use a shared conversation where that sharing is allowed. Cross-system object
+relationships must come from verified mappings or explicit user confirmation, not matching names.
+Original system/workspace bindings stay attached to tools, results and execution records.
+
+Cross-system scope and outbox v2 persist each member's public Hub/app/workspace and original
+Session with the same storage protections and plaintext archive boundary below. Same-system v1
+records remain unchanged. The full transcript belongs to the independent Hub management audit;
+holding one target's authorization does not grant full-transcript reading. This candidate does
+not upload hidden reasoning or provide cross-process business-task recovery.
+
+The following sections describe the released 0.4.0 same-system baseline.
+
 This bundle adds no telemetry and stores no BailingHub credentials. Version 0.4.0
 persists session-scope metadata and, when the SDK supports conversation archives, a separate
 private outbox containing visible task text as described below.
