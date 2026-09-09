@@ -7,6 +7,10 @@
 > published 0.4.0 packages alone does not enable it. See [cross-system conversations](docs/CROSS_SYSTEM_CONVERSATIONS.md).
 > The published-release instructions below describe the existing same-system baseline.
 
+The candidate can also explain what each selected business system is for before searching its
+tools, using descriptions maintained by its administrator. These descriptions do not grant
+permissions; actual actions still depend on the account's authorized capabilities.
+
 Ask your local DeepSeek Harness Agent to work with a business system connected to BailingHub:
 find records, update allowed fields, and follow the system's existing approval rules.
 BailingHub records which authorization was used and what each business action returned.

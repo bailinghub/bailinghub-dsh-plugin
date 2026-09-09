@@ -1,5 +1,43 @@
 # Agent Client Host Adapter Contract
 
+## Unreleased system descriptions
+
+The matched Core/SDK candidate adds optional `transport.getSystemInfo({ connectionKey,
+workspace, expectedBinding, signal })`. After the entire selected scope has passed identity
+validation and before first model assembly, the adapter reads one description for each original
+selected member. Requests include the original Hub/Client/workspace/Agent Session binding and
+never user text, tools, or a run identifier. They do not create business runs or load business
+context. Single, same-system multi-authorization and cross-system conversations use the same
+description projection. The existing same-system first-turn run policy remains unchanged.
+
+The response schema is `bailing.agent-system-info.v1`. Only `system.name`, `summary`, `domains`,
+and `boundaries`, their metadata status/revision, and availability enter the model directory.
+System references derive from the verified binding, including for a single authorization or
+same-system group. Product purpose describes typical use; it does not grant an action or prove
+that any tool is enabled. `not_loaded` means not yet loaded, not no capabilities. Product purpose,
+authorization limits, tool loading and availability remain separate fields.
+
+Descriptions are data, not executable model instructions. Missing configuration, an absent SDK
+method, an unsupported old Core or a temporary metadata failure degrades description fields to
+unknown without changing existing capability search. A 401/403 or changed response binding
+blocks the original whole scope. Scope storage errors retain their existing priority. No description
+is persisted in the scope, Session events or archive outbox; each turn reloads against the original
+complete binding, so mutable labels or another runtime cannot supply stale system identity.
+Cancelled or superseded requests cannot publish late metadata or reactivate business tools.
+
+An exact HTTP 404 `route_unavailable` is different from unknown metadata: the selected target
+remains in the directory with `metadata_status: "unknown"`, `availability: "unavailable"` and
+directory-only `availability_reason: "route_unavailable"`. It is not old-version unsupported or
+an authorization grant/revocation. Other ambiguous failures stay unknown. The Core wire's
+`unavailable_reason` still accepts only the documented runtime/direct-switch reasons. A later
+turn retries the same original binding and clears the directory reason after successful lookup.
+
+Hosts keep the existing scope/restore/archive interfaces. The scope view now consistently includes
+`clientAppId` and `systemRef` for all selected authorizations; this is additive and does not change
+stored v1/v2 records. No local hard-coded product dictionary or extra body-reporting channel is
+required. A host may keep a separately controlled fallback when metadata is unavailable, but must
+not infer identity from local labels or expand the selected scope.
+
 ## Unreleased cross-system extension
 
 This source candidate extends the released baseline below. It requires the matching SDK and

@@ -2,6 +2,12 @@
 
 ## Unreleased - cross-system conversation candidate
 
+- Understand each selected system's purpose before searching its tools. Read administrator-managed
+  descriptions using the original authorization binding, consistently for one account, multiple
+  accounts in one system, or multiple systems. Descriptions grant no permissions and create no runs.
+- Distinguish unknown or not-yet-loaded capabilities from unavailable services. Missing metadata
+  and older metadata APIs preserve existing business flows; identity failures still block the whole
+  scope. Cancelled description requests cannot replace a newer turn's directory.
 - Select authorized targets from different applications or workspaces on one Hub in the same
   conversation. The Agent discovers each target's capabilities only when needed; unrelated
   targets do not automatically receive the full user turn or load their context.

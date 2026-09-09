@@ -20,6 +20,26 @@ conversation audit still share the visible conversation.
 
 ## Start a conversation
 
+### Understand the selected systems before choosing tools
+
+An administrator can provide each connected system's name, short purpose, usual business areas
+and boundaries in BailingHub. The Agent reads these descriptions for the selected accounts before
+its first capability search. For example, it can distinguish service scheduling from inventory
+management without a client-specific product dictionary. Local account names remain display
+labels, not verified system identity.
+
+A description says what the product usually does. The actual tools and permissions still come
+from authorized capability discovery. “Not loaded” means the tools have not been requested yet;
+it does not mean the product has no capabilities. Missing descriptions or an older server show
+unknown information and preserve the existing search flow. Reading a description sends no user
+message and creates no business run. Existing same-system first-turn runs are unchanged.
+
+If the server explicitly reports that a selected workspace is unavailable, its directory says
+unavailable while retaining the original selection. An uncertain network failure remains unknown;
+neither condition selects another account. A later turn reads the original target again.
+
+### Select the accounts
+
 1. Authorize each target separately and give it a clear local name, such as `Cashier — Store A`
    and `CRM — Store A`. Verify the account on the business authorization page; a local label is
    not proof of business identity or a mapping between two systems.
@@ -85,6 +105,17 @@ installing this plugin does not migrate or deploy the Hub.
 的数据才适合放在同一会话。完整可见沟通通过独立会话账本归档，各系统仍保留自己的操作记录。
 
 ### 怎样开始
+
+接入方可以在中枢维护系统名称、简短用途、典型业务方向和边界。助手在首次搜索工具前就能看到本会话所选系统
+的介绍，例如分清“预约服务”和“库存管理”，不需要每个客户端分别写死产品词典。同系统的多个账号也会显示
+相同的系统归属；用户给授权起的名字仍只是展示标签。
+
+系统介绍说明产品通常做什么，实际能做什么仍取决于此授权的能力查询和原有权限规则。“尚未加载”表示还未
+查询工具，不表示没有能力。介绍缺失、旧版本不支持或介绍请求暂时失败时，可继续使用原有的授权工具搜索。
+读取介绍本身不发送用户正文、不创建业务运行记录；同系统原有首轮运行机制保持不变。
+
+如果服务端明确报告所选工作空间不可用，目录会显示“不可用”并保留原选择；无法确定的网络失败显示“未知”。
+两者都不会自动切换授权，后续轮次仍查询原目标。
 
 先分别授权并取好名字，例如“收银 A 店”“CRM A 店”，再新建会话，使用上面的 scope 命令选中两份固定授权。
 等选择成功后，再明确提出操作对象和要做的事。首次消息后范围固定；需要增减系统时新建会话。

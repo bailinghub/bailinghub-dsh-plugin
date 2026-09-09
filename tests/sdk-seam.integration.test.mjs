@@ -128,6 +128,13 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
         assert.equal(body.content.includes(`STORE_${account.label === 'A' ? 'B' : 'A'}_ONLY_RESULT`), false)
         assert.equal(body.content.includes('COMBINED_LOCAL_REPLY'), false)
         result = { schema: 'bailing.agent-run-completion.v1', run_id: account.runId, status: body.status }
+      } else if (path === '/agent-api/v1/workspaces/demo/system-info') {
+        // Optional descriptions are absent on this baseline Core fixture.
+        assert.equal(request.method, 'GET')
+        assert.equal(body, undefined)
+        response.writeHead(404, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ error: 'not_found' }))
+        return
       } else if (path.startsWith('/agent-api/v1/conversation-audits')) {
         // This fixture represents the baseline Core without the optional audit
         // endpoint. Candidate SDKs may probe it; business evidence is unchanged.
@@ -312,6 +319,13 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
       })
     }
     if (path === '/agent-api/v1/workspaces/demo/turns') return jsonResponse(turnResponse())
+    if (path === '/agent-api/v1/workspaces/demo/system-info') return jsonResponse({
+      schema_version: 'bailing.agent-system-info.v1',
+      binding: { client_app_id: profile.clientAppId, session_id: credentials.session_id, workspace: profile.workspace },
+      metadata_status: 'configured', revision: 'a'.repeat(64),
+      system: { name: 'Service scheduling', summary: 'Coordinate appointments and service delivery.', domains: ['Appointments'], boundaries: ['Use only permitted account actions.'] },
+      tool_status: 'not_loaded', availability: 'unknown',
+    })
     if (path === '/agent-api/v1/workspaces/demo/capabilities/search') {
       return jsonResponse({
         schema: 'bailing.agent-capability-search.v1',
@@ -381,7 +395,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
     turn: 1,
     message: userMessage('real-sdk-user-message', 'Update employee 42.'),
   })
-  await host.waterfall(
+  const initial = await host.waterfall(
     'system-prompt/assemble',
     baseAssembly(),
     { agent, signal: new AbortController().signal },
@@ -426,7 +440,14 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
   await settle()
 
   assert.equal(requests.every((request) => request.authorized), true)
-  const businessRequests = requests.filter((request) => request.path.startsWith('/agent-api/') && !request.path.startsWith('/agent-api/v1/conversation-audits'))
+  const descriptionRequests = requests.filter((request) => request.path.endsWith('/system-info'))
+  if (typeof transport.getSystemInfo === 'function') {
+    assert.equal(descriptionRequests.length, 1)
+    assert.equal(descriptionRequests[0].method, 'GET')
+    assert.equal(descriptionRequests[0].body, undefined)
+    assert.match(JSON.stringify(initial), /Service scheduling/)
+  }
+  const businessRequests = requests.filter((request) => request.path.startsWith('/agent-api/') && !request.path.startsWith('/agent-api/v1/conversation-audits') && !request.path.endsWith('/system-info'))
   assert.ok(requests.some((request) => request.path === '/agent-auth/v1/session'))
   assert.deepEqual(businessRequests.map((request) => request.path), [
     '/agent-api/v1/workspaces/demo/turns',
