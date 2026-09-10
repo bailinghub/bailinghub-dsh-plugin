@@ -41,7 +41,7 @@ Empty scope remains ordinary chat. Started conversations retain their original s
 
 One Hub and audit domain, with a distinct original Session per selected target. No cross-Hub scope, automatic product identity mapping, durable task scheduler, distributed transaction, automatic rollback or cross-process business task recovery. The local conversation can contain results from both systems; this is not automatic redaction or a field-level data-sharing policy.
 
-See [cross-system integration](CROSS_SYSTEM_CONVERSATIONS.md), [host contract](AGENT_CLIENT_CONTRACT.md), [compatibility](COMPATIBILITY.md), [release procedure](RELEASING.md) and [Core scenarios](https://github.com/bailinghub/bailinghub/blob/v0.7.0/docs/RELEASE_NOTES_v0.7.0.en.md).
+See [cross-system integration](CROSS_SYSTEM_CONVERSATIONS.md), [host contract](AGENT_CLIENT_CONTRACT.md), [compatibility](COMPATIBILITY.md), [release procedure](https://github.com/bailinghub/bailinghub-dsh-plugin/blob/v0.5.0/docs/RELEASING.md) and [Core scenarios](https://github.com/bailinghub/bailinghub/blob/v0.7.0/docs/RELEASE_NOTES_v0.7.0.en.md).
 
 ## 简体中文
 
@@ -76,4 +76,4 @@ See [cross-system integration](CROSS_SYSTEM_CONVERSATIONS.md), [host contract](A
 
 范围限同 Hub、同审计域和各自独立原 Session，不提供跨 Hub、自动商品映射、持久调度、分布式事务、自动回滚或跨进程恢复未完成业务任务。两边结果会参与同一段本地沟通，本功能不等于自动脱敏或字段级共享策略。
 
-详见[跨系统接入](CROSS_SYSTEM_CONVERSATIONS.md#简体中文)、[宿主契约](AGENT_CLIENT_CONTRACT.md)、[兼容说明](COMPATIBILITY.md)、[发布流程](RELEASING.md)和[Core 场景说明](https://github.com/bailinghub/bailinghub/blob/v0.7.0/docs/RELEASE_NOTES_v0.7.0.md)。
+详见[跨系统接入](CROSS_SYSTEM_CONVERSATIONS.md#简体中文)、[宿主契约](AGENT_CLIENT_CONTRACT.md)、[兼容说明](COMPATIBILITY.md)、[发布流程](https://github.com/bailinghub/bailinghub-dsh-plugin/blob/v0.5.0/docs/RELEASING.md)和[Core 场景说明](https://github.com/bailinghub/bailinghub/blob/v0.7.0/docs/RELEASE_NOTES_v0.7.0.md)。
