@@ -2,20 +2,9 @@
 
 [简体中文](docs/README.zh-CN.md) | English
 
-> **Unreleased source candidate:** this checkout adds one conversation across different business
-> systems on the same Hub. It requires matching Core, SDK and plugin candidates; installing the
-> published 0.4.0 packages alone does not enable it. See [cross-system conversations](docs/CROSS_SYSTEM_CONVERSATIONS.md).
-> The published-release instructions below describe the existing same-system baseline.
-
-The candidate can also explain what each selected business system is for before searching its
-tools, using descriptions maintained by its administrator. These descriptions do not grant
-permissions; actual actions still depend on the account's authorized capabilities.
-
-With the matched authorization-subject-display candidate, a completed authorization also carries
-the name supplied by the business backend, such as a team, organization or project. The host can
-show it automatically, separately from the product description. Missing names show “Authorization
-name pending sync”; duplicate names and renames keep their original authorizations and history.
-See the [display contract](docs/AGENT_CLIENT_CONTRACT.md#unreleased-authorization-subject-display).
+> **Unreleased source:** ask “Check tumbler stock, then change the corresponding shop product to 59 and list it.” The next plugin can use separate shop and inventory authorizations on one Hub, understand their purposes, and show business-supplied authorization names. Each action still requires the corresponding business capability and approval; product mappings must be confirmed.
+> Published Core 0.6.1 / SDK and plugin 0.4.0 do not include these extensions. The current lockfile retains the released SDK; cloning the plugin alone is insufficient.
+> [Changes and upgrade preparation](docs/NEXT_RELEASE.md). The installation instructions below remain the stable same-system baseline.
 
 Ask your local DeepSeek Harness Agent to work with a business system connected to BailingHub:
 find records, update allowed fields, and follow the system's existing approval rules.

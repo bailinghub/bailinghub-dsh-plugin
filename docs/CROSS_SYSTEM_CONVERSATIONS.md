@@ -6,9 +6,8 @@ published Core 0.6.1 / SDK 0.4.0 / DSH 0.4.0 do not include this extension.
 
 ## What you can do
 
-Select, for example, a cashier account and a CRM account already authorized on the same
-BailingHub deployment. Ask the same local Agent to query one system and use a permitted action
-in the other. The Agent keeps each system's tools and authorizations distinct; you do not switch
+Select, for example, a shop account and an inventory account already authorized on the same
+BailingHub deployment. Ask the same local Agent to check product stock, then change a corresponding shop product's price and list it using permitted actions. The Agent keeps each system's tools and authorizations distinct; you do not switch
 the global connection between steps. Available actions still depend on each system's declared
 capabilities and the permissions of the selected account.
 
@@ -24,7 +23,7 @@ conversation audit still share the visible conversation.
 
 An administrator can provide each connected system's name, short purpose, usual business areas
 and boundaries in BailingHub. The Agent reads these descriptions for the selected accounts before
-its first capability search. For example, it can distinguish service scheduling from inventory
+its first capability search. For example, it can distinguish online selling from inventory
 management without a client-specific product dictionary. Business-supplied subject names identify
 the particular organization, project or other authorized subject for display. They are separate
 from product purpose and do not prove identity or grant permissions.
@@ -46,7 +45,7 @@ neither condition selects another account. A later turn reads the original targe
    connection selector remains independent; missing names show “Authorization name pending sync”.
    Names do not prove a mapping between two systems or distinguish duplicate-named subjects.
 2. In a new conversation, use `/bailinghub connections list`, then
-   `/bailinghub scope set <cashier-connection-key> <crm-connection-key>`.
+   `/bailinghub scope set <shop-connection-key> <inventory-connection-key>`.
 3. Wait for successful confirmation before sending the first message. Start with a precise
    request identifying the intended systems, objects and allowed action.
 4. Review the separate results and any approval requests. Use `/bailinghub archive status`
@@ -99,8 +98,8 @@ installing this plugin does not migrate or deploy the Hub.
 
 ### 对使用者有什么变化
 
-你可以在同一个会话里选中“门店收银”和“CRM”等不同系统的授权，让助手先查询一个系统，再使用另一个
-系统允许的动作。每一步都会使用对应系统的工具与授权，仍按该系统的权限和审批规则执行。
+你可以在同一个会话里选中“商城”和“库存系统”的授权，让助手先查询保温杯库存，再使用商城允许的
+改价、上架等动作。每一步都会使用对应系统的工具与授权，仍按该系统的权限和审批规则执行。
 
 助手先看到你选中的目标目录，需要哪个系统时才查找它的能力、加载它的上下文。不会因为选中了两个系统，
 就把每句话自动发送给两者。某个系统的查询结果进入本地模型后，会成为同一会话的上下文；只有允许这样共享
@@ -109,7 +108,7 @@ installing this plugin does not migrate or deploy the Hub.
 ### 怎样开始
 
 接入方可以在中枢维护系统名称、简短用途、典型业务方向和边界。助手在首次搜索工具前就能看到本会话所选系统
-的介绍，例如分清“预约服务”和“库存管理”，不需要每个客户端分别写死产品词典。同系统的多个账号也会显示
+的介绍，例如分清“线上售卖”和“库存管理”，不需要每个客户端分别写死产品词典。同系统的多个账号也会显示
 相同的系统归属。配套展示候选单独提供业务授权主体的名称，用于表示具体的组织、账号、项目等；名称不证明身份，
 也不增加权限。
 
@@ -124,8 +123,8 @@ installing this plugin does not migrate or deploy the Hub.
 内部连接标识独立保留。再新建会话，使用上面的 scope 命令选中两份固定授权。
 等选择成功后，再明确提出操作对象和要做的事。首次消息后范围固定；需要增减系统时新建会话。
 
-如果收银里的 A 店与 CRM 中的某个组织需要关联，应使用已经确认的业务映射，或由用户明确确认。
-两个系统的店名或编号看起来相同，并不能证明它们是同一对象。
+如果库存里的商品与商城中的某个商品需要关联，应使用已经确认的业务映射，或由用户明确确认。
+两个系统的商品名或编号看起来相同，并不能证明它们是同一对象。库存查询不等于锁库存或建立自动库存同步。
 
 ### 下游需要配合什么
 

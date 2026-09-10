@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased - cross-system conversation candidate
+## Unreleased — shop and inventory in one conversation
+
+See [scenarios and upgrade preparation](docs/NEXT_RELEASE.md): check inventory, update a shop price and follow the listing result or approval. Business tools and confirmed product mappings are prerequisites.
 
 - Show the business-supplied name of an authorized organization, account, project or other subject
   separately from its product's purpose. Keep local connection selectors independent and explicitly
