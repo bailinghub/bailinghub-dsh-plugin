@@ -4,7 +4,7 @@ Report vulnerabilities through a private GitHub Security Advisory in this reposi
 Do not put tokens, private deployment URLs, personal information, or raw business payloads
 in a public issue.
 
-## Unreleased cross-system candidate
+## Cross-system scope in 0.5.0
 
 Different applications/workspaces may participate only through a frozen same-Hub target set,
 with a distinct original Session per target. Capability support must be explicitly negotiated;
@@ -24,6 +24,19 @@ late responses cannot reactivate ended-turn tools. Scope/outbox v2 retains origi
 event IDs and CAS; a downgrade cannot reinterpret that state as v1. Full transcript reading
 remains in the Hub's management audit boundary, not an individual member's Agent bearer.
 
+## System descriptions and authorization names
+
+System purpose comes from controlled Client/route metadata and is read only for selected original
+bindings before capability search. It is descriptive data, not executable instructions or a grant
+of tools. Business backends supply subject display names for the actual approved identity; names
+remain separate from internal keys, original Sessions and the system description. Only the name
+field is projected, with bounded length, valid Unicode and no control or line-separator characters.
+
+A duplicate or changed name cannot merge authorizations, replace scope members or rewrite archived
+labels. SDK display-cache data is auxiliary and cannot validate credentials or mask a scope/archive
+storage error. Missing or unsupported display metadata leaves existing tools unchanged; a confirmed
+identity failure still blocks the complete selection.
+
 ## Public legacy 0.1.x boundary
 
 This bundle contributes configuration only. It has no custom runtime JavaScript, production
@@ -39,9 +52,9 @@ configuration and are never model tool arguments.
 
 Non-loopback HTTP is denied by default. Do not enable insecure HTTP on an untrusted network.
 
-## Native 0.4.0 boundary
+## Native 0.5.0 boundary
 
-The native 0.4.0 plugin accepts only `hubUrl`, `clientAppId`, `workspace`, and
+The native 0.5.0 plugin accepts only `hubUrl`, `clientAppId`, `workspace`, and
 `connectionName`. The generic SDK owns browser authorization, refresh, and secure credential
 storage; business endpoints and final authorization remain Core/business-system concerns. The
 Hub Client App owns one business authorization entry. That business page, not the plugin or model,
@@ -61,7 +74,7 @@ falsely report a complete logout.
 Tools are Agent/run scoped. Message ids are replaced by Core-safe hash aliases, invocation ids are
 stable 64-character digests, and an `accepted_unknown` outcome must resume that exact invocation
 instead of creating a replacement. Completion retries are bounded and reuse one frozen,
-visible-only payload. Version 0.4.0 installs `bailinghub-mcp-server@0.4.0` as an exact ordinary
+visible-only payload. Version 0.5.0 installs `bailinghub-mcp-server@0.5.0` as an exact ordinary
 dependency and resolves its `./sdk` export. It does not depend on ambient modules, an optional
 peer, a range, a dist-tag, or a local path. Public `0.1.1` does not provide that facade.
 
@@ -72,7 +85,7 @@ plugin never receives the credential value and never writes one into Cordis conf
 
 ## Same-system authorization selection
 
-Version 0.4.0 lets the model select a session-local `authorization_ref` from the current
+The same-system path introduced in 0.4.0 lets the model select a session-local `authorization_ref` from the current
 conversation's directory. This is a constrained per-call selector, not a connection-management
 tool or authority to supply a Hub, route, raw connection key, credential, or business identity.
 The host must first explicitly select fixed connection keys for this conversation through

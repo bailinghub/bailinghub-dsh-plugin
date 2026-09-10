@@ -1,6 +1,69 @@
-# Migrate to 0.4.0
+# Migrate to 0.5.0
 
-## From 0.3.0: choose the conversation scope explicitly
+## From 0.4.0: add systems without replacing existing authorizations
+
+Version 0.5.0 extends one-system multi-account conversations to different business systems on one
+Hub and audit domain. It adds system descriptions before capability search and optional business
+subject names. The four public plugin fields, existing host scope/archive APIs, permissions and
+business approval rules remain in place.
+
+1. Have the administrator back up and upgrade to Core 0.7.0. Apply only outstanding migrations in
+   order; upgrading from 0.6.1 includes 058/059. The plugin installer does not migrate the Hub.
+2. Finish active business work and retry known pending completions with `/bailinghub sync`.
+   Retain the original DSH home, SDK credentials, real Session events, scope files and archive outbox.
+3. Install and restart DSH:
+
+   ```bash
+   dsh plugin --profile web add dsh-bailinghub@0.5.0
+   ```
+
+   The package installs exact SDK 0.5.0. Do not manually mix in an older SDK or a local file dependency.
+4. Check `/bailinghub doctor` and `/bailinghub connections list`. Valid existing authorizations
+   continue working; no new login is needed just for a version change or a display rename.
+5. Add and authorize only the extra systems needed for the new task. In a new conversation, select
+   their fixed connection keys and wait for `/bailinghub scope` to confirm before sending a message.
+6. Test an inventory read and a low-risk shop action with confirmed product mappings. Check each
+   target, separate result/approval, and original run link. Then check `/bailinghub archive status`.
+
+Existing started v1 conversations keep their exact original scope and archive identity. The upgrade
+never expands them to every account or converts them to a cross-system selection. A saved unstarted
+draft requires confirmation; a started conversation whose scope cannot be restored stays blocked.
+The same-runtime offline recovery rules continue to use the complete original group.
+
+Custom hosts keep `setSessionScope`, `getSessionScope`, `restoreSessionScope`,
+`getSessionArchiveStatus` and `syncSessionArchive`. Custom stores must preserve complete scope/outbox
+v2 records, original bindings, events, acknowledgement positions and CAS revisions. Hosts may show
+current `subjectDisplay` fields and omit a manual display-name input, but keep internal connection
+selectors/keys separate; do not rebuild authorization or archive state to update a name. Missing
+names stay explicit. Administrator-maintained system descriptions are separate from subject names
+and do not grant tools or permissions.
+
+### 0.4 用户升级摘要
+
+管理员先备份并升级 Core 0.7.0，按顺序仅执行未完成迁移（从 0.6.1 升级包括 058/059）。用户先
+结束当前业务任务，用 `/bailinghub sync` 重试待同步结尾，安装 `dsh-bailinghub@0.5.0` 并重启。
+插件自动安装 SDK 0.5.0。保留原凭据、真实 Session 事件及范围/待传文件；有效授权不因升级或改名重建。
+
+已有同系统会话范围保持不变。要把商城与库存一起使用，分别授权，另开会话，在首消息前选中固定
+连接键并等确认。先验证库存查询与一个低风险商城动作，核对各自结果、原审批和执行关联。
+自定义宿主保留原五个接口；自定义存储需完整保存 v2 的原绑定、事件、确认进度与修订号。名称
+只用于展示，不能替代连接键、身份或系统说明。详情见[本次更新](RELEASE_NOTES_v0.5.0.md#简体中文)。
+
+### Downgrading from 0.5 to 0.4
+
+Finish active work and synchronize pending completions and archives first. Keep the original profile
+and v2 files as recovery material. Version 0.4.0 does not understand cross-system v2 scope/outbox or
+provide this release's system/subject metadata. Do not reinterpret v2 as v1, delete it, or reconstruct
+it from the current registry. Use a separate profile with new same-system conversations if reverting.
+An application downgrade does not undo an accepted business action or remove its Hub audit. Core
+database rollback follows Core's own migration guide; never drop new columns as a plugin rollback.
+
+## Historical 0.3.0 → 0.4.0 behavior
+
+The section below documents the scope change introduced in 0.4.0. When upgrading directly to 0.5.0,
+follow the current install/Core versions above and also preserve these explicit-scope requirements.
+
+### From 0.3.0: choose the conversation scope explicitly
 
 Version 0.4.0 keeps the four public configuration fields and existing SDK-owned authorizations.
 It changes how a conversation gets business access: logging in or selecting a default no longer
@@ -107,7 +170,7 @@ switch account, and select a tenant.
 
 ## Safe evaluation before migration
 
-Do not replace a working production profile merely to evaluate 0.4.0. Use a separate DSH home or
+Do not replace a working production profile merely to evaluate 0.5.0. Use a separate DSH home or
 another isolated Web profile and verify that the CLI really honors that location. The named
 connection lifecycle introduced in `0.3.0` creates a separate credential for each name registered through
 `connections add` while authorization is pending. After authorization, the SDK replaces an older
@@ -117,7 +180,7 @@ alias and Session and receives a non-conflicting alias that becomes current. Use
 SDK installed by the DSH package when evaluating that behavior.
 
 1. Keep the existing `0.1.1` profile and its legacy environment unchanged.
-2. Install the exact released 0.4.0 package into an isolated profile.
+2. Install the exact released 0.5.0 package into an isolated profile.
 3. Configure only the four public native fields using neutral values for dry composition.
 4. Run `/bailinghub login` and approve a dedicated non-production client app/workspace whose
    credential can be revoked without affecting a maintainer's existing profile.
@@ -128,14 +191,14 @@ SDK installed by the DSH package when evaluating that behavior.
 Passing the native path does not prove legacy compatibility, and passing the legacy path does not
 prove the native Agent Client.
 
-## Moving a legacy 0.1 profile to 0.4
+## Moving a legacy 0.1 profile to 0.5
 
 Only after the isolated acceptance passes:
 
 1. Record the exact old plugin, DSH, MCP, and Core versions without copying credentials into the
    migration record.
 2. Finish or cancel outstanding legacy jobs. A wait timeout is not a terminal failure.
-3. Install the exact accepted 0.4.0 plugin version. Do not use an unpinned dist-tag.
+3. Install the exact accepted 0.5.0 plugin version. Do not use an unpinned dist-tag.
 4. Replace the legacy plugin configuration with the four native fields. Remove the old Client
    Token from that process environment after confirming no remaining 0.1 integration uses it.
 5. Start DSH, run `/bailinghub login`, use the business page to log in or switch account and select
@@ -172,7 +235,7 @@ reuse, move, or republish an npm version or Git tag as a rollback mechanism.
 
 ## Release gates
 
-Before a public 0.4 release:
+Before a public 0.5 release:
 
 1. The matching BailingHub Core Agent Auth/Agent API contracts are released.
 2. The exact `bailinghub-mcp-server/sdk` version is publicly installable and has passed DTO,

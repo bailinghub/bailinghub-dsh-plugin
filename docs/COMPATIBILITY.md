@@ -1,19 +1,36 @@
 # Compatibility
 
-## Unreleased authorization subject display
+## Native Agent Client 0.5.0
 
-Use the matched Core/SDK/DSH candidate hashes for business-supplied authorization names. New
+| Component | Release pairing / requirement |
+| --- | --- |
+| DeepSeek Harness | `0.1.1-rc.2`; real Session and native Cordis lifecycle |
+| Node.js | `^22.19.0` or `>=24.0.0` |
+| DSH tool presentation | Native Tool Mode; Code Mode deliberately degraded |
+| Generic Agent Client SDK | Exact `bailinghub-mcp-server@0.5.0` via `./sdk` |
+| BailingHub Core | `bailinghub@0.7.0`, with outstanding migrations through 059 applied |
+| Selected scope | Single account, same-system multiple accounts, or different Client Apps/workspaces on one Hub and audit domain |
+| Original authorization | A distinct original Agent Session for every selected target |
+| Persistence | Existing same-system v1 scope/outbox and cross-system v2 records |
+
+Install `dsh-bailinghub@0.5.0`; its ordinary dependency installs the exact SDK automatically.
+Core 0.6.1 and SDK/plugin 0.4.0 remain the historical same-system baseline, not an alternative
+pairing for new cross-system features. See the [upgrade steps](MIGRATION_VNEXT.md) and
+[release scenario](RELEASE_NOTES_v0.5.0.md).
+
+### Authorization subject display
+
+Core 0.7.0, SDK 0.5.0 and plugin 0.5.0 support business-supplied authorization names. New
 names are optional: an old SDK reports `unsupported`, a missing business name reports `missing`,
 and neither blocks the existing tools. A list may show cached display data without claiming it
 is fresh identity evidence. Current names and cache-write status remain separate from scope,
 credential, archive and business errors. Existing v1/v2 records need no conversion or new labels;
 names never replace their original key, binding or Session. See the
-[display contract](AGENT_CLIENT_CONTRACT.md#unreleased-authorization-subject-display).
+[display contract](AGENT_CLIENT_CONTRACT.md#authorization-subject-display-050).
 
-## Unreleased cross-system candidate
+### Cross-system scope
 
-Requires matching candidate Core, SDK and DSH sources; the released version numbers below are
-not evidence of this feature. Core must advertise
+Requires Core 0.7.0, SDK 0.5.0 and plugin 0.5.0. Core must advertise
 `cross_binding_members: true` and `member_bindings: "session-client-route.v1"` through
 `bailing.agent-conversation-audit-capabilities.v1`, with its additive target-member migration ready.
 The SDK must implement `getConversationArchiveCapabilities` and the `expectedBinding` dispatch guard.
@@ -22,11 +39,11 @@ same-system scope and archive interfaces continue using their v1 behavior.
 
 One Hub may contain different Client Apps and workspaces; every target must have a distinct
 original Agent Session. Multiple routes sharing a single Agent Session and cross-Hub conversations
-are outside this candidate. Hosts using custom stores must preserve scope/outbox v2 records with
+are outside this release. Hosts using custom stores must preserve scope/outbox v2 records with
 their original bindings and CAS revisions; do not convert v2 into v1 or reconstruct missing state.
-See [the candidate guide](CROSS_SYSTEM_CONVERSATIONS.md) for usage and limits.
+See [the cross-system guide](CROSS_SYSTEM_CONVERSATIONS.md) for usage and limits.
 
-## Native Agent Client 0.4.0
+## Historical native Agent Client 0.4.0
 
 | Component | Release pairing / requirement |
 | --- | --- |
@@ -41,7 +58,7 @@ See [the candidate guide](CROSS_SYSTEM_CONVERSATIONS.md) for usage and limits.
 Core `0.6.0` is the minimum API version for this contract. Use Core `0.6.1` for the
 recommended release pairing; the patch does not change these business APIs.
 
-Install only `dsh-bailinghub@0.4.0`; its ordinary dependency installs the exact SDK. A release
+For this historical pairing, install `dsh-bailinghub@0.4.0`; its ordinary dependency installs the exact SDK. A release
 requires a registry-generated lockfile and a clean package/profile check. Local source and
 synthetic HTTP verification are compatibility evidence, not evidence of an organization's
 production use. The older 0.3 baseline is retained below for existing users, not as a claim that
@@ -159,11 +176,13 @@ BailingHub Core release is compatible only after a separate clean legacy profile
 
 Compatibility requires independent evidence for both paths:
 
-1. Native 0.4: clean install of only the exact plugin package, browser authorization, workspace
+1. Native 0.5: clean install of only the exact plugin package, browser authorization, workspace
    discovery, same-identity replacement, different-identity isolation, read, permitted mutation,
    approval/resume, visible completion, and Hub trajectory. Additionally verify explicit single/multiple
    scope selection, full-set archive authorization, offline reopen/retry, revocation, and no business
-   replay after a lost archive acknowledgement.
+   replay after a lost archive acknowledgement. Verify cross-system routing and same-named tools,
+   unselected-target isolation, metadata before tool search, and duplicate/renamed subject displays.
+   Metadata reads must create no business run; subject names must not change identity or scope.
 2. Legacy 0.1.1: clean static profile, fixed Client Token route, one submit, and same-job follow-up
    through the unchanged public Client API.
 

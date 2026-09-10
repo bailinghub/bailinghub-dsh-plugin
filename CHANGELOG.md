@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased — shop and inventory in one conversation
+## 0.5.0 - 2026-09-10
 
-See [scenarios and upgrade preparation](docs/NEXT_RELEASE.md): check inventory, update a shop price and follow the listing result or approval. Business tools and confirmed product mappings are prerequisites.
+### Shop and inventory in one conversation
+
+See [release scenarios and upgrade steps](docs/RELEASE_NOTES_v0.5.0.md): check inventory, update a shop price and follow the listing result or approval. Business tools and confirmed product mappings are prerequisites.
 
 - Show the business-supplied name of an authorized organization, account, project or other subject
   separately from its product's purpose. Keep local connection selectors independent and explicitly
@@ -23,9 +25,14 @@ See [scenarios and upgrade preparation](docs/NEXT_RELEASE.md): check inventory, 
   cross-system scope/outbox v2 while retaining same-system v1 snapshots and APIs.
 - Require explicit SDK/Core capability support for cross-system scope. Older combinations
   refuse the new mode while retaining existing same-system behavior.
-- This is a source candidate, with unchanged package version metadata. Use the exact candidate
-  sources and package hashes. It is not a public release or a durable multi-system workflow engine.
-- Update the transitive Hono lock entry to 4.13.7 for upstream fixes; public SDK pins and package versions remain unchanged.
+- Pair with Core 0.7.0 and pin exact SDK 0.5.0. Preserve existing credentials, v1 scopes and original
+  archive events; open a new conversation when choosing targets from different systems.
+- Keep the same-Hub, same-audit-domain boundary. This is not a durable task scheduler, automatic
+  product mapping, stock synchronization, cross-system transaction or business rollback engine.
+- Retain the transitive Hono 4.13.7 update for upstream fixes.
+
+See the [migration guide](docs/MIGRATION_VNEXT.md) for upgrading from 0.4.0 or an older native
+version. Maintainer and synthetic compatibility checks are not independent production adoption.
 
 ## 0.4.0 - 2026-09-08
 

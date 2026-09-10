@@ -1,6 +1,6 @@
 # Agent Client Host Adapter Contract
 
-## Unreleased authorization subject display
+## Authorization subject display (0.5.0)
 
 The business backend may supply `subject_display: { name }` for the subject actually approved by
 the user. A subject can be an organization, account, project, department, workspace or another
@@ -53,9 +53,9 @@ Scope revalidation refreshes current names without changing the selected members
 Sessions, frozen scope revision, historical labels, visible events or archive context. Normal archive
 ACK writes continue their existing CAS sequence; display refresh itself writes no archive record.
 
-## Unreleased system descriptions
+## System descriptions (0.5.0)
 
-The matched Core/SDK candidate adds optional `transport.getSystemInfo({ connectionKey,
+Core 0.7.0 and SDK 0.5.0 add optional `transport.getSystemInfo({ connectionKey,
 workspace, expectedBinding, signal })`. After the entire selected scope has passed identity
 validation and before first model assembly, the adapter reads one description for each original
 selected member. Requests include the original Hub/Client/workspace/Agent Session binding and
@@ -91,11 +91,11 @@ stored v1/v2 records. No local hard-coded product dictionary or extra body-repor
 required. A host may keep a separately controlled fallback when metadata is unavailable, but must
 not infer identity from local labels or expand the selected scope.
 
-## Unreleased cross-system extension
+## Cross-system extension (0.5.0)
 
-This source candidate extends the released baseline below. It requires the matching SDK and
-Core candidates; unchanged package version metadata does not identify the feature. Existing
-same-system behavior, signatures and v1 records remain supported.
+This extension requires SDK 0.5.0 and Core 0.7.0 with migration 058 applied. Subject display
+additionally requires migration 059. Existing same-system behavior, signatures and v1 records
+remain supported; old selected scopes never expand to include newly available targets.
 
 The host selects fixed connection keys from one normalized Hub. Different Client Apps or
 workspaces form different capability sources. Each target must have a distinct original Agent
@@ -158,18 +158,21 @@ cross-system transaction, automatic rollback or field-level data-transfer policy
 continue owning their capabilities, permission checks, approvals and data semantics. See the
 [user and host guide](CROSS_SYSTEM_CONVERSATIONS.md).
 
-Status: native Agent Client contract for `dsh-bailinghub@0.4.0`, paired with
-`bailinghub-mcp-server@0.4.0` and recommended BailingHub Core `0.6.1` (minimum API version
-`0.6.0`). This contract is separate from the legacy static `0.1.x` path. Version 0.3.0 supported user-managed connections but did not include
+Status: native Agent Client contract for `dsh-bailinghub@0.5.0`, paired with
+`bailinghub-mcp-server@0.5.0` and BailingHub Core `0.7.0`. The same-system scope and archive
+baseline was introduced in plugin/SDK 0.4.0 and Core 0.6.0 (recommended historical Core 0.6.1).
+This contract is separate from the legacy static `0.1.x` path. Version 0.3.0 supported user-managed
+connections but did not include
 explicit conversation scope, multi-authorization tool selection, or the visible conversation archive.
 
 ## Same-System Authorization Selection
 
-This increment supports multiple independently authorized identities for one public
-`Hub + clientAppId + workspace` binding in one DSH conversation. It does not combine different
-systems or routes, alter business capability declarations, or change Core authorization rules.
+The retained same-system path supports multiple independently authorized identities for one
+public `Hub + clientAppId + workspace` binding in one DSH conversation. It uses the existing v1
+records and shared capability declarations. The cross-system v2 path above handles different
+sources; neither path changes Core authorization or business approval rules.
 
-Version 0.4.0 changes the default: a new conversation with no selected scope, or an explicitly
+Version 0.4.0 changed the default: a new conversation with no selected scope, or an explicitly
 empty `connectionKeys: []`, is ordinary chat. It starts no BailingHub run and exposes no BailingHub
 business tools. Browser authorization, the registry's current connection, and the four bootstrap
 fields do not select a conversation's scope. There is no automatic discovery-and-enable fallback.
@@ -283,9 +286,10 @@ frozen scope unchanged. The host must open a new conversation, not treat that re
 successful selection of the requested keys. Revision values may advance more than once
 during selection; always use the returned value for the next compare-and-swap request.
 
-Each same-system `authorizations` entry has the public host-facing fields
-`{ authorizationRef, connectionKey, label, workspace }`; cross-system candidate entries add the
-fields documented above. The selection accepts at most 64 unique
+Each `authorizations` entry retains the public host-facing fields
+`{ authorizationRef, connectionKey, label, workspace }`. Version 0.5.0 consistently adds
+`clientAppId`, `systemRef` and the current display fields documented above for single, same-system
+and cross-system scopes. The selection accepts at most 64 unique
 connection keys. The trusted host owns `sessionId`: it must remain stable when reopening the same
 conversation and be unique within that store's namespace. Do not let the model or an untrusted
 client choose another conversation's id, edit scope records, or control the storage namespace.
@@ -343,8 +347,10 @@ Restoring a scope does **not** restore an invocation, approval, pending completi
 
 ### Independent visible conversation archive
 
-The visible archive requires SDK `0.4.0` and Core APIs introduced in `0.6.0`; the recommended
-Core release is `0.6.1`. Earlier `0.3.0` SDK/plugin packages do not provide this contract.
+The original same-system visible archive uses SDK APIs introduced in `0.4.0` and Core APIs
+introduced in `0.6.0`; the historical recommended Core release is `0.6.1`. For this release,
+use SDK `0.5.0` with Core `0.7.0`, including cross-system member support. Earlier `0.3.0` SDK/plugin
+packages do not provide this contract.
 After a nonempty scope is frozen, the adapter captures claimed user text, every durable `assistant/message` text block, turn start/end, and verified original run links. It ignores
 `assistant/chunk`, hidden reasoning, attachments, raw provider requests, and arbitrary tool payloads.
 The archive is one record for the complete fixed authorization set; per-authorization run summaries

@@ -1,8 +1,10 @@
-# Get started with 0.4.0
+# Get started with 0.5.0
 
 This guide is for users whose business system is already connected to BailingHub. Your
-administrator must prepare Core 0.6.1, a public Client App ID, a workspace, and the business
-browser-authorization entry first. You do not need to change business capability declarations.
+administrator must prepare Core 0.7.0, a public Client App ID, a workspace, and the business
+browser-authorization entry first. For multiple systems, prepare one independently authorized
+connection per target on the same Hub and audit domain. Existing business capability declarations
+remain valid; each requested action must already be exposed by its own system.
 
 ## 1. Install and configure
 
@@ -10,10 +12,10 @@ Use Node.js `22.19.0+` or `24+` and the compatible DSH version:
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
-dsh plugin --profile web add dsh-bailinghub@0.4.0
+dsh plugin --profile web add dsh-bailinghub@0.5.0
 ```
 
-The plugin installs SDK 0.4.0 automatically. Enter the four public values in DSH plugin settings,
+The plugin installs SDK 0.5.0 automatically. Enter the four public values in DSH plugin settings,
 or use their environment names. The example values below are placeholders:
 
 ```bash
@@ -41,7 +43,10 @@ In DSH, authorize the first account:
 
 The browser opens the original business authorization page. Sign in or switch accounts there,
 select the intended store/tenant when asked, and check the actual identity before approving.
-The business page determines the identity; the local label `Store A` does not.
+The business page determines the identity; the local label `Store A` does not. A compatible
+backend supplies the approved subject name automatically. The current display name is separate
+from its fixed key and the system description; missing names remain explicit. Duplicate names
+or renames do not recreate authorization or change old conversation records.
 
 For another account in the **same system and workspace**, register a clearly named connection,
 using the same three administrator-provided values, then authorize it separately:
@@ -59,23 +64,44 @@ an available alias. Names such as `default-2` do not prove which store was autho
 mapping before use. If login reports cleanup required, the new connection is already authorized;
 inspect and remove the reported old entry rather than authorizing again.
 
+To add a **different system**, use its administrator-provided Client App and workspace on the
+same Hub, then authorize it independently. For example, an inventory target may use:
+
+```text
+/bailinghub connections add "Inventory" https://hub.example.com inventory-client inventory_assistant
+/bailinghub login
+/bailinghub connections list
+```
+
+These are placeholders, not values to guess from a product name. Each selected target needs its
+own original Agent Session. Keep the existing Store B connection if using the same-system flow.
+
 ## 3. Choose this conversation's business scope
 
 Start a **new conversation before sending any message**, then run:
 
 ```text
 /bailinghub connections list
-/bailinghub scope set <store-a-connection-key> <store-b-connection-key>
+/bailinghub scope set <shop-connection-key> <inventory-connection-key>
 /bailinghub scope
 ```
 
 Copy the fixed connection keys from the list; the scope command does not accept names. Select
-one key for one account, or several for the same Hub/Client App/workspace. Wait for the successful
-confirmation before sending. For example, when the reporting capability is available:
+one key for one account, several for the same system, or several systems on one Hub and audit
+domain. Wait for successful confirmation. With the required inventory/shop capabilities and a
+confirmed product mapping, you can ask:
 
 ```text
-Compare today's sales at Store A and Store B. Show each store separately.
+Check tumbler stock. If any are available, change the corresponding shop product to 59 and list it.
+Otherwise leave it unlisted.
 ```
+
+The system description can explain online selling versus inventory before tool search. “Not loaded”
+means tools have not been queried, not that none exist. A stock read does not reserve or synchronize
+stock. Check price and listing outcomes separately, including any pending approval.
+
+For the retained same-system flow, select Store A and Store B instead and compare their sales
+when reporting tools are available. A system that was not used must not be marked as executed.
 
 The Agent chooses which selected authorization to use for each call. The system still decides
 which data and actions that authorization permits. Test a read first, then a reversible permitted
@@ -89,7 +115,7 @@ connection does not change a conversation's scope.
 ## 4. Check results and the visible conversation
 
 Check the actual business result and its original invocation trail in BailingHub. With the matching
-Core 0.6.1, you can also follow visible user/assistant messages, turns, and the linked runs as one
+Core 0.7.0, you can also follow visible user/assistant messages, turns, and the linked runs as one
 conversation record. Multi-authorization runs keep their own call summaries separately.
 
 ```text

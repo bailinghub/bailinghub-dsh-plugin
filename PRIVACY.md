@@ -1,11 +1,12 @@
 # Privacy
 
-## Unreleased cross-system candidate
+## Cross-system conversations in 0.5.0
 
-The candidate's cross-system mode is opt-in through an explicit selected target set on one Hub.
+The 0.5.0 cross-system mode is opt-in through an explicit selected target set on one Hub.
 Before business execution, the original members and the Hub's capability support are verified.
-The Agent initially receives only a directory of authorization references, local labels, opaque
-system references and workspace names. A target starts its run only after an explicit capability
+The Agent initially receives only a directory of authorization references, business subject display
+names, controlled system descriptions, opaque system references and workspace names. Descriptions
+and names are read under the original selection without sending user text or creating a run. A target starts its run only after an explicit capability
 search or recovery selecting that target. The search query becomes that target's task input;
 the full original user message is retained in the independent conversation archive instead of
 automatically being sent to every target's run. Other selected targets may receive authorization
@@ -20,12 +21,13 @@ Original system/workspace bindings stay attached to tools, results and execution
 Cross-system scope and outbox v2 persist each member's public Hub/app/workspace and original
 Session with the same storage protections and plaintext archive boundary below. Same-system v1
 records remain unchanged. The full transcript belongs to the independent Hub management audit;
-holding one target's authorization does not grant full-transcript reading. This candidate does
+holding one target's authorization does not grant full-transcript reading. This release does
 not upload hidden reasoning or provide cross-process business-task recovery.
 
-The following sections describe the released 0.4.0 same-system baseline.
+The following sections describe the retained same-system flow introduced in 0.4.0, and common
+storage/archiving behavior. The cross-system target-query rules above take precedence for v2 scopes.
 
-This bundle adds no telemetry and stores no BailingHub credentials. Version 0.4.0
+This bundle adds no telemetry and stores no BailingHub credentials. The native plugin
 persists session-scope metadata and, when the SDK supports conversation archives, a separate
 private outbox containing visible task text as described below.
 
@@ -37,9 +39,9 @@ using personal, confidential, or regulated data.
 Do not include tokens, private URLs, personal information, or production payloads in public
 issues, screenshots, or compatibility reports.
 
-## Native Agent Client 0.4.0
+## Native Agent Client: retained same-system data flow
 
-After explicit nonempty scope selection, the native 0.4.0 plugin sends each direct human user turn
+After explicit nonempty same-system scope selection, the plugin sends each direct human user turn
 to BailingHub Core and receives model-visible instructions, memory, reference-only knowledge, governance, and active tool schemas.
 Business tool arguments and governed results cross the same boundary. At completion it sends a
 hash-aliased message id, legal status, optional model/runtime labels, and numeric public usage. A single-authorization run receives the visible final answer;
@@ -55,9 +57,19 @@ The multi-connection registry contains public connection name, Hub URL, client a
 timestamps, and current-selection state. It does not contain access tokens, refresh tokens, model
 keys, business cookies, prompts, tool arguments, or business results.
 
+## Authorization display metadata
+
+The SDK may cache the business-supplied subject name in a separate private display-only record
+bound to the original connection and Session. A connection list can read that cache without a
+network request; `cache` does not claim the name or authorization was freshly verified. Credential
+storage and the registry are independent. The plugin retains current metadata in memory for
+presentation; a refresh does not rewrite scope, archive events or frozen historical labels.
+Controlled system descriptions are fetched for each selected member and are not persisted by
+this adapter. See the [host contract](docs/AGENT_CLIENT_CONTRACT.md#authorization-subject-display-050).
+
 ## Same-system authorization selection
 
-Version 0.4.0 includes only the authorization keys explicitly selected for a DSH
+The same-system scope introduced in 0.4.0 includes only the authorization keys explicitly selected for a DSH
 conversation, restricted to the same Hub/client/workspace binding. Unset or empty scope means
 ordinary chat: no BailingHub run starts, no BailingHub business tool is registered, and the plugin
 does not send that conversation's user input to a business system. Logging in or selecting a
@@ -67,7 +79,9 @@ DSH, the configured model provider, or unrelated host tools.
 The host snapshots the selected connection bindings and exposes only session-local authorization
 references, local display names, and availability as the selection directory. It does not expose
 the raw registry, credentials, connection keys, or Session inspection responses to the model.
-Local display names are user-controlled labels, not verified business identity claims.
+In 0.5.0, current business-supplied subject names are display metadata, separate from system
+descriptions, frozen historical labels and fixed authorization references. Neither a name nor a
+cached display record proves current identity. Names do not grant permission or rewrite history.
 
 After the full selection is validated, each user turn is sent to a separate Core run under each
 selected authorization to obtain its instructions, governance, memory, and reference-only
@@ -83,7 +97,7 @@ default or silently retaining a subset.
 Each business call uses only its selected authorization. Recovery retains the original
 authorization and invocation. At completion, multi-authorization runs receive separate
 deterministic summaries of their own governed calls, not the combined visible final answer or
-another authorization's results. SDK 0.4.0 with Core 0.6.1 also receives the combined visible
+another authorization's results. SDK 0.5.0 with Core 0.7.0 also sends the combined visible
 conversation through the independent archive boundary below. Single-authorization conversations
 retain the existing visible-answer completion flow.
 Hidden reasoning is never uploaded by the adapter.
@@ -114,7 +128,7 @@ tasks across a process restart.
 
 ## Visible conversation archive
 
-For a nonempty frozen scope, SDK 0.4.0 with Core 0.6.1 receives the claimed user messages,
+For a nonempty frozen scope, SDK 0.5.0 with Core 0.7.0 sends the claimed user messages,
 visible assistant text, turn boundaries, and original run links as one conversation audit owned
 by the complete selected authorization set. Visible text may itself contain personal or business
 data; the adapter does not claim to redact arbitrary secrets pasted into that text. It never adds
