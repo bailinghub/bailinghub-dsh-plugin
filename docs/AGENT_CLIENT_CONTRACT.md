@@ -1,5 +1,58 @@
 # Agent Client Host Adapter Contract
 
+## Unreleased authorization subject display
+
+The business backend may supply `subject_display: { name }` for the subject actually approved by
+the user. A subject can be an organization, account, project, department, workspace or another
+business entity; the upstream contract does not prescribe a store or any particular product.
+The name is display data, separate from both trusted authorization identity and `system_info`
+(the product's purpose). Only the trusted business backend supplies this name; the DSH model,
+local alias, device label and principal identifiers are not sources for it.
+
+The matched SDK exposes these additive fields on `login`, `status` and every `connectionsList`
+entry, and the plugin passes them to its host:
+
+| Field | Meaning |
+| --- | --- |
+| `subjectDisplay` | `{ name: string }`, or `null` when unavailable |
+| `subjectDisplayStatus` | `provided`, `missing`, `unsupported` or `unavailable` |
+| `subjectDisplaySource` | `verified` after the SDK reads the original Session, `cache` for display-only local data, otherwise `none` |
+| `subjectDisplayCacheStatus` | SDK auxiliary cache outcome: `saved`, `storage_error` or `not_cached` |
+| `displayLabel` | Plugin presentation label: the provided name, otherwise `Authorization name pending sync` |
+
+Names are trimmed, nonempty, at most 120 UTF-16 code units, with C0/C1 controls and Unicode line
+separators U+2028/U+2029 and unpaired surrogate code units rejected. Valid Unicode emoji are
+preserved. Only the `name` field enters model assembly. A matching name
+does not establish an identity or a business relationship. Cached display data proves no current
+authorization; a real identity-validation failure still blocks the complete original scope.
+An old SDK without these fields yields `unsupported`; a supported response without a name yields
+`missing`. Neither condition prevents the existing authorized tools from working. A display-cache
+write error stays auxiliary and cannot replace a scope/archive `storage_error` or `recovery_gap`.
+
+Custom hosts may omit a user-entered remark/name field and render the returned business name.
+Keep the internal `connectionName` selector and fixed `connectionKey` independently; do not rename,
+merge or recreate credentials because two subjects have the same name or an existing subject is
+renamed. A host may combine a separately trusted product name with this subject name for display.
+When unavailable, localize the generic pending-name message; never guess the name from a product
+description, local alias, principal identifier or list order. Older hosts can keep their current
+connection-management UI unchanged.
+
+`setSessionScope`, `getSessionScope` and `restoreSessionScope` add `subjectDisplay`,
+`subjectDisplayStatus` and `subjectDisplaySource` to each visible authorization. The legacy `label`
+is the frozen historical value: newly selected scopes capture the supplied name (or the generic
+pending-name label), while existing stored labels remain byte-for-byte unchanged. Hosts should
+render the new display fields for current names, not reinterpret an old `label` as verified metadata.
+
+After the whole scope is validated, current display fields are held separately in coordinator
+memory. They do not enter binding comparisons, persisted v1/v2 scope records or archive identity.
+Single, same-system and cross-system model directories include `subject_display`,
+`subject_display_status` and `subject_display_source`, separately from `system_description` and
+`metadata_status`. The current directory `label` and attributed tool-result label use this display
+projection; the original `authorization_ref` remains the only model target selector.
+Scope revalidation refreshes current names without changing the selected members, original Agent
+Sessions, frozen scope revision, historical labels, visible events or archive context. Normal archive
+ACK writes continue their existing CAS sequence; display refresh itself writes no archive record.
+
 ## Unreleased system descriptions
 
 The matched Core/SDK candidate adds optional `transport.getSystemInfo({ connectionKey,
@@ -54,7 +107,8 @@ and `authorizations` containing `{ connectionKey, sessionId, label, workspace, c
 The host view keeps `bailing.agent-session-scope.v1` and adds `targetMode: "multi_system"` and
 per-authorization `clientAppId`/`systemRef`. Existing `authorizationRef`, key and lifecycle fields
 retain their meaning. System references are opaque identifiers for capability sources; labels
-remain local user-controlled data, not business identity or object mappings.
+remain descriptive data, not business identity or object mappings. The subject-display extension
+above separates current business names from historical local labels.
 
 Selection/restoration verifies the whole original group and calls SDK
 `getConversationArchiveCapabilities({ members })`. Support requires

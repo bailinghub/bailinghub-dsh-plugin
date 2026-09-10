@@ -1,5 +1,15 @@
 # Compatibility
 
+## Unreleased authorization subject display
+
+Use the matched Core/SDK/DSH candidate hashes for business-supplied authorization names. New
+names are optional: an old SDK reports `unsupported`, a missing business name reports `missing`,
+and neither blocks the existing tools. A list may show cached display data without claiming it
+is fresh identity evidence. Current names and cache-write status remain separate from scope,
+credential, archive and business errors. Existing v1/v2 records need no conversion or new labels;
+names never replace their original key, binding or Session. See the
+[display contract](AGENT_CLIENT_CONTRACT.md#unreleased-authorization-subject-display).
+
 ## Unreleased cross-system candidate
 
 Requires matching candidate Core, SDK and DSH sources; the released version numbers below are

@@ -191,7 +191,7 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
       current: async () => currentProfile,
     },
     credentialStore: (key) => stores.get(key),
-    load: async (key) => stores.get(key).load(),
+    load: async (key) => ({ profile: profiles.find((profile) => profile.connectionKey === key), credentials: await stores.get(key).load() }),
   }
   const config = { hubUrl, clientAppId: 'dsh_client', workspace: 'demo', connectionName: 'Store A' }
   const transport = sdk.createAgentClientTransport({ ...config, allowInsecureHttp: true }, {
@@ -213,8 +213,14 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
   const directoryLine = assembly.sections.flatMap((section) => section.text.split('\n'))
     .find((line) => line.startsWith('Authorization directory: '))
   assert.ok(directoryLine, serverErrors.map(String).join('\n'))
-  const refs = Object.fromEntries(JSON.parse(directoryLine.slice('Authorization directory: '.length))
-    .map((entry) => [entry.label, entry.authorization_ref]))
+  const directory = JSON.parse(directoryLine.slice('Authorization directory: '.length))
+  assert.ok(directory.every((entry) => entry.subject_display === null && entry.label === 'Authorization name pending sync'))
+  // The installed old SDK supplies no business name. Resolve test targets by
+  // their fixed host-selected keys instead of merging duplicate display labels.
+  const scope = await host.services.get('bailingHubAgentClient').getSessionScope(agent.session.id)
+  const refs = Object.fromEntries(accounts.map((account) => [`Store ${account.label}`,
+    scope.authorizations.find((entry) => entry.connectionKey === account.connectionKey).authorizationRef]))
+  assert.deepEqual(new Set(directory.map((entry) => entry.authorization_ref)), new Set(Object.values(refs)))
   assert.equal(assembly.tools.filter((tool) => tool.name === 'employee_update').length, 1)
   assert.equal(Object.keys(refs).length, 2)
   for (const account of accounts) {
@@ -230,7 +236,8 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
     }, { agent, callId: `sdk-multi-${account.label}`, signal: new AbortController().signal })
     const decoded = result
     assert.equal(decoded.authorization_ref, refs[`Store ${account.label}`])
-    assert.equal(decoded.authorization_label, `Store ${account.label}`)
+    assert.equal(decoded.authorization_label, 'Authorization name pending sync')
+    assert.equal(decoded.subject_display, null)
     assert.equal(decoded.result.state, 'executed', serverErrors.map(String).join('\n'))
   }
   host.emit('session/event', agent.session, {
@@ -294,7 +301,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
       getByAlias: async (alias) => alias === profile.alias ? profile : undefined,
     },
     credentialStore: () => credentialStore,
-    load: async (key) => key === profile.connectionKey ? credentialStore.load() : undefined,
+    load: async (key) => key === profile.connectionKey ? { profile, credentials: await credentialStore.load() } : undefined,
   }
   const requests = []
   const fetchImpl = async (url, init = {}) => {

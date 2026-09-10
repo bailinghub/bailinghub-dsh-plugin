@@ -11,6 +11,12 @@ The candidate can also explain what each selected business system is for before 
 tools, using descriptions maintained by its administrator. These descriptions do not grant
 permissions; actual actions still depend on the account's authorized capabilities.
 
+With the matched authorization-subject-display candidate, a completed authorization also carries
+the name supplied by the business backend, such as a team, organization or project. The host can
+show it automatically, separately from the product description. Missing names show “Authorization
+name pending sync”; duplicate names and renames keep their original authorizations and history.
+See the [display contract](docs/AGENT_CLIENT_CONTRACT.md#unreleased-authorization-subject-display).
+
 Ask your local DeepSeek Harness Agent to work with a business system connected to BailingHub:
 find records, update allowed fields, and follow the system's existing approval rules.
 BailingHub records which authorization was used and what each business action returned.
@@ -50,6 +56,8 @@ Token, signing secret, or model-provider key into this plugin's settings or chat
 
 ## Choose the accounts for each conversation
 
+The published 0.4.0 baseline uses local labels as described below; the matched display candidate
+uses business-supplied names for current target descriptions while preserving local selectors.
 Authorize each account separately through the original business authorization page. Give each
 connection a clear local name, such as `Store A` and `Store B`, and verify the actual identity on
 that page. The name is a label you provide; it does not prove identity or grant permission.

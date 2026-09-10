@@ -259,7 +259,8 @@ test('system metadata refresh does not change frozen scope revision or labels', 
   end(f)
   f.changeRevision('b'.repeat(64))
   f.entries[0].connectionName = 'A different user-editable label'
-  assert.ok(directory(await begin(f, 2)).every((item) => item.metadata_revision === 'b'.repeat(64) && item.label === 'Same local label'))
+  assert.ok(directory(await begin(f, 2)).every((item) => item.metadata_revision === 'b'.repeat(64) &&
+    item.label === 'Authorization name pending sync' && item.subject_display_status === 'unsupported'))
   assert.deepEqual(await f.scopeStore.load(f.session.id), snapshot)
 })
 

@@ -2,6 +2,10 @@
 
 ## Unreleased - cross-system conversation candidate
 
+- Show the business-supplied name of an authorized organization, account, project or other subject
+  separately from its product's purpose. Keep local connection selectors independent and explicitly
+  identify missing names, unsupported metadata and cached display data. Renames and duplicate names
+  preserve original scope, Session, invocation and archive identities and historical labels.
 - Understand each selected system's purpose before searching its tools. Read administrator-managed
   descriptions using the original authorization binding, consistently for one account, multiple
   accounts in one system, or multiple systems. Descriptions grant no permissions and create no runs.

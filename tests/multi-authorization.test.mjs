@@ -189,6 +189,8 @@ function createFixture(options = {}) {
         sessionId: sessionIds.get(key),
         workspace: config.workspace,
         connectionKey: key,
+        subjectDisplay: { name: key === KEY_A ? 'Store A' : 'Store B' },
+        subjectDisplayStatus: 'provided', subjectDisplaySource: 'verified',
       }
     },
     startTurn: async (input, metadata) => {

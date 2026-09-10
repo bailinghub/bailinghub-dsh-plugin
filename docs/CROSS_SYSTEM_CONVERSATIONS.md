@@ -25,8 +25,9 @@ conversation audit still share the visible conversation.
 An administrator can provide each connected system's name, short purpose, usual business areas
 and boundaries in BailingHub. The Agent reads these descriptions for the selected accounts before
 its first capability search. For example, it can distinguish service scheduling from inventory
-management without a client-specific product dictionary. Local account names remain display
-labels, not verified system identity.
+management without a client-specific product dictionary. Business-supplied subject names identify
+the particular organization, project or other authorized subject for display. They are separate
+from product purpose and do not prove identity or grant permissions.
 
 A description says what the product usually does. The actual tools and permissions still come
 from authorized capability discovery. “Not loaded” means the tools have not been requested yet;
@@ -40,9 +41,10 @@ neither condition selects another account. A later turn reads the original targe
 
 ### Select the accounts
 
-1. Authorize each target separately and give it a clear local name, such as `Cashier — Store A`
-   and `CRM — Store A`. Verify the account on the business authorization page; a local label is
-   not proof of business identity or a mapping between two systems.
+1. Authorize each target separately and verify the intended subject on the business authorization
+   page. With the matched display candidate, the backend supplies its name automatically. A local
+   connection selector remains independent; missing names show “Authorization name pending sync”.
+   Names do not prove a mapping between two systems or distinguish duplicate-named subjects.
 2. In a new conversation, use `/bailinghub connections list`, then
    `/bailinghub scope set <cashier-connection-key> <crm-connection-key>`.
 3. Wait for successful confirmation before sending the first message. Start with a precise
@@ -108,7 +110,8 @@ installing this plugin does not migrate or deploy the Hub.
 
 接入方可以在中枢维护系统名称、简短用途、典型业务方向和边界。助手在首次搜索工具前就能看到本会话所选系统
 的介绍，例如分清“预约服务”和“库存管理”，不需要每个客户端分别写死产品词典。同系统的多个账号也会显示
-相同的系统归属；用户给授权起的名字仍只是展示标签。
+相同的系统归属。配套展示候选单独提供业务授权主体的名称，用于表示具体的组织、账号、项目等；名称不证明身份，
+也不增加权限。
 
 系统介绍说明产品通常做什么，实际能做什么仍取决于此授权的能力查询和原有权限规则。“尚未加载”表示还未
 查询工具，不表示没有能力。介绍缺失、旧版本不支持或介绍请求暂时失败时，可继续使用原有的授权工具搜索。
@@ -117,7 +120,8 @@ installing this plugin does not migrate or deploy the Hub.
 如果服务端明确报告所选工作空间不可用，目录会显示“不可用”并保留原选择；无法确定的网络失败显示“未知”。
 两者都不会自动切换授权，后续轮次仍查询原目标。
 
-先分别授权并取好名字，例如“收银 A 店”“CRM A 店”，再新建会话，使用上面的 scope 命令选中两份固定授权。
+先分别授权并在业务授权页确认对象。配套展示候选由业务后端提供主体名称；名称缺失时明确显示“授权名称待同步”，
+内部连接标识独立保留。再新建会话，使用上面的 scope 命令选中两份固定授权。
 等选择成功后，再明确提出操作对象和要做的事。首次消息后范围固定；需要增减系统时新建会话。
 
 如果收银里的 A 店与 CRM 中的某个组织需要关联，应使用已经确认的业务映射，或由用户明确确认。
