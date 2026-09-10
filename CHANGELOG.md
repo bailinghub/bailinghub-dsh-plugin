@@ -25,6 +25,7 @@ See [scenarios and upgrade preparation](docs/NEXT_RELEASE.md): check inventory, 
   refuse the new mode while retaining existing same-system behavior.
 - This is a source candidate, with unchanged package version metadata. Use the exact candidate
   sources and package hashes. It is not a public release or a durable multi-system workflow engine.
+- Update the transitive Hono lock entry to 4.13.7 for upstream fixes; public SDK pins and package versions remain unchanged.
 
 ## 0.4.0 - 2026-09-08
 
