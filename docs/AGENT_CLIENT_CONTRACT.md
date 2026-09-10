@@ -1,5 +1,163 @@
 # Agent Client Host Adapter Contract
 
+## Unreleased authorization subject display
+
+The business backend may supply `subject_display: { name }` for the subject actually approved by
+the user. A subject can be an organization, account, project, department, workspace or another
+business entity; the upstream contract does not prescribe a store or any particular product.
+The name is display data, separate from both trusted authorization identity and `system_info`
+(the product's purpose). Only the trusted business backend supplies this name; the DSH model,
+local alias, device label and principal identifiers are not sources for it.
+
+The matched SDK exposes these additive fields on `login`, `status` and every `connectionsList`
+entry, and the plugin passes them to its host:
+
+| Field | Meaning |
+| --- | --- |
+| `subjectDisplay` | `{ name: string }`, or `null` when unavailable |
+| `subjectDisplayStatus` | `provided`, `missing`, `unsupported` or `unavailable` |
+| `subjectDisplaySource` | `verified` after the SDK reads the original Session, `cache` for display-only local data, otherwise `none` |
+| `subjectDisplayCacheStatus` | SDK auxiliary cache outcome: `saved`, `storage_error` or `not_cached` |
+| `displayLabel` | Plugin presentation label: the provided name, otherwise `Authorization name pending sync` |
+
+Names are trimmed, nonempty, at most 120 UTF-16 code units, with C0/C1 controls and Unicode line
+separators U+2028/U+2029 and unpaired surrogate code units rejected. Valid Unicode emoji are
+preserved. Only the `name` field enters model assembly. A matching name
+does not establish an identity or a business relationship. Cached display data proves no current
+authorization; a real identity-validation failure still blocks the complete original scope.
+An old SDK without these fields yields `unsupported`; a supported response without a name yields
+`missing`. Neither condition prevents the existing authorized tools from working. A display-cache
+write error stays auxiliary and cannot replace a scope/archive `storage_error` or `recovery_gap`.
+
+Custom hosts may omit a user-entered remark/name field and render the returned business name.
+Keep the internal `connectionName` selector and fixed `connectionKey` independently; do not rename,
+merge or recreate credentials because two subjects have the same name or an existing subject is
+renamed. A host may combine a separately trusted product name with this subject name for display.
+When unavailable, localize the generic pending-name message; never guess the name from a product
+description, local alias, principal identifier or list order. Older hosts can keep their current
+connection-management UI unchanged.
+
+`setSessionScope`, `getSessionScope` and `restoreSessionScope` add `subjectDisplay`,
+`subjectDisplayStatus` and `subjectDisplaySource` to each visible authorization. The legacy `label`
+is the frozen historical value: newly selected scopes capture the supplied name (or the generic
+pending-name label), while existing stored labels remain byte-for-byte unchanged. Hosts should
+render the new display fields for current names, not reinterpret an old `label` as verified metadata.
+
+After the whole scope is validated, current display fields are held separately in coordinator
+memory. They do not enter binding comparisons, persisted v1/v2 scope records or archive identity.
+Single, same-system and cross-system model directories include `subject_display`,
+`subject_display_status` and `subject_display_source`, separately from `system_description` and
+`metadata_status`. The current directory `label` and attributed tool-result label use this display
+projection; the original `authorization_ref` remains the only model target selector.
+Scope revalidation refreshes current names without changing the selected members, original Agent
+Sessions, frozen scope revision, historical labels, visible events or archive context. Normal archive
+ACK writes continue their existing CAS sequence; display refresh itself writes no archive record.
+
+## Unreleased system descriptions
+
+The matched Core/SDK candidate adds optional `transport.getSystemInfo({ connectionKey,
+workspace, expectedBinding, signal })`. After the entire selected scope has passed identity
+validation and before first model assembly, the adapter reads one description for each original
+selected member. Requests include the original Hub/Client/workspace/Agent Session binding and
+never user text, tools, or a run identifier. They do not create business runs or load business
+context. Single, same-system multi-authorization and cross-system conversations use the same
+description projection. The existing same-system first-turn run policy remains unchanged.
+
+The response schema is `bailing.agent-system-info.v1`. Only `system.name`, `summary`, `domains`,
+and `boundaries`, their metadata status/revision, and availability enter the model directory.
+System references derive from the verified binding, including for a single authorization or
+same-system group. Product purpose describes typical use; it does not grant an action or prove
+that any tool is enabled. `not_loaded` means not yet loaded, not no capabilities. Product purpose,
+authorization limits, tool loading and availability remain separate fields.
+
+Descriptions are data, not executable model instructions. Missing configuration, an absent SDK
+method, an unsupported old Core or a temporary metadata failure degrades description fields to
+unknown without changing existing capability search. A 401/403 or changed response binding
+blocks the original whole scope. Scope storage errors retain their existing priority. No description
+is persisted in the scope, Session events or archive outbox; each turn reloads against the original
+complete binding, so mutable labels or another runtime cannot supply stale system identity.
+Cancelled or superseded requests cannot publish late metadata or reactivate business tools.
+
+An exact HTTP 404 `route_unavailable` is different from unknown metadata: the selected target
+remains in the directory with `metadata_status: "unknown"`, `availability: "unavailable"` and
+directory-only `availability_reason: "route_unavailable"`. It is not old-version unsupported or
+an authorization grant/revocation. Other ambiguous failures stay unknown. The Core wire's
+`unavailable_reason` still accepts only the documented runtime/direct-switch reasons. A later
+turn retries the same original binding and clears the directory reason after successful lookup.
+
+Hosts keep the existing scope/restore/archive interfaces. The scope view now consistently includes
+`clientAppId` and `systemRef` for all selected authorizations; this is additive and does not change
+stored v1/v2 records. No local hard-coded product dictionary or extra body-reporting channel is
+required. A host may keep a separately controlled fallback when metadata is unavailable, but must
+not infer identity from local labels or expand the selected scope.
+
+## Unreleased cross-system extension
+
+This source candidate extends the released baseline below. It requires the matching SDK and
+Core candidates; unchanged package version metadata does not identify the feature. Existing
+same-system behavior, signatures and v1 records remain supported.
+
+The host selects fixed connection keys from one normalized Hub. Different Client Apps or
+workspaces form different capability sources. Each target must have a distinct original Agent
+Session; two selected routes sharing a Session are rejected. A scope never expands to another Hub,
+registry default, newly added connection, or surviving subset after one member is lost.
+
+Cross-system scope uses persisted `bailing.agent-session-scope.v2` with shared `binding: { hubUrl }`
+and `authorizations` containing `{ connectionKey, sessionId, label, workspace, clientAppId }`.
+The host view keeps `bailing.agent-session-scope.v1` and adds `targetMode: "multi_system"` and
+per-authorization `clientAppId`/`systemRef`. Existing `authorizationRef`, key and lifecycle fields
+retain their meaning. System references are opaque identifiers for capability sources; labels
+remain descriptive data, not business identity or object mappings. The subject-display extension
+above separates current business names from historical local labels.
+
+Selection/restoration verifies the whole original group and calls SDK
+`getConversationArchiveCapabilities({ members })`. Support requires
+`schema: "bailing.agent-conversation-audit-capabilities.v1"`, `cross_binding_members: true`
+and `member_bindings: "session-client-route.v1"`. Missing support produces
+`CROSS_SYSTEM_SCOPE_UNSUPPORTED` and no cross-system business run. Temporary discovery failures
+remain retryable under the original selection; confirmed authorization replacement remains blocked.
+
+Initial prompt assembly registers the target directory, capability search and known-invocation
+recovery tools, without starting any business run. In this mode `search_business_capabilities`
+requires `{ authorization_ref, query, limit? }`. Its bounded query (up to 500 characters) is the
+task projection passed as `userInput` to that target's first `startTurn` in the current turn.
+The original visible user text stays in the independent archive. Subsequent searches reuse that
+target's run. Omission/unknown target fails before dispatch; another selected target is not
+started merely because its authorization is available. Authorization and archive membership checks
+may still inspect the full original set.
+
+Tools are grouped only by capability-source binding and complete declaration. Host-issued
+`bh_...` aliases keep same-named tools from different sources separate, even with identical schemas.
+Each alias enumerates only its own `authorization_ref` values and wraps unchanged business
+`arguments`. The server receives the original tool name. Revisions, invocation IDs, argument
+snapshots and original target bindings remain fixed on replay. The SDK receives host-only
+`expectedBinding: { hubUrl, clientAppId, workspace, sessionId }` together with an explicit key
+on status and all business calls. Model arguments cannot replace these fields.
+Explicit search prioritizes that target's results inside the existing twelve-tool budget;
+same-named capabilities on earlier targets cannot permanently crowd it out.
+
+Recovery accepts only a known original invocation. When needed in a later live turn, it opens
+only that original target's run with a recovery-specific input and resumes the original invocation;
+it does not call the business action again. It does not restore invocation state after process restart.
+Cancellation and superseding turns cannot register tools or dispatch a new write from a late start.
+Each cross-system turn owns an AbortSignal combined with the host's signal. SDK dispatch checks
+that signal after local IO and before HTTP; an in-flight write with an unknown outcome keeps its
+original invocation identity. Completion summaries and archive upload are separate from business
+dispatch cancellation and may still synchronize after a turn ends.
+
+Cross-system archives use `bailing.agent-conversation-outbox.v2`. Context binding is `{ hubUrl }`;
+each member retains `{ connectionKey, hubUrl, clientAppId, workspace, expectedSessionId, label }`.
+Event/ACK schemas, random archive identity, source hashes, ordering, local capture-gap reporting
+and CAS semantics remain unchanged. The SDK uses explicit cross-binding create v2 and each
+member's own credential to confirm; the Core verifies each original app/route/Session and run link.
+The full transcript remains available only through the management audit read boundary.
+
+Query minimization, object mapping and step planning are Agent responsibilities. The runtime
+enforces target/tool/invocation authority; it does not establish a deterministic dependency DAG,
+cross-system transaction, automatic rollback or field-level data-transfer policy. Business systems
+continue owning their capabilities, permission checks, approvals and data semantics. See the
+[user and host guide](CROSS_SYSTEM_CONVERSATIONS.md).
+
 Status: native Agent Client contract for `dsh-bailinghub@0.4.0`, paired with
 `bailinghub-mcp-server@0.4.0` and recommended BailingHub Core `0.6.1` (minimum API version
 `0.6.0`). This contract is separate from the legacy static `0.1.x` path. Version 0.3.0 supported user-managed connections but did not include
@@ -125,8 +283,9 @@ frozen scope unchanged. The host must open a new conversation, not treat that re
 successful selection of the requested keys. Revision values may advance more than once
 during selection; always use the returned value for the next compare-and-swap request.
 
-Each returned `authorizations` entry has exactly the public host-facing fields
-`{ authorizationRef, connectionKey, label, workspace }`. The selection accepts at most 64 unique
+Each same-system `authorizations` entry has the public host-facing fields
+`{ authorizationRef, connectionKey, label, workspace }`; cross-system candidate entries add the
+fields documented above. The selection accepts at most 64 unique
 connection keys. The trusted host owns `sessionId`: it must remain stable when reopening the same
 conversation and be unique within that store's namespace. Do not let the model or an untrusted
 client choose another conversation's id, edit scope records, or control the storage namespace.

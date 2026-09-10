@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — shop and inventory in one conversation
+
+See [scenarios and upgrade preparation](docs/NEXT_RELEASE.md): check inventory, update a shop price and follow the listing result or approval. Business tools and confirmed product mappings are prerequisites.
+
+- Show the business-supplied name of an authorized organization, account, project or other subject
+  separately from its product's purpose. Keep local connection selectors independent and explicitly
+  identify missing names, unsupported metadata and cached display data. Renames and duplicate names
+  preserve original scope, Session, invocation and archive identities and historical labels.
+- Understand each selected system's purpose before searching its tools. Read administrator-managed
+  descriptions using the original authorization binding, consistently for one account, multiple
+  accounts in one system, or multiple systems. Descriptions grant no permissions and create no runs.
+- Distinguish unknown or not-yet-loaded capabilities from unavailable services. Missing metadata
+  and older metadata APIs preserve existing business flows; identity failures still block the whole
+  scope. Cancelled description requests cannot replace a newer turn's directory.
+- Select authorized targets from different applications or workspaces on one Hub in the same
+  conversation. The Agent discovers each target's capabilities only when needed; unrelated
+  targets do not automatically receive the full user turn or load their context.
+- Keep same-named capabilities from different systems separate. Each call and recovery retains
+  its original connection, application, workspace, Session, run and invocation.
+- Keep one visible conversation archive with independently verified target members. Persist
+  cross-system scope/outbox v2 while retaining same-system v1 snapshots and APIs.
+- Require explicit SDK/Core capability support for cross-system scope. Older combinations
+  refuse the new mode while retaining existing same-system behavior.
+- This is a source candidate, with unchanged package version metadata. Use the exact candidate
+  sources and package hashes. It is not a public release or a durable multi-system workflow engine.
+- Update the transitive Hono lock entry to 4.13.7 for upstream fixes; public SDK pins and package versions remain unchanged.
+
 ## 0.4.0 - 2026-09-08
 
 ### For users

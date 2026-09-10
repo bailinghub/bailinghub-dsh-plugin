@@ -61,7 +61,8 @@ test('executes shared authorization envelopes in real DSH before and after scope
     }),
     status: async (metadata) => {
       const account = accountFor(metadata)
-      return { state: 'authorized', workspace: 'demo', connectionKey: account.connectionKey, sessionId: account.sessionId }
+      return { state: 'authorized', workspace: 'demo', connectionKey: account.connectionKey, sessionId: account.sessionId,
+        subjectDisplay: { name: `Store ${account.label}` }, subjectDisplayStatus: 'provided', subjectDisplaySource: 'verified' }
     },
     startTurn: async (_input, metadata) => {
       const account = accountFor(metadata)

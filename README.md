@@ -2,6 +2,10 @@
 
 [简体中文](docs/README.zh-CN.md) | English
 
+> **Unreleased source:** ask “Check tumbler stock, then change the corresponding shop product to 59 and list it.” The next plugin can use separate shop and inventory authorizations on one Hub, understand their purposes, and show business-supplied authorization names. Each action still requires the corresponding business capability and approval; product mappings must be confirmed.
+> Published Core 0.6.1 / SDK and plugin 0.4.0 do not include these extensions. The current lockfile retains the released SDK; cloning the plugin alone is insufficient.
+> [Changes and upgrade preparation](docs/NEXT_RELEASE.md). The installation instructions below remain the stable same-system baseline.
+
 Ask your local DeepSeek Harness Agent to work with a business system connected to BailingHub:
 find records, update allowed fields, and follow the system's existing approval rules.
 BailingHub records which authorization was used and what each business action returned.
@@ -41,6 +45,8 @@ Token, signing secret, or model-provider key into this plugin's settings or chat
 
 ## Choose the accounts for each conversation
 
+The published 0.4.0 baseline uses local labels as described below; the matched display candidate
+uses business-supplied names for current target descriptions while preserving local selectors.
 Authorize each account separately through the original business authorization page. Give each
 connection a clear local name, such as `Store A` and `Store B`, and verify the actual identity on
 that page. The name is a label you provide; it does not prove identity or grant permission.

@@ -128,6 +128,13 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
         assert.equal(body.content.includes(`STORE_${account.label === 'A' ? 'B' : 'A'}_ONLY_RESULT`), false)
         assert.equal(body.content.includes('COMBINED_LOCAL_REPLY'), false)
         result = { schema: 'bailing.agent-run-completion.v1', run_id: account.runId, status: body.status }
+      } else if (path === '/agent-api/v1/workspaces/demo/system-info') {
+        // Optional descriptions are absent on this baseline Core fixture.
+        assert.equal(request.method, 'GET')
+        assert.equal(body, undefined)
+        response.writeHead(404, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ error: 'not_found' }))
+        return
       } else if (path.startsWith('/agent-api/v1/conversation-audits')) {
         // This fixture represents the baseline Core without the optional audit
         // endpoint. Candidate SDKs may probe it; business evidence is unchanged.
@@ -184,7 +191,7 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
       current: async () => currentProfile,
     },
     credentialStore: (key) => stores.get(key),
-    load: async (key) => stores.get(key).load(),
+    load: async (key) => ({ profile: profiles.find((profile) => profile.connectionKey === key), credentials: await stores.get(key).load() }),
   }
   const config = { hubUrl, clientAppId: 'dsh_client', workspace: 'demo', connectionName: 'Store A' }
   const transport = sdk.createAgentClientTransport({ ...config, allowInsecureHttp: true }, {
@@ -206,8 +213,14 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
   const directoryLine = assembly.sections.flatMap((section) => section.text.split('\n'))
     .find((line) => line.startsWith('Authorization directory: '))
   assert.ok(directoryLine, serverErrors.map(String).join('\n'))
-  const refs = Object.fromEntries(JSON.parse(directoryLine.slice('Authorization directory: '.length))
-    .map((entry) => [entry.label, entry.authorization_ref]))
+  const directory = JSON.parse(directoryLine.slice('Authorization directory: '.length))
+  assert.ok(directory.every((entry) => entry.subject_display === null && entry.label === 'Authorization name pending sync'))
+  // The installed old SDK supplies no business name. Resolve test targets by
+  // their fixed host-selected keys instead of merging duplicate display labels.
+  const scope = await host.services.get('bailingHubAgentClient').getSessionScope(agent.session.id)
+  const refs = Object.fromEntries(accounts.map((account) => [`Store ${account.label}`,
+    scope.authorizations.find((entry) => entry.connectionKey === account.connectionKey).authorizationRef]))
+  assert.deepEqual(new Set(directory.map((entry) => entry.authorization_ref)), new Set(Object.values(refs)))
   assert.equal(assembly.tools.filter((tool) => tool.name === 'employee_update').length, 1)
   assert.equal(Object.keys(refs).length, 2)
   for (const account of accounts) {
@@ -223,7 +236,8 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
     }, { agent, callId: `sdk-multi-${account.label}`, signal: new AbortController().signal })
     const decoded = result
     assert.equal(decoded.authorization_ref, refs[`Store ${account.label}`])
-    assert.equal(decoded.authorization_label, `Store ${account.label}`)
+    assert.equal(decoded.authorization_label, 'Authorization name pending sync')
+    assert.equal(decoded.subject_display, null)
     assert.equal(decoded.result.state, 'executed', serverErrors.map(String).join('\n'))
   }
   host.emit('session/event', agent.session, {
@@ -287,7 +301,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
       getByAlias: async (alias) => alias === profile.alias ? profile : undefined,
     },
     credentialStore: () => credentialStore,
-    load: async (key) => key === profile.connectionKey ? credentialStore.load() : undefined,
+    load: async (key) => key === profile.connectionKey ? { profile, credentials: await credentialStore.load() } : undefined,
   }
   const requests = []
   const fetchImpl = async (url, init = {}) => {
@@ -312,6 +326,13 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
       })
     }
     if (path === '/agent-api/v1/workspaces/demo/turns') return jsonResponse(turnResponse())
+    if (path === '/agent-api/v1/workspaces/demo/system-info') return jsonResponse({
+      schema_version: 'bailing.agent-system-info.v1',
+      binding: { client_app_id: profile.clientAppId, session_id: credentials.session_id, workspace: profile.workspace },
+      metadata_status: 'configured', revision: 'a'.repeat(64),
+      system: { name: 'Service scheduling', summary: 'Coordinate appointments and service delivery.', domains: ['Appointments'], boundaries: ['Use only permitted account actions.'] },
+      tool_status: 'not_loaded', availability: 'unknown',
+    })
     if (path === '/agent-api/v1/workspaces/demo/capabilities/search') {
       return jsonResponse({
         schema: 'bailing.agent-capability-search.v1',
@@ -381,7 +402,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
     turn: 1,
     message: userMessage('real-sdk-user-message', 'Update employee 42.'),
   })
-  await host.waterfall(
+  const initial = await host.waterfall(
     'system-prompt/assemble',
     baseAssembly(),
     { agent, signal: new AbortController().signal },
@@ -426,7 +447,14 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
   await settle()
 
   assert.equal(requests.every((request) => request.authorized), true)
-  const businessRequests = requests.filter((request) => request.path.startsWith('/agent-api/') && !request.path.startsWith('/agent-api/v1/conversation-audits'))
+  const descriptionRequests = requests.filter((request) => request.path.endsWith('/system-info'))
+  if (typeof transport.getSystemInfo === 'function') {
+    assert.equal(descriptionRequests.length, 1)
+    assert.equal(descriptionRequests[0].method, 'GET')
+    assert.equal(descriptionRequests[0].body, undefined)
+    assert.match(JSON.stringify(initial), /Service scheduling/)
+  }
+  const businessRequests = requests.filter((request) => request.path.startsWith('/agent-api/') && !request.path.startsWith('/agent-api/v1/conversation-audits') && !request.path.endsWith('/system-info'))
   assert.ok(requests.some((request) => request.path === '/agent-auth/v1/session'))
   assert.deepEqual(businessRequests.map((request) => request.path), [
     '/agent-api/v1/workspaces/demo/turns',

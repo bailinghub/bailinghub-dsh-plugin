@@ -39,6 +39,7 @@
     "cordis.agent-client.patch.yml",
     "cordis.patch.yml",
     "docs/AGENT_CLIENT_CONTRACT.md",
+    "docs/CROSS_SYSTEM_CONVERSATIONS.md",
     "docs/GETTING_STARTED.md",
     "docs/GETTING_STARTED.zh-CN.md",
     "docs/MIGRATION_VNEXT.md",

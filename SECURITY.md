@@ -4,6 +4,26 @@ Report vulnerabilities through a private GitHub Security Advisory in this reposi
 Do not put tokens, private deployment URLs, personal information, or raw business payloads
 in a public issue.
 
+## Unreleased cross-system candidate
+
+Different applications/workspaces may participate only through a frozen same-Hub target set,
+with a distinct original Session per target. Capability support must be explicitly negotiated;
+unsupported Core/SDK combinations cannot start cross-system business runs. Each member keeps
+its own app/workspace binding, credential checks, approval rules and original invocations.
+The SDK verifies the full expected binding before target HTTP dispatch, including refresh.
+
+Capability search requires an explicit target and sends a model-authored, task-specific query;
+it cannot fan out to all systems by omitting a selector. Identical tool names or schemas in
+different systems do not establish shared semantics. Scoped aliases map back to an immutable
+original capability and an allowed authorization set. The host enforces target membership;
+it does not automatically prove the business meaning of model-generated queries or arguments.
+
+All original members must remain valid. Temporary validation failure closes a retryable gate;
+confirmed identity replacement or revocation blocks the complete selection. Cancellation and
+late responses cannot reactivate ended-turn tools. Scope/outbox v2 retains original membership,
+event IDs and CAS; a downgrade cannot reinterpret that state as v1. Full transcript reading
+remains in the Hub's management audit boundary, not an individual member's Agent bearer.
+
 ## Public legacy 0.1.x boundary
 
 This bundle contributes configuration only. It has no custom runtime JavaScript, production

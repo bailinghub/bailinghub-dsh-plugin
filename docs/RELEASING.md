@@ -1,5 +1,9 @@
 # Releasing
 
+## Writing release notes
+
+For each release, lead with a common business scenario and explain the previous limitation, new behavior, affected roles, exact upgrade steps, observable checks and limits. Prefer shop/product/inventory examples; state which business APIs and mappings must already exist. Distinguish newly added features from existing behavior and fixes. Keep English and Chinese facts aligned. Use [the next-release notes](NEXT_RELEASE.md) as the current example, then freeze versions and package instructions only when the artifacts are ready.
+
 ## Release units and order
 
 The Agent Client spans three independently versioned release units. Publish and verify them in
