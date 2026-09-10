@@ -2,7 +2,7 @@
 
 ## Writing release notes
 
-For each release, lead with a common business scenario and explain the previous limitation, new behavior, affected roles, exact upgrade steps, observable checks and limits. Prefer shop/product/inventory examples; state which business APIs and mappings must already exist. Distinguish newly added features from existing behavior and fixes. Keep English and Chinese facts aligned. Use [the next-release notes](NEXT_RELEASE.md) as the current example, then freeze versions and package instructions only when the artifacts are ready.
+For each release, lead with a common business scenario and explain the previous limitation, new behavior, affected roles, exact upgrade steps, observable checks and limits. Prefer shop/product/inventory examples; state which business APIs and mappings must already exist. Distinguish newly added features from existing behavior and fixes. Keep English and Chinese facts aligned. Use [the 0.5.0 release notes](RELEASE_NOTES_v0.5.0.md) as the current example, then freeze versions and package instructions only when the artifacts are ready.
 
 ## Release units and order
 
@@ -30,13 +30,13 @@ its package, or silently reinterpret its Client Token and Hub-orchestrated seman
 
 ## Public manifest gates
 
-The stable `0.4.0` manifest is publishable and must retain all of these properties:
+The stable `0.5.0` manifest is publishable and must retain all of these properties:
 
 ```text
-version: 0.4.0
+version: 0.5.0
 publishConfig.access: public
 publishConfig.provenance: true
-dependency: bailinghub-mcp-server@0.4.0 (exact ordinary dependency)
+dependency: bailinghub-mcp-server@0.5.0 (exact ordinary dependency)
 ```
 
 For every public prerelease or stable version:
@@ -45,7 +45,7 @@ For every public prerelease or stable version:
 2. Place one exact compatible `bailinghub-mcp-server` version in ordinary `dependencies`.
 3. Keep the SDK out of `peerDependencies`, `peerDependenciesMeta`, and
    `optionalDependencies`.
-4. After SDK 0.4.0 is publicly installable, regenerate `package-lock.json` from the registry; both
+4. After SDK 0.5.0 is publicly installable, regenerate `package-lock.json` from the registry; both
    its root dependency and resolved package version must equal the exact manifest value. Never
    invent registry integrity metadata or commit a local tarball dependency. Before that point, a
    local exact SDK tarball can validate source behavior, but is not the final release lock or
@@ -192,11 +192,16 @@ In the isolated DSH Web profile:
 12. Explicitly select both independently authorized identities in one new conversation and verify
     matching tools select the correct original authorization per call. Scope changes after the first
     message require a new conversation; invalid members must not shrink the group or select defaults.
-13. Reopen a saved locked conversation offline, then reconnect in the same runtime. Verify scope
+13. In another new conversation, select a shop and inventory target from different Client Apps or
+    workspaces on the same Hub/audit domain. Verify each original target and same-named tool route,
+    while an unselected target receives no input/context/search/invoke. A selected but unused target
+    must not be marked executed. Verify system descriptions before tool search without creating runs,
+    and duplicate/renamed subject names without replacing identity or archive state.
+14. Reopen a saved locked conversation offline, then reconnect in the same runtime. Verify scope
     restoration and archive retry preserve the original members, identity, events, and acknowledgements.
     A lost upload acknowledgement must retry the same events without duplicating business actions.
     Confirmed revocation and storage conflicts remain blocked; known capture gaps remain visible.
-14. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
+15. Run `/bailinghub logout` and confirm the selected Agent Session is revoked and removed.
 
 Native Code Mode must degrade rather than expose stale or unsafe dynamic schemas. Run the live
 business checks in Native Tool Mode.

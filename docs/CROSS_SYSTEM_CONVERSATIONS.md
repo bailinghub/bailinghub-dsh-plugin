@@ -1,8 +1,8 @@
 # One conversation across business systems
 
-**Unreleased source candidate.** Install the matched candidate Core, SDK and DSH artifacts and
-verify their source commits and package hashes. The package version alone is insufficient;
-published Core 0.6.1 / SDK 0.4.0 / DSH 0.4.0 do not include this extension.
+**Release pairing: Core 0.7.0, SDK 0.5.0 and DSH 0.5.0.** The plugin installs its exact SDK
+dependency. Core 0.6.1 / SDK 0.4.0 / DSH 0.4.0 do not include this extension; upgrade the Hub
+before selecting targets from different systems.
 
 ## What you can do
 
@@ -41,7 +41,7 @@ neither condition selects another account. A later turn reads the original targe
 ### Select the accounts
 
 1. Authorize each target separately and verify the intended subject on the business authorization
-   page. With the matched display candidate, the backend supplies its name automatically. A local
+   page. With a compatible business backend, the backend supplies its name automatically. A local
    connection selector remains independent; missing names show “Authorization name pending sync”.
    Names do not prove a mapping between two systems or distinguish duplicate-named subjects.
 2. In a new conversation, use `/bailinghub connections list`, then
@@ -76,7 +76,7 @@ and the Core's target-member archive extension. Missing support reports
 The matched Core requires an additive database migration through its own deployment process;
 installing this plugin does not migrate or deploy the Hub.
 
-## Limits of this candidate
+## Limits
 
 - One Hub, with independently authorized Sessions for every selected target. Cross-Hub scope
   and multiple selected routes sharing one Agent Session are not supported.
@@ -93,8 +93,8 @@ installing this plugin does not migrate or deploy the Hub.
 
 ## 简体中文
 
-这是尚未发布的源码候选，需要配套的 Core、SDK 和 DSH 候选，并核对提交与包哈希。
-公开的 Core 0.6.1、SDK 0.4.0、DSH 0.4.0 不包含本次扩展，不能只凭版本号判断是否已接入。
+本版配套 Core 0.7.0、SDK 0.5.0 与 DSH 0.5.0，插件会安装精确 SDK 依赖。
+Core 0.6.1、SDK/DSH 0.4.0 不含本次扩展；选择不同系统前先升级中枢。
 
 ### 对使用者有什么变化
 
@@ -109,7 +109,7 @@ installing this plugin does not migrate or deploy the Hub.
 
 接入方可以在中枢维护系统名称、简短用途、典型业务方向和边界。助手在首次搜索工具前就能看到本会话所选系统
 的介绍，例如分清“线上售卖”和“库存管理”，不需要每个客户端分别写死产品词典。同系统的多个账号也会显示
-相同的系统归属。配套展示候选单独提供业务授权主体的名称，用于表示具体的组织、账号、项目等；名称不证明身份，
+相同的系统归属。授权主体展示接口单独提供业务授权主体的名称，用于表示具体的组织、账号、项目等；名称不证明身份，
 也不增加权限。
 
 系统介绍说明产品通常做什么，实际能做什么仍取决于此授权的能力查询和原有权限规则。“尚未加载”表示还未
@@ -119,7 +119,7 @@ installing this plugin does not migrate or deploy the Hub.
 如果服务端明确报告所选工作空间不可用，目录会显示“不可用”并保留原选择；无法确定的网络失败显示“未知”。
 两者都不会自动切换授权，后续轮次仍查询原目标。
 
-先分别授权并在业务授权页确认对象。配套展示候选由业务后端提供主体名称；名称缺失时明确显示“授权名称待同步”，
+先分别授权并在业务授权页确认对象。授权主体展示接口由业务后端提供主体名称；名称缺失时明确显示“授权名称待同步”，
 内部连接标识独立保留。再新建会话，使用上面的 scope 命令选中两份固定授权。
 等选择成功后，再明确提出操作对象和要做的事。首次消息后范围固定；需要增减系统时新建会话。
 
@@ -130,7 +130,7 @@ installing this plugin does not migrate or deploy the Hub.
 
 宿主继续使用现有五个范围与归档接口，不需要另加一条正文上报链路。界面可以按新返回的系统字段分组展示，
 并继续保持“选择成功才允许发首条消息”。内置持久化已支持新记录；自定义存储需要原样保留 v2 的目标绑定、
-原会话身份、事件和修订号。Core 候选需要通过自身发布流程应用新增迁移。
+原会话身份、事件和修订号。Core 0.7.0 需要通过自身升级流程应用未执行的迁移（本次包括 058/059）。
 
 业务后端只需继续声明能力、独立授权并执行原有业务规则；如果用户要做的动作尚未开放，才需要补充该业务能力。
-本候选先解决跨系统选择、调用和完整追溯，不包含周年庆等长任务的持久依赖调度、跨进程恢复或自动回滚。
+本版解决跨系统选择、调用和完整追溯，不包含周年庆等长任务的持久依赖调度、跨进程恢复或自动回滚。

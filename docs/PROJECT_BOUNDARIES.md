@@ -24,7 +24,10 @@ community integration, not an official DeepSeek plugin or partnership.
 ## Public native line (0.2.0 onward)
 
 Version 0.2.0 introduced this dependency path; 0.3.0 added the named connection lifecycle.
-Version 0.4.0 adds explicit same-system conversation scope and visible conversation archiving.
+Version 0.4.0 added explicit same-system conversation scope and visible conversation archiving.
+Version 0.5.0 extends selection across systems on one Hub and audit domain, and adds controlled
+system descriptions and business subject display names. These names do not establish identity or
+product mappings, and cross-system selection does not provide durable task orchestration or rollback.
 All remain separate from the public static MCP path:
 
 ```text
