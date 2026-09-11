@@ -198,7 +198,7 @@ test('coalesces concurrent DSH replays and rejects argument drift for the same c
 
   await assert.rejects(
     definition.execute({ employee_id: '43' }, exec),
-    /changed the original (?:tool or )?arguments/,
+    (error) => error.feedback.category === 'invalid_request' && error.feedback.dispatch === 'not_dispatched',
   )
   assert.equal(callsFor(mock.calls, 'invoke').length, 1)
   assert.equal(callsFor(mock.calls, 'resume').length, 1)

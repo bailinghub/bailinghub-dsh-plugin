@@ -1,5 +1,13 @@
 # Compatibility
 
+## Capability feedback candidate
+
+The additive [capability feedback contract](CAPABILITY_FEEDBACK.md) requires the paired
+Core/SDK/DSH candidate hashes for complete counts and error detail. Package versions
+remain unchanged during private acceptance. Older combinations keep their existing
+business behavior with unknown optional metadata. No new migration is introduced.
+
+
 ## Native Agent Client 0.5.0
 
 | Component | Release pairing / requirement |

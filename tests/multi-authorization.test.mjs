@@ -479,7 +479,7 @@ test('revoking A invalidates the full selected scope without silently reducing i
   await assert.rejects(() => fixture.local.get('tenant_info').execute(
     { authorization_ref: refs.b, arguments: {} },
     execution(fixture.agent, 'blocked-b-in-invalid-scope'),
-  ), /SESSION_SCOPE_UNAVAILABLE/)
+  ), (error) => error.feedback?.code === 'SESSION_SCOPE_UNAVAILABLE' && error.feedback.category === 'authorization_unavailable')
   assert.equal(callsFor(fixture.mock.calls, 'invoke').length, before)
 })
 
@@ -662,7 +662,7 @@ test('authorization status failures redact raw credential errors before they rea
   assert.equal(callsFor(fixture.mock.calls, 'invoke').length, invokeCount)
   await assert.rejects(() => fixture.local.get('tenant_info').execute(
     { authorization_ref: refs.b, arguments: {} }, execution(fixture.agent, 'b-after-a-status-failure'),
-  ), /SESSION_SCOPE_UNAVAILABLE/)
+  ), (error) => error.feedback?.code === 'SESSION_SCOPE_UNAVAILABLE' && error.feedback.category === 'authorization_unavailable')
   assert.equal(callsFor(fixture.mock.calls, 'invoke').length, invokeCount)
 })
 

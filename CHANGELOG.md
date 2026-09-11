@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Explain each search target’s returned candidates separately from the conversation’s
+  currently loaded tools. Keep unknown totals explicit and describe the shared loading limit.
+- Return actionable, safe failure feedback through native DSH dispatch, including retired
+  tool names rejected before the business SDK. Valid loaded tools remain directly callable.
+- Keep an unconfirmed write bound to its original invocation; discovery cannot create
+  a replacement operation. Add read-only feedback seams for custom hosts.
+- See [capability discovery and recovery](docs/CAPABILITY_FEEDBACK.md) for shop/inventory
+  examples, compatibility and exact candidate installation requirements.
+
 ## 0.5.0 - 2026-09-10
 
 ### Shop and inventory in one conversation

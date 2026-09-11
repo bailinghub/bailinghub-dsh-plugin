@@ -420,7 +420,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
   await assert.rejects(() => local.get('resume_governed_tool_invocation').execute(
     { invocation_id: 'b'.repeat(64) },
     { agent, callId: 'sdk-resume-unknown', signal: new AbortController().signal },
-  ), /not bound|unknown|original invocation/i)
+  ), (error) => error.feedback.category === 'invalid_request' && error.feedback.dispatch === 'not_dispatched')
 
   host.emit('session/event', agent.session, {
     type: 'tool/call',
