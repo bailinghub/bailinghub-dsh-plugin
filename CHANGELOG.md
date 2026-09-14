@@ -2,12 +2,14 @@
 
 ## Unreleased
 
+- Honor Hub retry delays after pre-dispatch rate limiting. Long waits retain the original invocation for later recovery; early manual resumes avoid extra requests. Shared quota details stay visible to the model.
+
 - Add an image-first Local Agent attachment space for adapted hosts: list approved conversation
   outputs, upload 1–8 PNG/JPEG/WebP images to an explicitly selected authorization, and reuse
   ready URLs with existing business tools. Persist original upload records for recovery.
 - See [attachment integration](docs/GENERATED_ARTIFACTS.md) for campaign artwork, charts
   and shop examples. Host file access is explicit; upload success and business action results
-  are independent. Known business rate-window and resume-argument limits remain documented.
+  are independent. Business limits and original-call recovery remain independent from attachment delivery.
 
 - Explain each search target’s returned candidates separately from the conversation’s
   currently loaded tools. Keep unknown totals explicit and describe the shared loading limit.

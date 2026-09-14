@@ -60,6 +60,6 @@ const plugin = createAgentClientPlugin({
 
 ## 分开记录的已知限制
 
-Core 当前在出站前可重试拒绝后恢复业务 invocation 时，可能因缺少原完整参数而拒绝继续；小时/日限额折合为每分钟限额也可能限制短时批量操作。这是业务调用治理的待完善项，不代表附件上传或地址返回失败。
+配套 Core 候选已提供可配置的中枢工具限额，小时/日额度按原窗口计数，并为新调用保留加密原参数。DSH 读取 `retry_after_ms`，等待后只恢复原 `invocation_id`；长于自动等待预算时返回 `agent_client_wait.state=rate_limited`，保留等待时间和原调用。手动过早恢复也不向中枢反复请求。原权限、审批、取消和授权目标约束继续生效；旧 Core 不返回提示时仍沿原恢复流程。
 
 当前列表工具的源错误可能经过通用分类变成 unknown_failure；宿主应保留自己检查到的 storage_error/recovery_gap，不能将其描述为空目录。上传工具仍返回逐项错误。不要用新业务调用或重新上传已经 ready 的附件掩盖这些问题。

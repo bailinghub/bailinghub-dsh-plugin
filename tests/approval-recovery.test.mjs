@@ -286,3 +286,48 @@ test('retries only the same invocation for in-progress and retryable pre-dispatc
     [invocationId, invocationId],
   )
 })
+
+test('rate hints pause polling and manual resume retains the original call and authorization', async () => {
+  let now = 0
+  const { mock, agent, local } = await createApprovalRuntime({
+    invoke: async (input) => invocation(input, 'rejected_before_dispatch', {
+      auto_retry_allowed: true, retry_after_ms: 3_600_000,
+      rate_limit: { level: 'tool', count: 120, window_sec: 3600, scope: 'tool_provider_shared', source: 'declaration' },
+    }),
+    resume: async (id) => invocation({ invocationId: id }, 'executed'),
+  }, { now: () => now, sleep: async (ms) => { now += ms } })
+  const result = await local.get('employee_update').execute({ employee_id: '42' }, { agent, callId: 'rate-first', signal: new AbortController().signal })
+  assert.equal(result.agent_client_wait.state, 'rate_limited')
+  assert.equal(result.rate_limit.count, 120)
+  assert.equal(callsFor(mock.calls, 'resume').length, 0)
+  const early = await local.get('resume_governed_tool_invocation').execute({ invocation_id: result.invocation_id }, { agent, callId: 'rate-early', signal: new AbortController().signal })
+  assert.equal(early.agent_client_wait.state, 'rate_limited')
+  assert.equal(callsFor(mock.calls, 'resume').length, 0)
+  now = 3_600_000
+  const completed = await local.get('resume_governed_tool_invocation').execute({ invocation_id: result.invocation_id }, { agent, callId: 'rate-due', signal: new AbortController().signal })
+  assert.equal(completed.state, 'executed')
+  assert.equal(callsFor(mock.calls, 'invoke').length, 1)
+  assert.deepEqual(callsFor(mock.calls, 'resume').map((call) => call.args[0]), [result.invocation_id])
+})
+
+test('short rate waits honor the server delay before resuming', async () => {
+  let now = 0
+  const { mock, agent, local } = await createApprovalRuntime({
+    invoke: async (input) => invocation(input, 'rejected_before_dispatch', { auto_retry_allowed: true, retry_after_ms: 250 }),
+    resume: async (id) => { assert.ok(now >= 250); return invocation({ invocationId: id }, 'executed') },
+  }, { now: () => now, sleep: async (ms) => { now += ms } })
+  const result = await local.get('employee_update').execute({ employee_id: '42' }, { agent, callId: 'rate-short', signal: new AbortController().signal })
+  assert.equal(result.state, 'executed')
+  assert.equal(callsFor(mock.calls, 'invoke').length, 1)
+  assert.equal(callsFor(mock.calls, 'resume').length, 1)
+})
+
+test('cancellation during a rate wait prevents resume even if host sleep resolves', async () => {
+  const controller = new AbortController()
+  const { mock, agent, local } = await createApprovalRuntime({
+    invoke: async (input) => invocation(input, 'rejected_before_dispatch', { auto_retry_allowed: true, retry_after_ms: 250 }),
+  }, { sleep: async () => { controller.abort() } })
+  await assert.rejects(local.get('employee_update').execute({ employee_id: '42' }, { agent, callId: 'rate-cancel', signal: controller.signal }), (error) => error.feedback?.category === 'cancelled')
+  assert.equal(callsFor(mock.calls, 'invoke').length, 1)
+  assert.equal(callsFor(mock.calls, 'resume').length, 0)
+})
