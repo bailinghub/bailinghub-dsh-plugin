@@ -1,0 +1,55 @@
+# 生成图片上传接入（候选）
+
+例如用户让智能体“生成三张商品展示图，再更新商城轮播图”。宿主把生成图片登记在本会话的产物目录里，插件提供目录查询和上传工具，模型选择目标授权及产物编号，中枢保存图片并返回 URL，最后通过原商品能力完成更新。
+
+这是尚未公开发布的候选能力。需要配套 Core / SDK / DSH，并由客户端宿主连接实际生成文件。本插件不内置图片生成服务，不扫描用户电脑，也不接受模型指定的任意本地路径。
+
+## 宿主需要接哪两处
+
+```js
+import { createAgentClientPlugin, createFileArtifactStore } from 'dsh-bailinghub'
+
+const plugin = createAgentClientPlugin({
+  // 保留原 SDK、scopeStore、archiveStore 等配置。
+  artifactSource: {
+    async list({ sessionId }) {
+      // 从本会话已获准的生成产物中读取；只返回元数据，最多 100 项。
+      return [{ artifactRef: 'product-front', name: 'product-front.png',
+        mime: 'image/png', bytes: generatedSize, sha256: generatedDigest }]
+    },
+    async read({ sessionId, artifactRef }) {
+      // 宿主按已登记引用读取获准文件，返回 Uint8Array。
+      // 检查归属、允许目录、符号链接及读取期间文件变化；不要直接拼接模型给出的路径。
+      return generatedBytes
+    },
+  },
+  artifactStore: createFileArtifactStore({ directory: artifactRecoveryDirectory }),
+})
+```
+
+`artifactRef` 是宿主管理的稳定引用，允许字母、数字、下划线和短横线，最多128字符；不可把同一个引用改指另一份生成文件。同名图片可以用不同引用。目录属于真实 DSH Session，重新打开时保持原归属；后台持久化上传元数据目录同样需要跨重启保留。也可实现自有 `artifactStore.get(uploadId)` / `reserve(record)`：reserve 必须原子、只写一次并返回先前记录或新记录，落盘完成才成功返回。内存 store 仅用于测试或明确的临时会话。
+
+未提供 artifactSource 时不会新增模型工具，已有业务流程不变。缺少持久恢复 store 时上传返回 storage_error，并且不会发送文件。
+
+## 模型实际能用的工具
+
+- `list_generated_artifacts`：读取当前会话产物目录，不返回路径或文件正文。
+- `upload_generated_artifacts`：必须明确 `authorization_ref` 与 `artifact_refs` 数组；每批1–8张，单张不超过6MiB，支持PNG/JPEG/WebP。
+
+工具说明会提醒：上传成功不等于商品修改成功；所有必需图片 ready 后再提交完整轮播清单；保留未被要求删除的旧图片；业务结果未知时恢复原 invocation，不能重发写操作。
+
+模型不选择桶或密钥。中枢管理员在“智能体客户端 → 配置接入 → 工具与审批 → 生成图片上传”选择媒体存储。第一期图片用于公开展示；普通COS/OSS或显式本地存储都由部署方管理保留，不增加文件到期判定。
+
+## 失败和重开
+
+每文件上传身份绑定原真实 Session、连接与产物引用，首发前原子保存原 Hub/client/workspace/Agent Session、内容摘要、名称和原会话/轮次/run关联。重试或重开先读取原中枢记录，成功项直接复用 URL；pending 或尚未写入时补传原文件。即使原文件已不可读，已确认成功的上传仍可恢复。
+
+批量结果包含 `results`、`all_ready` 和 `business_operation_performed=false`。每项为 ready、pending 或 blocked。成功项保留，失败项独立处理；不要因部分上传成功就写入残缺图库。
+
+本地持久化失败返回 storage_error；原记录损坏或丢失须由宿主标记恢复缺口，不能猜补原历史。暂时网络失败可以在同一 runtime 重试，保留原记录。任何原授权成员撤销或改绑时整组阻断，不退回默认、子集或替代 Session。取消后迟到上传不会重新注册业务工具或返回可继续执行的轮次；已经保存的对象及原记录仍可在合法恢复时查询。
+
+旧SDK/Core返回artifact_unsupported，保留原业务工具能力。Lazy SDK transport 已转发新增接口，但宿主仍必须实际提供生成文件来源。测试替身与真实对象存储连通性分开验收。
+
+## 业务后端要不要改
+
+如果原商品能力已经接收图片 URL，不必改授权或审批规则。客户端将 ready URL 作为原业务参数传入即可。需要业务自身素材ID、转存或素材库归属时，另接该系统的业务导入能力。

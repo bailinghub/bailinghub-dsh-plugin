@@ -50,7 +50,8 @@
     "CHANGELOG.md",
     "docs/COMPATIBILITY.md",
     "docs/CAPABILITY_FEEDBACK.md",
-    "docs/PROJECT_BOUNDARIES.md"
+    "docs/PROJECT_BOUNDARIES.md",
+    "docs/GENERATED_ARTIFACTS.md"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
