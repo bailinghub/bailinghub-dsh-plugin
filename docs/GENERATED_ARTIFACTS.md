@@ -1,6 +1,8 @@
-# 生成图片上传接入（候选）
+# 本地智能体附件空间：DSH 宿主接入（候选）
 
-例如用户让智能体“生成三张商品展示图，再更新商城轮播图”。宿主把生成图片登记在本会话的产物目录里，插件提供目录查询和上传工具，模型选择目标授权及产物编号，中枢保存图片并返回 URL，最后通过原商品能力完成更新。
+智能体生成的图片可以用于活动海报、内容封面、经营图表，也可以用于商城商品。宿主把当前会话获准使用的图片登记到附件目录，插件提供目录查询和上传工具；模型选择目标授权与附件引用，中枢保存图片并返回 URL，供后续业务工具使用。
+
+首期支持 PNG、JPEG、WebP。附件空间提供会话级目录、上传与上传结果恢复，不把 PDF、Word、视频或完整网盘管理写成已经交付的能力。业务系统需要预先提供相应的图片 URL 接口。
 
 这是尚未公开发布的候选能力。需要配套 Core / SDK / DSH，并由客户端宿主连接实际生成文件。本插件不内置图片生成服务，不扫描用户电脑，也不接受模型指定的任意本地路径。
 
@@ -14,7 +16,7 @@ const plugin = createAgentClientPlugin({
   artifactSource: {
     async list({ sessionId }) {
       // 从本会话已获准的生成产物中读取；只返回元数据，最多 100 项。
-      return [{ artifactRef: 'product-front', name: 'product-front.png',
+      return [{ artifactRef: 'campaign-banner', name: 'campaign-banner.png',
         mime: 'image/png', bytes: generatedSize, sha256: generatedDigest }]
     },
     async read({ sessionId, artifactRef }) {
@@ -36,7 +38,9 @@ const plugin = createAgentClientPlugin({
 - `list_generated_artifacts`：读取当前会话产物目录，不返回路径或文件正文。
 - `upload_generated_artifacts`：必须明确 `authorization_ref` 与 `artifact_refs` 数组；每批1–8张，单张不超过6MiB，支持PNG/JPEG/WebP。
 
-工具说明会提醒：上传成功不等于商品修改成功；所有必需图片 ready 后再提交完整轮播清单；保留未被要求删除的旧图片；业务结果未知时恢复原 invocation，不能重发写操作。
+上传成功后模型直接使用 ready URL，不需要为每次使用重复查询地址或上传。只有不确定的上传结果或会话重开恢复才查询原上传记录。
+
+业务操作独立执行并单独判断结果。例如更新商城轮播图时，所有必需图片 ready 后再提交完整清单，保留未被要求删除的旧图片；业务结果未知时保留原 invocation，不能重发写操作。
 
 模型不选择桶或密钥。中枢管理员在“智能体客户端 → 配置接入 → 工具与审批 → 生成图片上传”选择媒体存储。第一期图片用于公开展示；普通COS/OSS或显式本地存储都由部署方管理保留，不增加文件到期判定。
 
@@ -52,4 +56,10 @@ const plugin = createAgentClientPlugin({
 
 ## 业务后端要不要改
 
-如果原商品能力已经接收图片 URL，不必改授权或审批规则。客户端将 ready URL 作为原业务参数传入即可。需要业务自身素材ID、转存或素材库归属时，另接该系统的业务导入能力。
+如果原业务能力已经接收图片 URL，不必改授权或审批规则。客户端将 ready URL 作为原业务参数传入即可。需要业务自身素材ID、转存或素材库归属时，另接该系统的业务导入能力。
+
+## 分开记录的已知限制
+
+Core 当前在出站前可重试拒绝后恢复业务 invocation 时，可能因缺少原完整参数而拒绝继续；小时/日限额折合为每分钟限额也可能限制短时批量操作。这是业务调用治理的待完善项，不代表附件上传或地址返回失败。
+
+当前列表工具的源错误可能经过通用分类变成 unknown_failure；宿主应保留自己检查到的 storage_error/recovery_gap，不能将其描述为空目录。上传工具仍返回逐项错误。不要用新业务调用或重新上传已经 ready 的附件掩盖这些问题。

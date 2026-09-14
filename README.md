@@ -168,7 +168,7 @@ identity separately. Custom DSH hosts must implement the [scope selection and re
 and display confirmation before the first message. The native slash commands already use those
 APIs. Tool envelopes, persistence, event schemas, and recovery limits are documented in the
 [Agent Client contract](docs/AGENT_CLIENT_CONTRACT.md).
-For the unreleased generated-image upload extension, see [host artifact integration](docs/GENERATED_ARTIFACTS.md).
+For the unreleased Local Agent attachment space (image-first), see [host artifact integration](docs/GENERATED_ARTIFACTS.md). Register approved conversation outputs, upload them once, and use ready URLs with existing business tools.
 
 Use Native Tool Mode. DSH Code Mode is deliberately degraded because it cannot safely present the
 current-turn dynamic schemas. See the [compatibility matrix](docs/COMPATIBILITY.md).

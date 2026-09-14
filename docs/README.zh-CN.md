@@ -138,7 +138,7 @@ DSH 负责思考与工具编排；BailingHub Core 负责可信身份、治理、
 业务系统继续声明原有能力，为每个身份分别授权即可。自定义 DSH 宿主需接入[范围选择与恢复 API](AGENT_CLIENT_CONTRACT.md#host-owned-session-scope-api)，
 在首条消息前显示确认；原生斜杠命令已经使用这些 API。参数结构、持久化和恢复细节见
 [Agent Client 契约](AGENT_CLIENT_CONTRACT.md)。
-生成图片上传候选见[宿主接入说明](GENERATED_ARTIFACTS.md)。
+本地智能体附件空间候选（首期支持图片）见[宿主接入说明](GENERATED_ARTIFACTS.md)：登记当前会话的生成结果，上传保存并取得可供已有业务工具使用的地址。
 
 请使用 Native Tool Mode。DSH Code Mode 无法安全呈现本轮动态工具结构，因此明确降级。
 版本范围见[兼容矩阵](COMPATIBILITY.md)。
