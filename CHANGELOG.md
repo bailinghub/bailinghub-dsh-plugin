@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Let an opted-in host retain complete shop, inventory or other business tool
+  declarations across user messages in the same living Session. Prepare current
+  target context once per user turn; valid exact-name lookups need no additional
+  capability-search request. Ordinary chat starts no business run.
+- Bound the session cache to 64 target-tool pairs and 2 MiB, with a 12-schema
+  presentation window. Separate cached declarations from currently prepared tools;
+  return full schemas and current context through the existing search entry point.
+- A direct unprepared cached call returns preparation only. It creates no business
+  invocation, and replaying its call ID cannot turn it into a write. Current identity,
+  declaration changes, cancellation and original-invocation recovery remain enforced.
+- Keep legacy `active_turn` behavior by default. Hosts explicitly enable
+  `toolLifecycle: 'session'` after handling preparation results. Core and SDK need
+  no additional API for this candidate. See [the integration contract](docs/SESSION_TOOL_REUSE.md).
+
 - Preserve an authoritative `invocation_not_found` response during polling and
   direct recovery. Stop automatic retries and ask for inspection of the original
   execution evidence, without declaring the business action unexecuted or creating

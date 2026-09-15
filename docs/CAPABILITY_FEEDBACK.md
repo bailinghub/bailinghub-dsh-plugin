@@ -16,6 +16,9 @@ For example, an Agent checks warehouse stock and then updates a shop product.
 - Only 12 full schemas are shown at a time; up to 64 discovered business tools remain
   registered and directly callable with their original target and known parameters.
   This is a tool-type budget, not a limit on operations, products or task duration.
+- Hosts can opt into [cross-turn declaration reuse](SESSION_TOOL_REUSE.md) with
+  `toolLifecycle: 'session'`. A cached tool is prepared with current target context
+  before use in a new turn. The default remains `active_turn`.
 - If the shop request was sent but its response is unconfirmed, recover only its
   original invocation. A new search or tool name must not produce another write.
 
@@ -24,7 +27,9 @@ This change adds no stock synchronization, cross-system transaction or rollback.
 
 ## Search result meanings
 
-`search_business_capabilities` keeps its existing parameters. Cross-system search
+The default `search_business_capabilities` keeps its existing parameters. Opt-in
+session mode adds `tool_name` for exact cached declaration preparation and retrieval;
+a broad `query` without `tool_name` still discovers capabilities. Cross-system search
 requires the original `authorization_ref` and a minimal target-specific query.
 Single-account and same-system selection continue to work.
 
@@ -37,11 +42,12 @@ Single-account and same-system selection continue to work.
 | `discovery.truncation_scope` | `authorized_catalog` when reported, otherwise `unknown` |
 | `discovery.mode` | `ranked_candidates`, or `unknown` for older/malformed optional metadata |
 | `discovery.pagination` | `unsupported`; the result does not promise complete paging |
-| `active_tools` | Business tools currently registered for this conversation, with their target references where applicable |
+| `active_tools` | Business tools ready for dispatch in the current turn, with their target references where applicable; session-mode cached preparation guards are listed separately in `cached_tools` |
 | `toolset.active_count`, `limit` | Current registered business-tool count and shared ceiling of 64; search/resume/local tools do not consume this budget |
 | `visible_tools`, `toolset.visible_count`, `visible_limit` | Current full-schema presentation window, capped at 12 across targets; absence here does not mean unloaded |
 | `toolset.retained_outside_window_count` | Registered tools outside that window, still callable using the exact schema already discovered |
 | `toolset.lifetime` | `active_turn`: one user message through its completion/cancellation, including all intermediate searches and operations |
+| `toolset.reuse`, `cache.lifetime` | `session_runtime` only when the host opted into cross-turn declaration reuse; does not change the current-run execution lifetime |
 | `toolset.generation` | Local collection generation, separate from Core's capability revision; compare only within the same runtime/session |
 | `toolset.omitted_tool_count` | Compatible cached candidates omitted by the shared budget, not all unreturned Core capabilities |
 | `toolset.conflicting_tool_count` | Excluded shared declaration conflicts plus per-target contradictory catalog entries |
@@ -77,11 +83,20 @@ revision clears that target's old candidates even if the new response is empty.
 Core still checks the original identity, allowed surface and revision before each
 new invocation; local retention does not extend permission or skip approval.
 
-Each target retains up to 64 recently discovered/used declarations. The shared
+In the default `active_turn` mode, each target retains up to 64 recently
+discovered/used declarations. The shared
 registry also caps at 64, favoring recently searched/used tools; the schema window
 favors the latest search and subsequent use. Candidates outside the registry cap
 need discovery again. Tools merely outside `visible_tools` do not. This keeps
 memory and prompt costs bounded without forcing a search for every call.
+
+With `toolLifecycle: 'session'`, the declaration cache instead shares a total
+budget of 64 target-tool pairs and 2 MiB of JSON across the living Session. Its
+12-schema presentation window remains separate. New turns prepare only targets
+actually needed, using new context and runs; exact valid cached declarations
+avoid an extra search request. Core's existing `startTurn` may still perform
+bounded internal discovery. See the [session lifecycle contract](SESSION_TOOL_REUSE.md)
+for `cached_tools`, target readiness and preparation-only call handling.
 
 The registry applies differences rather than clearing all registrations on every
 search. Unchanged definitions keep their registration; changed schemas or target
@@ -92,7 +107,9 @@ and ID regardless of cache eviction. Resume never creates a replacement write.
 
 Completion, cancellation, scope failure and a new user turn retain their existing
 boundaries: ended turns cannot accept late search results or reactivate tools.
-The cache is not persisted or reused as authority across turns/restarts. Archive
+The default cache ends with the active turn. Opt-in session-mode declarations
+can survive between turns in the same living runtime; they are never reused as
+authorization or old run context, and are not persisted across restarts. Archive
 events, original run links, ACK/CAS and attachment upload identities are unchanged.
 Original invocation metadata can be persisted separately by the
 [durable recovery candidate](INVOCATION_RECOVERY.md); it does not restore the old tool cache.
@@ -167,6 +184,14 @@ fields in model-facing search results. Custom hosts which only allow names in th
 current schema window need to support retained native registry dispatch; otherwise
 their presentation layer can still produce an artificial `UNKNOWN_TOOL`.
 No new user/assistant message upload path is needed.
+
+Session-mode hosts must also preserve `targets`, `cached_tools`, `contexts`,
+`tool_schemas` and the preparation result's `business_operation_performed=false`.
+An unprepared cached tool name can return preparation and schema without performing
+the requested operation. The model must read current context and issue a new call
+before a new business operation; replaying the preparation's call ID does not
+convert it into an operation. Do not gate these native preparation guards against
+`active_tools` alone. Read-only tool-state methods do not prepare targets.
 
 Tested with the public native registry `@deepseek-ai/dsh-tools@0.1.1-rc.2` and real
 Cordis/DSH Sessions. A custom host must verify the hook and preserve the feedback

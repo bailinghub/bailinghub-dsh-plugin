@@ -28,6 +28,19 @@ that record fails, it can retry after reconnecting or restarting without repeati
 This is an independent community integration, not a plugin developed, certified, endorsed, or
 recommended by DeepSeek.
 
+## Candidate: continue a conversation without discovering the same tool again
+
+A user checks a shop product, then asks “what about its stock?” in the next message.
+An opted-in host can keep recent complete tool declarations in that same living session.
+The next business step prepares current context and a new run for the selected account,
+then reuses a valid declaration without another capability-search request. A greeting
+does not start business runs. Unknown writes still recover only their original invocation.
+
+This is a **local candidate**, enabled by the host with `toolLifecycle: 'session'`;
+the published version number alone does not identify its bytes. Existing hosts keep
+their current behavior. See the [lifecycle and host integration contract](docs/SESSION_TOOL_REUSE.md)
+before installing the exact candidate and enabling it.
+
 ## Install and start
 
 You need Node.js `22.19.0+` or `24+`, pnpm, and a compatible DeepSeek Harness release. Your

@@ -1,5 +1,12 @@
 # Agent Client Host Adapter Contract
 
+The additive [session tool reuse candidate](SESSION_TOOL_REUSE.md) is explicitly
+enabled with `createAgentClientPlugin({ toolLifecycle: 'session', ... })`. It uses
+lazy current-turn target preparation for one or many selected authorizations,
+and retains bounded declarations between messages. The lifecycle descriptions
+below remain the default `active_turn` behavior unless that option is enabled.
+Neither mode changes fixed scope, business approval or original-invocation recovery.
+
 ## Authorization subject display (0.5.0)
 
 The business backend may supply `subject_display: { name }` for the subject actually approved by

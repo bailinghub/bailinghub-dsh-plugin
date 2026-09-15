@@ -52,7 +52,8 @@
     "docs/CAPABILITY_FEEDBACK.md",
     "docs/PROJECT_BOUNDARIES.md",
     "docs/GENERATED_ARTIFACTS.md",
-    "docs/INVOCATION_RECOVERY.md"
+    "docs/INVOCATION_RECOVERY.md",
+    "docs/SESSION_TOOL_REUSE.md"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
