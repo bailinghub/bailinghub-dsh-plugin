@@ -122,6 +122,16 @@ Core's `reconciliation_required` result remains a non-auto-retry result. Its
 feedback says `inspect_original`; ordinary resume may only replay the recorded
 uncertainty and can require an operator to verify the result.
 
+An authoritative original-record lookup failure also requires inspection:
+`code=invocation_not_found`, `category=invocation_outcome_unknown`,
+`next_action=inspect_original`, `retryable=false`, `original_outcome=unverified`.
+The plugin stops the current recovery poll and preserves the original invocation ID.
+For example, a host may have saved a shop listing's dispatch fence before it crashed,
+while the request never reached Core. That is only one possible cause: a missing
+record does not prove that the listing was never performed. Do not recreate it from
+the conversation or switch accounts. Generic 404/network errors cannot establish
+this condition. See [recovery failure rules](INVOCATION_RECOVERY.md#failure-and-compatibility-rules).
+
 ## Client host integration
 
 Standard native DSH uses the existing `tools/execute` hook. Error results retain

@@ -331,3 +331,149 @@ test('cancellation during a rate wait prevents resume even if host sleep resolve
   assert.equal(callsFor(mock.calls, 'invoke').length, 1)
   assert.equal(callsFor(mock.calls, 'resume').length, 0)
 })
+
+for (const [label, fields] of [
+  ['legacy transport without a public code', {}],
+  ['generic HTTP 404', { statusCode: 404 }],
+  ['unknown public code', { statusCode: 404, publicCode: 'private_unknown_code' }],
+  ['public code without HTTP status', { publicCode: 'invocation_not_found' }],
+  ['public code with conflicting HTTP 500', { statusCode: 500, publicCode: 'invocation_not_found' }],
+  ['untrusted error code field', { statusCode: 404, code: 'invocation_not_found' }],
+  ['temporary network failure', { statusCode: 0, publicCode: 'agent_transport_unavailable' }],
+  ['timeout', { statusCode: 408, publicCode: 'agent_request_timeout' }],
+]) {
+  test(`recovery remains conservative for ${label}, without inferring from error text`, async () => {
+    let originalId
+    const unknown = () => Object.assign(new Error('PRIVATE_BODY invocation_not_found'), {
+      disposition: 'accepted_unknown', ...fields,
+    })
+    const { host, mock, agent, local } = await createApprovalRuntime({
+      invoke: async input => { originalId = input.invocationId; throw unknown() },
+      resume: async id => { assert.equal(id, originalId); throw unknown() },
+    }, { maxAttempts: 2 })
+    const checkUnknown = error => {
+      assert.equal(error.feedback.code, 'BAILINGHUB_ACCEPTED_UNKNOWN')
+      assert.equal(error.feedback.category, 'invocation_outcome_unknown')
+      assert.equal(error.feedback.next_action, 'resume_original')
+      assert.equal(error.feedback.retryable, true)
+      assert.equal(error.feedback.invocation_id, originalId)
+      assert.notEqual(error.feedback.dispatch, 'not_dispatched')
+      assert.doesNotMatch(JSON.stringify(error), /PRIVATE_BODY|private_unknown_code/)
+      return true
+    }
+    await assert.rejects(local.get('employee_update').execute({ employee_id: '42' }, {
+      agent, callId: 'original-unknown-write', signal: new AbortController().signal,
+    }), checkUnknown)
+    assert.equal(callsFor(mock.calls, 'resume').length, 2, 'polling keeps its finite recovery bound')
+    await assert.rejects(host.services.get('bailingHubAgentClient').resume(originalId), checkUnknown)
+    assert.equal(callsFor(mock.calls, 'resume').length, 3)
+    assert.equal(callsFor(mock.calls, 'invoke').length, 1, 'no replacement business invocation')
+  })
+}
+
+test('direct recovery keeps the original ID on definitive authorization errors', async () => {
+  const id = 'c'.repeat(64)
+  const { host, mock } = await createApprovalRuntime({
+    resume: async () => { throw Object.assign(new Error('PRIVATE_AUTH_BODY'), {
+      publicCode: 'unauthorized', statusCode: 401, disposition: 'definitive_rejection',
+    }) },
+  })
+  await assert.rejects(host.services.get('bailingHubAgentClient').resume(id), error => {
+    assert.equal(error.feedback.invocation_id, id)
+    assert.equal(error.feedback.category, 'authorization_unavailable')
+    assert.equal(error.feedback.next_action, 'reauthorize')
+    assert.doesNotMatch(JSON.stringify(error), /PRIVATE_AUTH_BODY/)
+    return true
+  })
+  assert.equal(callsFor(mock.calls, 'invoke').length, 0)
+})
+
+for (const ending of ['signal cancellation', 'turn end']) {
+  test(`late invocation_not_found preserves ${ending} and never revives an original write`, async () => {
+    let originalId
+    let reportResumeStarted
+    let releaseResume
+    const started = new Promise(resolve => { reportResumeStarted = resolve })
+    const gate = new Promise(resolve => { releaseResume = resolve })
+    const controller = new AbortController()
+    const { host, mock, agent, local } = await createApprovalRuntime({
+      invoke: async input => {
+        originalId = input.invocationId
+        return invocation(input, 'awaiting_approval', { approval_id: 47 })
+      },
+      resume: async id => {
+        assert.equal(id, originalId)
+        reportResumeStarted()
+        await gate
+        throw Object.assign(new Error('PRIVATE_LATE_RESPONSE'), {
+          publicCode: 'invocation_not_found', statusCode: 404, disposition: 'accepted_unknown',
+        })
+      },
+    })
+    const definition = local.get('employee_update')
+    const execution = definition.execute({ employee_id: '42' }, {
+      agent, callId: 'cancel-before-missing-response', signal: controller.signal,
+    })
+    const rejected = assert.rejects(execution, error => {
+      assert.equal(error.feedback.category, 'cancelled')
+      assert.equal(error.feedback.invocation_id, originalId)
+      assert.equal(error.feedback.retryable, false)
+      assert.notEqual(error.feedback.code, 'invocation_not_found')
+      assert.doesNotMatch(JSON.stringify(error), /PRIVATE_LATE_RESPONSE/)
+      return true
+    })
+    await started
+    if (ending === 'signal cancellation') controller.abort()
+    else host.emit('session/event', agent.session, {
+      type: 'turn/end', data: { turn: 1, reason: { kind: 'cancelled' } },
+    })
+    releaseResume()
+    await rejected
+    await settle()
+    assert.equal(callsFor(mock.calls, 'invoke').length, 1)
+    assert.deepEqual(callsFor(mock.calls, 'resume').map(call => call.args[0]), [originalId])
+    if (ending === 'turn end') {
+      const runtime = host.services.get('bailingHubAgentClient')
+      assert.equal(runtime.getSessionToolState(agent.session.id).state, 'inactive')
+      assert.equal(local.has('employee_update'), false, 'a late response must not register tools again')
+      await assert.rejects(definition.execute({ employee_id: '42' }, {
+        agent, callId: 'ended-turn-write', signal: new AbortController().signal,
+      }))
+      assert.equal(callsFor(mock.calls, 'invoke').length, 1)
+    }
+  })
+}
+
+test('late invocation_not_found in direct recovery preserves an aborted signal and original ID', async () => {
+  const id = 'd'.repeat(64)
+  const controller = new AbortController()
+  let reportResumeStarted
+  let releaseResume
+  const started = new Promise(resolve => { reportResumeStarted = resolve })
+  const gate = new Promise(resolve => { releaseResume = resolve })
+  const { host, mock } = await createApprovalRuntime({
+    resume: async original => {
+      assert.equal(original, id)
+      reportResumeStarted()
+      await gate
+      throw Object.assign(new Error('PRIVATE_DIRECT_LATE_RESPONSE'), {
+        publicCode: 'invocation_not_found', statusCode: 404, disposition: 'accepted_unknown',
+      })
+    },
+  })
+  const execution = host.services.get('bailingHubAgentClient').resume(id, { signal: controller.signal })
+  const rejected = assert.rejects(execution, error => {
+    assert.equal(error.feedback.category, 'cancelled')
+    assert.equal(error.feedback.invocation_id, id)
+    assert.equal(error.feedback.retryable, false)
+    assert.notEqual(error.feedback.code, 'invocation_not_found')
+    assert.doesNotMatch(JSON.stringify(error), /PRIVATE_DIRECT_LATE_RESPONSE/)
+    return true
+  })
+  await started
+  controller.abort()
+  releaseResume()
+  await rejected
+  assert.equal(callsFor(mock.calls, 'invoke').length, 0)
+  assert.deepEqual(callsFor(mock.calls, 'resume').map(call => call.args[0]), [id])
+})

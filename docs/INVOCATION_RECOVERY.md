@@ -118,6 +118,19 @@ this does not enable business access or discard either failure.
 - `invocation_binding_unavailable` / `invocation_binding_conflict`: inspect original
   evidence. Never guess the binding from transcript text or accept model-supplied targets.
 - `invocation_store_unsupported`: the host has not enabled durable invocation storage.
+- An authoritative HTTP 404 with SDK `publicCode=invocation_not_found` stops the
+  current recovery poll immediately, even if an older receipt said `awaiting_approval`.
+  Both the native model tool and direct `runtime.resume` preserve the original ID in
+  `feedback`: `category=invocation_outcome_unknown`, `code=invocation_not_found`,
+  `next_action=inspect_original`, `retryable=false`, `original_outcome=unverified`.
+  Dispatch remains `attempted` or `unknown`; the original business outcome is not
+  declared unexecuted. The local journal, scope and original run are retained.
+  Inspect that call's original evidence instead of retrying automatically or
+  reconstructing a new write. The existing feedback schema and host APIs are unchanged.
+- An arbitrary 404, a message containing that name, a missing public code or a
+  conflicting status is not authoritative not-found evidence. Older SDKs and custom
+  transports keep conservative bounded recovery for unconfirmed requests. A timeout
+  or temporary network failure does not become a missing-record diagnosis.
 - Existing SDK/Core network, authorization, unsupported and reconciliation feedback
   continues unchanged. No new Core endpoint, SDK method, database migration or business
   backend capability declaration is required for this candidate.
@@ -149,3 +162,9 @@ resume; all-member revalidation; offline recovery; pre/post-dispatch storage fai
 CAS conflicts and lost save acknowledgements; cancellation before delayed save returns;
 and empty scope with zero Hub requests. Preserve the existing long-task tool retention,
 declaration-change, archive and attachment regressions.
+
+For missing-record regressions, use the real SDK and Core's error response shape
+`{"error":"invocation_not_found","message":"..."}` with HTTP 404. Test both recovery
+paths for pending approval and unknown outcomes. Require accurate final model/host
+feedback and no replacement `invoke`, rediscovery, changed target or journal revision.
+A test that only reproduces the old generic error is not a passing recovery test.

@@ -37,7 +37,7 @@ async function waitUntil(condition, errorMessage) {
 
 // This fixture exercises a real SDK facade and HTTP serialization. It deliberately
 // uses a synthetic in-memory HTTP service, not a Core repository or database.
-async function fixture(t, outcome) {
+async function fixture(t, outcome, recovery = {}) {
   const sdk = await import(moduleUrl(sdkDist))
   const directory = await mkdtemp(join(tmpdir(), 'bailinghub-recovery-sdk-'))
   const now = Date.now()
@@ -57,6 +57,7 @@ async function fixture(t, outcome) {
   let recoveryRequested = false
   let currentProfile
   let confirmationLost = false
+  let originalRecordMissing = false
   const resultFor = (invocationId, original, pending) => ({
     schema_version: 'bailing.agent-tool-invocation.v1', invocation_id: invocationId,
     route: original.route, tool: original.tool, state: pending ? 'awaiting_approval' : 'executed',
@@ -127,6 +128,13 @@ async function fixture(t, outcome) {
         assert.equal(original.account, account.label)
         assert.equal(original.agentSessionId, account.sessionId)
         assert.equal(original.route, account.route)
+        if (originalRecordMissing) {
+          // Keep the fixture's dispatch ledger as evidence of the original
+          // write. A missing recovery record does not prove it never ran.
+          response.writeHead(404, { 'content-type': 'application/json' })
+          response.end(JSON.stringify({ error: 'invocation_not_found', message: 'Synthetic original invocation record not found.' }))
+          return
+        }
         // The original live turn may perform one bounded status poll according
         // to the SDK's normalized recovery guidance. Keep it unresolved until
         // a separately recreated runtime explicitly requests recovery.
@@ -200,7 +208,7 @@ async function fixture(t, outcome) {
       transport, scopeStore: createFileSessionScopeStore({ directory: join(directory, 'scopes') }),
       invocationStore: createFileInvocationStore({ directory: join(directory, 'invocations') }),
       archiveStore: createMemoryConversationArchiveStore(),
-      recovery: { maxAttempts: 1, maxWaitMilliseconds: 100, pollIntervalMilliseconds: 1, sleep: async () => {} },
+      recovery: { maxAttempts: 1, maxWaitMilliseconds: 100, pollIntervalMilliseconds: 1, sleep: async () => {}, ...recovery },
     }), config)
     const runtime = ctx.get('bailingHubAgentClient')
     const session = Session.create(`sdk-recovery-${outcome}`, structuredClone(history))
@@ -239,7 +247,80 @@ async function fixture(t, outcome) {
   }
   return { accounts, requests, errors, invocations, launch, get confirmationLost() { return confirmationLost },
     markReopened: () => { phase = 'reopened'; currentProfile = profiles[2] },
+    markOriginalRecordMissing: () => { originalRecordMissing = true },
     requestRecovery: () => { recoveryRequested = true } }
+}
+
+for (const [outcome, recoveryPath] of ['approval', 'unknown'].flatMap(outcome => ['polling tool', 'direct runtime'].map(path => [outcome, path]))) {
+  test(`real SDK and HTTP preserve invocation_not_found through ${recoveryPath} recovery after ${outcome} without replacing the original write`, { timeout: 15_000 }, async t => {
+    const f = await fixture(t, outcome, { maxAttempts: 3, maxWaitMilliseconds: 1_000 })
+    const instance = await f.launch()
+    await instance.start(1)
+    const authorizationRef = instance.refs[f.accounts[0].connectionKey]
+    const discovery = await instance.execute('search_business_capabilities', {
+      query: 'Update product title', authorization_ref: authorizationRef,
+    })
+    assert.equal(discovery.isError, false, f.errors.map(String).join('\n'))
+    const name = discovery.value.active_tools.find(value => value.original_name === definition.name || value.name === definition.name)?.name
+    assert.ok(name)
+    const written = await instance.execute(name, { authorization_ref: authorizationRef,
+      arguments: { product_id: 'synthetic-product', title: 'Synthetic updated title' } })
+    const id = invocationIdFor(written)
+    assert.match(id, /^[a-f0-9]{64}$/)
+    if (outcome === 'approval') assert.equal(resultBody(written).state, 'awaiting_approval')
+    else {
+      assert.equal(f.confirmationLost, true)
+      assert.equal(written.isError, true)
+      assert.equal(written.meta.bailinghub.feedback.dispatch, 'unknown')
+    }
+    const original = structuredClone(f.invocations.get(id))
+    const before = await instance.runtime.getSessionInvocationStatus(instance.session.id)
+    assert.equal(before.state, 'ready')
+    assert.equal(before.entries.find(value => value.invocation_id === id).last_known_state,
+      outcome === 'approval' ? 'awaiting_approval' : 'unknown')
+    const requestOffset = f.requests.length
+    f.markOriginalRecordMissing()
+
+    let feedback
+    if (recoveryPath === 'polling tool') {
+      const recovered = await instance.execute('resume_governed_tool_invocation', { invocation_id: id })
+      assert.equal(recovered.isError, true, 'the new authoritative 404 must not fall back to an old pending approval result')
+      assert.notEqual(resultBody(recovered)?.state, 'awaiting_approval')
+      feedback = recovered.meta?.bailinghub?.feedback
+      assert.deepEqual(JSON.parse(recovered.content[0].text).feedback, feedback,
+        'the model-visible result must retain the same structured feedback as the host metadata')
+    } else {
+      await assert.rejects(instance.runtime.resume(id, {
+        connectionName: f.accounts[0].connectionKey, workspace: f.accounts[0].route,
+      }), error => {
+        feedback = error.feedback
+        return true
+      })
+    }
+    assert.ok(feedback)
+    assert.equal(feedback.code, 'invocation_not_found')
+    assert.equal(feedback.category, 'invocation_outcome_unknown')
+    assert.equal(feedback.next_action, 'inspect_original')
+    assert.equal(feedback.retryable, false)
+    assert.equal(feedback.original_outcome, 'unverified')
+    assert.equal(feedback.invocation_id, id)
+
+    const recoveryRequests = f.requests.slice(requestOffset)
+    const resumes = recoveryRequests.filter(value => value.path.endsWith('/resume'))
+    assert.equal(resumes.length, 1, 'an authoritative missing-record response must end polling immediately')
+    assert.equal(resumes[0].path, `/agent-api/v1/tool-invocations/${id}/resume`)
+    assert.equal(resumes[0].account, original.account)
+    assert.equal(resumes[0].agentSessionId, original.agentSessionId)
+    assert.equal(resumes[0].body, undefined, 'recovery must not resend the original write arguments')
+    assert.equal(recoveryRequests.some(value => value.path === '/agent-api/v1/tool-invocations'), false)
+    assert.equal(recoveryRequests.some(value => value.path.endsWith('/capabilities/search') || value.path.endsWith('/turns')), false)
+    assert.equal(f.requests.filter(value => value.path === '/agent-api/v1/tool-invocations').length, 1)
+    assert.equal(f.requests.some(value => value.account === 'C'), false)
+    assert.deepEqual(f.invocations.get(id), original)
+    assert.deepEqual(await instance.runtime.getSessionInvocationStatus(instance.session.id), before,
+      '404 feedback must retain the original journal identity, CAS revision and unverified last-known state')
+    assert.deepEqual(f.errors, [])
+  })
 }
 
 for (const outcome of ['approval', 'unknown']) {

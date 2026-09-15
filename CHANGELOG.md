@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Preserve an authoritative `invocation_not_found` response during polling and
+  direct recovery. Stop automatic retries and ask for inspection of the original
+  execution evidence, without declaring the business action unexecuted or creating
+  a replacement write. Generic network/HTTP failures retain conservative recovery.
+
 - Reopen a conversation after pending approval or a lost business response and recover
   the original invocation through a durable, metadata-only local journal. Persist the
   original authorization, run, invocation and parameter digest before dispatch; never
