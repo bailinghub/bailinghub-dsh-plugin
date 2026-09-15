@@ -118,8 +118,11 @@ Each invocation binds its chosen authorization, Core run, and capability revisio
 accepts only an invocation known to this conversation and resolves its original binding; the
 model cannot provide a replacement authorization. Changing a default connection cannot retarget
 an existing call.
-This invocation map lasts only for the live conversation: later turns can recover its original
-calls, while new conversations and process restarts must reject unknown invocation ids.
+The live invocation map supports later turns of the same conversation. The unreleased
+[durable recovery candidate](docs/INVOCATION_RECOVERY.md) additionally persists original
+metadata before dispatch and validates it after reopening. New conversations, missing records,
+and conflicting original identities still reject recovery. Raw parameters and credentials do
+not belong in the invocation journal; model text never reconstructs its authority.
 
 Only non-secret scope metadata belongs in the scope store. Its default file store uses SHA-256 session filenames,
 mode-0600 files and mode-0700 directories on POSIX, bounded reads, rejection of symlinks/non-regular files,

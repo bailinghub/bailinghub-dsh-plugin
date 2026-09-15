@@ -183,3 +183,12 @@ legacy version when using that path and follow the [migration guide](docs/MIGRAT
 Report issues at [GitHub Issues](https://github.com/bailinghub/bailinghub-dsh-plugin/issues) with
 versions and redacted errors. Do not include tokens, private URLs, personal data, or production
 payloads. Compatibility tests and package downloads are not evidence of production adoption.
+
+
+## Candidate: recover an original action after reopening
+
+An unreleased candidate adds a local invocation journal for actions such as a product listing
+awaiting approval or an inventory update whose response was lost. Reopen the same conversation
+and explicitly recover the original call without creating a second business request. Custom
+hosts must retain the new store alongside their existing Session scope. See the
+[recovery contract, limits and host integration](docs/INVOCATION_RECOVERY.md).

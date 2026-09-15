@@ -76,7 +76,10 @@ New conversations need explicit scope selection before the first message. Custom
 and display selection, preserve the stable conversation id, and restore the original scope before
 sending on reopen. Missing started-session snapshots stay blocked. Saved drafts require fresh
 confirmation. Scope restoration and archive synchronization do not recover business invocations,
-approvals, or task execution after a process restart.
+approvals, or task execution after a process restart. The unreleased
+[invocation recovery candidate](INVOCATION_RECOVERY.md) supplies a separate durable journal
+for explicit recovery of original calls. Custom scope-store hosts must explicitly provide
+`invocationStore`; existing calls remain available if they have not enabled that feature.
 
 Temporary network failure during reopening is retryable on the same runtime under the complete
 original scope. Confirmed revocation, replaced identity, or storage/CAS conflict stays blocked.

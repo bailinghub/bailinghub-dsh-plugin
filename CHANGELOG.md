@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Reopen a conversation after pending approval or a lost business response and recover
+  the original invocation through a durable, metadata-only local journal. Persist the
+  original authorization, run, invocation and parameter digest before dispatch; never
+  rebuild a business write from transcript text or substitute another account.
+- Custom hosts can supply an invocation store and inspect or restore its local status.
+  Storage failures remain explicit. Restoring metadata sends no business recovery
+  request; an explicit resume may continue the original approved operation.
+  See [reopening and original invocation recovery](docs/INVOCATION_RECOVERY.md).
+
 - Keep long tasks moving between product creation, queries and inventory checks:
   searches merge valid tools during the active turn instead of unloading the previous
   batch. Retain up to 64 callable tools behind a 12-schema model window; unchanged

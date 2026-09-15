@@ -138,7 +138,9 @@ same-named capabilities on earlier targets cannot permanently crowd it out.
 
 Recovery accepts only a known original invocation. When needed in a later live turn, it opens
 only that original target's run with a recovery-specific input and resumes the original invocation;
-it does not call the business action again. It does not restore invocation state after process restart.
+it does not create a replacement invocation. The [durable recovery candidate](INVOCATION_RECOVERY.md)
+can restore original binding metadata after process restart; scope or archive restoration alone
+cannot. Explicit Core resume may continue the original approved operation.
 Cancellation and superseding turns cannot register tools or dispatch a new write from a late start.
 Each cross-system turn owns an AbortSignal combined with the host's signal. SDK dispatch checks
 that signal after local IO and before HTTP; an in-flight write with an unknown outcome keeps its
@@ -241,9 +243,10 @@ invocation known to this conversation and uses the original binding; it accepts 
 authorization selector. Pending approval and unknown dispatch outcomes follow the same
 exact-invocation recovery rules as the baseline. Removing or selecting another default must not
 retarget an existing invocation.
-The local invocation map survives later turns of the same live conversation. It is not persisted
-across process restarts or copied into new conversations, and unknown invocation ids fail closed.
-This increment does not provide durable task recovery across those boundaries.
+The local invocation map survives later turns of the same live conversation. The
+[durable recovery candidate](INVOCATION_RECOVERY.md) can restore trusted original binding metadata
+across process restarts, never into another conversation. Unknown IDs fail closed. This is
+original-invocation recovery, not durable automatic continuation of a whole task.
 
 On multi-authorization completion, the adapter freezes one deterministic summary of each run's
 own governed calls and synchronizes that run separately. It does not send the combined visible
@@ -669,3 +672,12 @@ Missing/invalid configuration, missing SDK, failed authorization, failed Core co
 collision, or unsupported DSH Code Mode removes the Core business tools and inserts a concise
 status section. The local Agent may continue using unrelated local tools, but it is explicitly
 told not to claim a BailingHub business action was executed.
+
+
+## Original invocation recovery after reopening
+
+See [the durable recovery contract](INVOCATION_RECOVERY.md) for the additive
+`invocationStore`, `getSessionInvocationStatus(sessionId)` and
+`restoreSessionInvocations(sessionId)` host interfaces. They do not replace the fixed
+scope, original visible-event archive, or attachment store. A host using its own scope
+store must explicitly provide durable invocation storage to support full reopening.

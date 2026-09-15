@@ -94,6 +94,8 @@ Completion, cancellation, scope failure and a new user turn retain their existin
 boundaries: ended turns cannot accept late search results or reactivate tools.
 The cache is not persisted or reused as authority across turns/restarts. Archive
 events, original run links, ACK/CAS and attachment upload identities are unchanged.
+Original invocation metadata can be persisted separately by the
+[durable recovery candidate](INVOCATION_RECOVERY.md); it does not restore the old tool cache.
 
 ## Structured failure feedback
 

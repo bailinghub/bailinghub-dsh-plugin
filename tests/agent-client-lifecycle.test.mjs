@@ -146,7 +146,7 @@ test('search replaces only this session active set and unknown invocation recove
   await assert.rejects(() => local.get('resume_governed_tool_invocation').execute(
     { invocation_id: 'a'.repeat(64) },
     { agent, callId: 'resume-unknown', signal: new AbortController().signal },
-  ), (error) => error.feedback.category === 'invalid_request' && error.feedback.dispatch === 'not_dispatched')
+  ), (error) => error.feedback.category === 'unsupported' && error.feedback.code === 'invocation_store_unsupported' && error.feedback.dispatch === 'not_dispatched')
   assert.equal(callsFor(mock.calls, 'resume').length, 0)
   assert.equal(searchCall.args[1].connectionKey, MOCK_CONNECTION_KEY)
 })
