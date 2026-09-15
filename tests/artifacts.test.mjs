@@ -21,6 +21,7 @@ function backend() {
     uploads++
     const receipt = { schema_version: 'bailing.agent-artifact.v1', upload_id: input.uploadId, workspace: 'demo', session_id: binding.sessionId,
       state: 'ready', name: input.name, mime: input.mime, bytes: input.body.length, sha256: sha, client_conversation_id: input.clientConversationId, client_turn_id: input.clientTurnId,
+      ...(input.runId ? { run_id: input.runId } : {}),
       visibility: 'public', url: `https://cdn.example.com/${input.name}`, next_action: 'use_url' }
     records.set(input.uploadId, receipt)
     if (loseAck) throw Object.assign(new Error('synthetic lost ACK'), { publicCode: 'agent_transport_unavailable' })
