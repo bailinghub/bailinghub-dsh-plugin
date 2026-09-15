@@ -686,7 +686,7 @@ test('same-name tools with different governance are excluded from shared declara
   }
 })
 
-test('the twelve-tool business budget is global across both authorization catalogs', async () => {
+test('the schema window is shared across catalogs while all retained tools remain callable', async () => {
   const fixture = createFixture({
     toolsFor: (key) => Array.from({ length: 12 }, (_, index) => ({
       ...readTool(), name: `business_read_${index + (key === KEY_A ? 0 : 6)}`,
@@ -694,21 +694,23 @@ test('the twelve-tool business budget is global across both authorization catalo
   })
   const assembly = await assemble(fixture.host, fixture.agent, 1)
   const businessTools = () => [...fixture.local.values()].filter((tool) => tool.name.startsWith('business_read_'))
-  assert.equal(businessTools().length, 12)
+  assert.equal(businessTools().length, 18)
   assert.equal(assembly.tools.filter((tool) => tool.name.startsWith('business_read_')).length, 12)
-  assert.equal(new Set(businessTools().map((tool) => tool.name)).size, 12)
+  assert.equal(new Set(businessTools().map((tool) => tool.name)).size, 18)
   const shared = fixture.local.get('business_read_6')
   assert.equal(shared.parameters.properties.authorization_ref.enum.length, 2)
   assert.match(assembly.sections.find((section) => section.name === 'bailinghub:agent-client-profile').text,
-    /Additional tools omitted by the shared budget: 6/)
+    /Known tools omitted by the retained registry budget: 0/)
 
   const searchResult = await fixture.local.get('search_business_capabilities').execute(
     { query: 'Other store reads', limit: 12, authorization_ref: shared.parameters.properties.authorization_ref.enum[1] },
     execution(fixture.agent, 'search-with-global-budget'),
   )
-  assert.equal(businessTools().length, 12)
-  assert.equal(searchResult.active_tools.length, 12)
-  assert.equal(searchResult.omitted_tool_count, 6)
+  assert.equal(businessTools().length, 18)
+  assert.equal(searchResult.active_tools.length, 18)
+  assert.equal(searchResult.omitted_tool_count, 0)
+  assert.equal(searchResult.toolset.visible_count, 12)
+  assert.equal(searchResult.toolset.retained_outside_window_count, 6)
 })
 
 test('Code Mode degradation still completes both authorization runs at turn end', async () => {

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Keep long tasks moving between product creation, queries and inventory checks:
+  searches merge valid tools during the active turn instead of unloading the previous
+  batch. Retain up to 64 callable tools behind a 12-schema model window; unchanged
+  registrations survive concurrent discovery and calls.
+- Invalidate only the changed authorization catalog, quarantine contradictory
+  declarations, and preserve original invocation recovery and cancellation boundaries.
+  See [long-task lifecycle and host upgrade guidance](docs/CAPABILITY_FEEDBACK.md).
+
 - Honor Hub retry delays after pre-dispatch rate limiting. Long waits retain the original invocation for later recovery; early manual resumes avoid extra requests. Shared quota details stay visible to the model.
 
 - Add an image-first Local Agent attachment space for adapted hosts: list approved conversation

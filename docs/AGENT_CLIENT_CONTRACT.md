@@ -133,7 +133,7 @@ Each alias enumerates only its own `authorization_ref` values and wraps unchange
 snapshots and original target bindings remain fixed on replay. The SDK receives host-only
 `expectedBinding: { hubUrl, clientAppId, workspace, sessionId }` together with an explicit key
 on status and all business calls. Model arguments cannot replace these fields.
-Explicit search prioritizes that target's results inside the existing twelve-tool budget;
+Explicit search prioritizes that target's results inside the twelve-schema window while retaining up to 64 callable tools;
 same-named capabilities on earlier targets cannot permanently crowd it out.
 
 Recovery accepts only a known original invocation. When needed in a later live turn, it opens
@@ -218,7 +218,7 @@ attribution; all injected context still shares the local Agent/model boundary de
 Business definitions with the same name, description, input schema, and governance are registered
 once.
 Conflicting declarations are not merged for execution. Availability remains specific to each
-authorization, and the conversation's total active business-tool limit remains 12. In a
+authorization, and the conversation's retained business-tool limit is 64, with at most 12 full schemas shown at once. In a
 multi-authorization session, each shared definition wraps its unchanged business schema:
 
 ```json
@@ -522,7 +522,8 @@ exactly `bailing.agent-turn-context.v1`. Its runtime result is:
 }
 ```
 
-At most 12 active tools are accepted. Each tool must use the Core tool-name grammar, an
+At most 12 active tools are accepted per Core response. Further searches can accumulate
+up to 64 retained tools in this active turn; see [discovery lifecycle](CAPABILITY_FEEDBACK.md). Each tool must use the Core tool-name grammar, an
 object-rooted input schema, and complete governance metadata (`scope`, `risk`,
 `approval_required`, `readonly`, and `idempotent`).
 Both revision fields are required lowercase 64-character SHA-256 values; shorter labels or

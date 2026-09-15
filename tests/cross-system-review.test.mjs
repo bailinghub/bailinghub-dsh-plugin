@@ -115,7 +115,7 @@ test('a cancelled old target start failure cannot invalidate a successful newer 
   assert.ok(callsFor(f.mock.calls, 'startTurn').every((call) => call.args[1].connectionKey === A))
 })
 
-test('explicitly searching a thirteenth same-name system keeps that target usable within the global twelve-tool budget', async (t) => {
+test('explicitly searching a thirteenth same-name system keeps that target usable alongside retained tools and within the twelve-schema window', async (t) => {
   const entries = Array.from({ length: 13 }, (_, index) => ({
     connectionKey: `conn_${(index + 1).toString(16).padStart(32, '0')}`,
     hubUrl: config.hubUrl, clientAppId: `system_${index}`, workspace: `route_${index}`,
@@ -129,7 +129,8 @@ test('explicitly searching a thirteenth same-name system keeps that target usabl
     }, exec(f, `search-${entry.clientAppId}`))
   }
   const businessTools = [...f.local.values()].filter((tool) => tool.name.startsWith('bh_'))
-  assert.ok(businessTools.length <= 12)
+  assert.equal(businessTools.length, 13)
+  assert.equal(f.runtime.getSessionToolState(f.agent.session.id).toolset.visible_count, 12)
   const requestedRef = f.refs[entries.at(-1).connectionKey]
   const requestedTool = businessTools.find((tool) => tool.parameters.properties.authorization_ref.enum.includes(requestedRef))
   assert.ok(requestedTool, 'The explicitly searched system must not remain permanently hidden behind previously loaded same-name tools.')

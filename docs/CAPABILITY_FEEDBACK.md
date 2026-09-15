@@ -10,9 +10,12 @@ and package SHA-256 from the accompanying candidate manifest.
 For example, an Agent checks warehouse stock and then updates a shop product.
 
 - A currently loaded shop tool can be called directly for its selected account.
-- Searching warehouse capabilities may replace some previously loaded tools under
-  the shared limit. A retired shop tool means “discover it again”, not “the shop
-  does not support this operation”.
+- The Agent can discover product creation, create a product, discover a query tool,
+  check the result, and return to product creation without another search. Searching
+  warehouse tools also retains valid shop tools within the current turn.
+- Only 12 full schemas are shown at a time; up to 64 discovered business tools remain
+  registered and directly callable with their original target and known parameters.
+  This is a tool-type budget, not a limit on operations, products or task duration.
 - If the shop request was sent but its response is unconfirmed, recover only its
   original invocation. A new search or tool name must not produce another write.
 
@@ -35,21 +38,62 @@ Single-account and same-system selection continue to work.
 | `discovery.mode` | `ranked_candidates`, or `unknown` for older/malformed optional metadata |
 | `discovery.pagination` | `unsupported`; the result does not promise complete paging |
 | `active_tools` | Business tools currently registered for this conversation, with their target references where applicable |
-| `toolset.active_count`, `limit` | Current session business-tool count and shared ceiling of 12; search/resume/local tools do not consume this budget |
+| `toolset.active_count`, `limit` | Current registered business-tool count and shared ceiling of 64; search/resume/local tools do not consume this budget |
+| `visible_tools`, `toolset.visible_count`, `visible_limit` | Current full-schema presentation window, capped at 12 across targets; absence here does not mean unloaded |
+| `toolset.retained_outside_window_count` | Registered tools outside that window, still callable using the exact schema already discovered |
+| `toolset.lifetime` | `active_turn`: one user message through its completion/cancellation, including all intermediate searches and operations |
 | `toolset.generation` | Local collection generation, separate from Core's capability revision; compare only within the same runtime/session |
 | `toolset.omitted_tool_count` | Compatible cached candidates omitted by the shared budget, not all unreturned Core capabilities |
-| `toolset.conflicting_tool_count` | Separately excluded conflicting declarations |
+| `toolset.conflicting_tool_count` | Excluded shared declaration conflicts plus per-target contradictory catalog entries |
+| `toolset.catalog_conflict_count` | The per-target contradictory catalog portion of that count |
 
 Multi-account results place `discovery` under each searched `authorizations[]`
 entry. The top-level `toolset` covers the whole conversation, not just that target.
 The existing top-level `omitted_tool_count` remains as a compatibility alias for
-the shared-budget count. Successful searches replace the searched target's
-candidates (`candidate_update=replace`), then recompute the shared set
-(`toolset.update=recompute_shared`). Single-account search uses `update=replace`.
+the shared-budget count. `toolset.update=merge` describes the registration policy, consistently for one or
+many accounts. Per-target `candidate_update=merge` means the new results were added
+under the same authoritative catalog revision; `reset` with
+`invalidation_reason=capability_revision_changed` invalidates that target's old
+cache before retaining the new response. Tools from other targets keep their own
+revisions. `evicted_count` counts candidates removed by the per-target cache cap
+in this update; it is not a catalog total.
+
+If the same target, revision and tool name claim different declarations, that
+name is quarantined for the revision. `conflicting_tools` and structured
+`feedback.category=capability_changed` explain the exclusion. Other valid tools
+remain available. The runtime never silently reinterprets old arguments under the
+new declaration. An authoritative new revision can remove the quarantine.
 
 An unrelated query can still return ranked candidates. Neither an empty result
 nor a transport failure proves that the entire business system lacks a feature.
 Optional metadata from older components is unknown, never a fabricated zero.
+
+## Long-task lifecycle and safety
+
+Discovery merges only tools actually returned for selected authorizations; it does
+not preload a system's whole catalog. An empty successful search with an unchanged
+revision or a temporary search failure preserves prior valid candidates. A new
+revision clears that target's old candidates even if the new response is empty.
+Core still checks the original identity, allowed surface and revision before each
+new invocation; local retention does not extend permission or skip approval.
+
+Each target retains up to 64 recently discovered/used declarations. The shared
+registry also caps at 64, favoring recently searched/used tools; the schema window
+favors the latest search and subsequent use. Candidates outside the registry cap
+need discovery again. Tools merely outside `visible_tools` do not. This keeps
+memory and prompt costs bounded without forcing a search for every call.
+
+The registry applies differences rather than clearing all registrations on every
+search. Unchanged definitions keep their registration; changed schemas or target
+enumerations are retired individually. Searches are serialized within the turn;
+independent calls keep their original invocation bindings while discovery runs.
+An invocation already issued keeps its original arguments, revision, authorization
+and ID regardless of cache eviction. Resume never creates a replacement write.
+
+Completion, cancellation, scope failure and a new user turn retain their existing
+boundaries: ended turns cannot accept late search results or reactivate tools.
+The cache is not persisted or reused as authority across turns/restarts. Archive
+events, original run links, ACK/CAS and attachment upload identities are unchanged.
 
 ## Structured failure feedback
 
@@ -93,7 +137,7 @@ Two read-only runtime methods support hosts which intercept dispatch earlier:
 
 ```js
 runtime.getSessionToolState(sessionId)
-// { state, toolset, active_tools }; no HTTP requests or new business run
+// { state, toolset, active_tools, visible_tools }; no HTTP requests or new business run
 
 runtime.getToolDispatchFeedback(sessionId, {
   toolName, callId, errorCode: 'UNKNOWN_TOOL',
@@ -104,6 +148,12 @@ runtime.getToolDispatchFeedback(sessionId, {
 Pass the original call ID. If that call already has an invocation, feedback points
 to that original ID instead of suggesting a new operation. These methods do not
 execute or restore tools and must not be used to bypass normal scope validation.
+Do not filter dispatch against `visible_tools` or the latest search response: the
+native registry and `active_tools` determine retained availability. Do not cache a
+stale copy of the registry or demand discovery before every call. Keep all new
+fields in model-facing search results. Custom hosts which only allow names in the
+current schema window need to support retained native registry dispatch; otherwise
+their presentation layer can still produce an artificial `UNKNOWN_TOOL`.
 No new user/assistant message upload path is needed.
 
 Tested with the public native registry `@deepseek-ai/dsh-tools@0.1.1-rc.2` and real
@@ -112,6 +162,8 @@ carrier through its own model loop. Simply adding properties to a thrown Error i
 insufficient: the host may discard them. Older SDK/Core combinations retain their
 business flows, but may lack precise counts or authoritative error detail.
 
-Use the paired candidate packages and verify their installed hashes. A normal
+This iteration changes DSH only; the accompanying manifest pins the existing SDK/Core
+without requiring a server deployment or database migration. Use the exact DSH
+candidate package and verify its installed hashes. A normal
 installation of the same numbered registry release will not fetch unpublished
 candidate changes. No credential, scope, archive or database migration is added.
