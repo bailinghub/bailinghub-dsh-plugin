@@ -46,6 +46,9 @@ set 会锁定已选 scope，逐个查询所有原成员，并核对同 Hub、原
 聊天、目录加载、task 查询、重开、缓存恢复都不会自动创建任务或业务 run。
 受管 Session 保留最多 64 条声明与 12 条完整 schema 窗口；下一轮只准备实际目标，声明有效时无需再次远端搜索。
 缓存或 task 快照都不是派发许可，每笔业务仍由 Core 原子裁决。
+同一受管操作合并重复身份探针：每次实际 invoke/resume 前仍验证全部原成员和最新任务状态，GET/restore 也重新验证。
+若继续操作需要等待，等待结束后重新验证；同 runtime 断网后必须重验原组才能恢复，不跨操作缓存授权证明。
+固定原绑定可复用协议支持证明；不缓存任务状态、成员身份、unsupported 或未绑定任务时的 required/optional 判定。
 
 - `inspect_governed_tool_invocation` 仅接受原 invocation_id，读取 SDK GET receipt，并与可信 journal 的 run、工具、route、task 和完整原 scope 比对。没有可靠 journal 时不能根据聊天文本猜补身份。
 - 受管后台等待只用 inspect，审批已批准也不会触发 POST resume。

@@ -118,9 +118,10 @@ async function fixture(t, selected = 2, settings = {}) {
         }
       } else if (path === '/agent-auth/v1/session') {
         assert.equal(request.method, 'GET')
+        if (control.statusNetworkFailed === account.label) { response.writeHead(503, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'agent_runtime_unavailable', message: 'Synthetic identity probe unavailable.' })); return }
         result = { session_id: account.sessionId, client_app_id: account.clientAppId, device_label: 'synthetic cross-turn fixture',
           principal: { subject: `fixture-${account.label}` }, on_behalf_of: `fixture-${account.label}`,
-          allowed_routes: [account.route], created_at: new Date(now).toISOString(),
+          allowed_routes: control.revoked === account.label ? [] : [account.route], created_at: new Date(now).toISOString(),
           expires_at: new Date(now + 3_600_000).toISOString(), refresh_expires_at: new Date(now + 86_400_000).toISOString() }
       } else if (path === `/agent-api/v1/workspaces/${account.route}/turns`) {
         assert.equal(request.method, 'POST')
@@ -346,6 +347,57 @@ test('whole-group network failure preserves binding and blocks dispatch until or
   assert.equal(f.invocations.size, 0)
   assert.equal((await f.business(f.accounts[0], name)).isError, false)
   assert.equal(f.invocations.size, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('each managed dispatch probes both original members once; cached support never skips fresh task GETs', async t => {
+  const f = await fixture(t)
+  f.control.terminal = true
+  await f.bind(); await f.start(1)
+  const found = await f.search(f.accounts[0]); const name = f.nameFor(found, f.accounts[0])
+  for (let call = 0; call < 2; call++) {
+    const offset = f.requests.length
+    assert.equal((await f.business(f.accounts[0], name)).isError, false)
+    const probes = f.requests.slice(offset)
+    for (const account of f.accounts) {
+      assert.equal(probes.filter(value => value.account === account.label && value.path === '/agent-auth/v1/session').length, 1)
+      assert.equal(probes.filter(value => value.account === account.label && value.path === `/agent-api/v1/tasks/${f.taskId}`).length, 1)
+    }
+  }
+  const beforeGet = f.requests.filter(value => value.path.includes('/tasks/')).length
+  await f.runtime.getSessionTaskState(f.session)
+  await f.runtime.restoreSessionTaskBinding(f.session)
+  assert.equal(f.requests.filter(value => value.path.includes('/tasks/')).length - beforeGet, 4)
+  assert.equal(f.invocations.size, 2)
+  assert.deepEqual(f.errors, [])
+})
+
+for (const revoked of ['A', 'B']) test(`revoking original ${revoked} after a successful managed dispatch blocks the next cached tool call`, async t => {
+  const f = await fixture(t)
+  f.control.terminal = true
+  await f.bind(); await f.start(1)
+  const { name } = await write(f)
+  f.control.revoked = revoked
+  assert.equal((await f.business(f.accounts[0], name)).isError, true)
+  assert.equal(f.invocations.size, 1)
+  assert.equal(requestCount(f, '/turns'), 1)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.deepEqual((await f.stores.taskStore.load(f.session.id)).entries[0].taskBinding, f.taskBinding)
+  assert.deepEqual(f.errors, [])
+})
+
+test('same runtime recovers an offline whole-scope identity probe before its next managed dispatch', async t => {
+  const f = await fixture(t)
+  f.control.terminal = true
+  await f.bind(); await f.start(1)
+  const { name } = await write(f)
+  f.control.statusNetworkFailed = 'B'
+  assert.equal((await f.business(f.accounts[0], name)).isError, true)
+  assert.equal(f.invocations.size, 1)
+  f.control.statusNetworkFailed = null
+  assert.equal((await f.business(f.accounts[0], name)).isError, false)
+  assert.equal(f.invocations.size, 2)
+  assert.equal(requestCount(f, '/turns'), 1)
   assert.deepEqual(f.errors, [])
 })
 
