@@ -60,7 +60,7 @@ async function fixture(t, selected = 2, settings = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-task-control-'))
   t.after(() => rm(directory, { recursive: true, force: true }))
   const stores = { scopeStore: createFileSessionScopeStore({ directory: join(directory, 'scopes') }),
-    invocationStore: createFileInvocationStore({ directory: join(directory, 'invocations') }),
+    invocationStore: Object.hasOwn(settings, 'invocationStore') ? settings.invocationStore : createFileInvocationStore({ directory: join(directory, 'invocations') }),
     taskStore: settings.taskStore ?? createFileSessionTaskStore({ directory: join(directory, 'tasks') }),
     archiveStore: createMemoryConversationArchiveStore() }
   const caps = { schema_version: 'bailing.agent-task-control-capabilities.v1', supported: true, mode: 'required',
@@ -68,7 +68,7 @@ async function fixture(t, selected = 2, settings = {}) {
   const receiptCaps = { schema_version: 'bailing.agent-invocation-inspection-capabilities.v1', receipt_schema: 'bailing.agent-invocation-receipt.v1', read_only: true }
   const invocationResult = (id, account, terminal = control.terminal) => ({ schema_version: 'bailing.agent-tool-invocation.v1', invocation_id: id,
     route: account.route, tool: definition.name, state: terminal ? 'executed' : 'awaiting_approval', ok: terminal, auto_retry_allowed: false,
-    ...(terminal ? {} : { approval_id: 1 }), text: 'Synthetic governed result.' })
+    ...(terminal ? {} : control.retryDelay ? { state: 'rejected_before_dispatch', auto_retry_allowed: true, retry_after_ms: control.retryDelay } : { approval_id: 1 }), text: 'Synthetic governed result.' })
   const server = createServer(async (request, response) => {
     try {
       const account = accounts.find(value => request.headers.authorization === `Bearer ${value.accessToken}`)
@@ -84,6 +84,7 @@ async function fixture(t, selected = 2, settings = {}) {
       if (path === '/agent-api/v1/task-control/capabilities') {
         result = { ...caps, mode: control.required ? 'required' : 'optional' }
       } else if (path === '/agent-api/v1/tool-invocations/inspection-capabilities') {
+        if (control.inspectionUnsupported) { response.writeHead(404, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'not_found' })); return }
         result = receiptCaps
       } else if (path === `/agent-api/v1/tasks/${taskId}`) {
         assert.equal(request.method, 'GET')
@@ -106,18 +107,22 @@ async function fixture(t, selected = 2, settings = {}) {
         if (path.endsWith('/resume')) {
           assert.equal(request.method, 'POST')
           assert.equal(control.state, 'active')
+          if (control.lateResume) await control.lateResume
           control.terminal = true
+          if (control.loseResumeAck) { response.destroy(); return }
           result = invocationResult(id, account)
         } else {
           assert.equal(request.method, 'GET')
+          if (control.lateReceipt) await control.lateReceipt
           if (control.receiptUnavailable) { response.writeHead(503, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'agent_runtime_unavailable', message: 'Synthetic unavailable receipt.' })); return }
           result = { schema_version: 'bailing.agent-invocation-receipt.v1', read_only: true, business_operation_performed: false,
             invocation_id: id, agent_run_id: control.receiptMismatch ? uuid(998) : original.runId, route: account.route, tool: definition.name,
-            observed_at: new Date(now).toISOString(), result: invocationResult(id, account), result_source: 'job', dispatch_state: 'not_dispatched',
+            observed_at: new Date(now).toISOString(), result: control.noReceiptResult ? null : invocationResult(id, account), result_source: control.noReceiptResult ? 'none' : 'job', dispatch_state: control.dispatchState ?? 'not_dispatched',
             approval: { status: 'approved', approval_id: 1 }, journal_state: 'absent' }
         }
       } else if (path === '/agent-auth/v1/session') {
         assert.equal(request.method, 'GET')
+        if (control.lateStatus?.account === account.label) await control.lateStatus.promise
         if (control.statusNetworkFailed === account.label) { response.writeHead(control.statusFailureCode ?? 503, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'agent_runtime_unavailable', message: 'Synthetic identity probe unavailable.' })); return }
         result = { session_id: account.sessionId, client_app_id: account.clientAppId, device_label: 'synthetic cross-turn fixture',
           principal: { subject: `fixture-${account.label}` }, on_behalf_of: `fixture-${account.label}`,
@@ -126,7 +131,7 @@ async function fixture(t, selected = 2, settings = {}) {
       } else if (path === `/agent-api/v1/workspaces/${account.route}/turns`) {
         assert.equal(request.method, 'POST')
         assert.ok([1, 2, 3].includes(currentTurn))
-        assert.deepEqual(body.task_binding, taskBinding)
+        assert.deepEqual(body.task_binding, control.unmanaged ? undefined : taskBinding)
         if (control.lateTurn) await control.lateTurn
         const key = `${account.label}:${body.client_turn_id}`
         let runId = runsByTurn.get(key)
@@ -136,7 +141,7 @@ async function fixture(t, selected = 2, settings = {}) {
           runs.set(runId, { account: account.label, agentSessionId: account.sessionId, route: account.route,
             turn: currentTurn, request: structuredClone(body) })
         } else assert.deepEqual(body, runs.get(runId).request)
-        result = { ...turnResponse({ runId, tools: [], capabilityRevision: revision }), task_binding: taskBinding }
+        result = { ...turnResponse({ runId, tools: [], capabilityRevision: revision }), ...(control.unmanaged ? {} : { task_binding: taskBinding }) }
         result.context.instructions = `Current synthetic instructions for ${account.label}, turn ${currentTurn}.`
         result.context.knowledge = [{ title: 'Synthetic policy', excerpt: `Policy revision for turn ${currentTurn}.` }]
       } else if (path === `/agent-api/v1/workspaces/${account.route}/capabilities/search`) {
@@ -203,12 +208,13 @@ async function fixture(t, selected = 2, settings = {}) {
   }
   const config = { hubUrl, clientAppId: accounts[0].clientAppId, workspace: accounts[0].route, connectionName: profiles[0].alias }
   const transport = sdk.createAgentClientTransport({ ...config, allowInsecureHttp: true }, { connectionStore, now: () => now })
+  settings.configureTransport?.(transport)
   let runtime, session, agent, refs
   const launch = async (history) => {
     ctx = new Context()
     await ctx.plugin(SystemPrompt, {}); await ctx.plugin(ToolRuntime, { mode: 'native' }); await ctx.plugin(CommandRuntime, {})
     await ctx.plugin(createAgentClientPlugin({ transport, toolLifecycle: 'session', ...stores,
-      recovery: { maxAttempts: 1, maxWaitMilliseconds: 1000, pollIntervalMilliseconds: 1 } }), config)
+      recovery: { maxAttempts: 1, maxWaitMilliseconds: 1000, pollIntervalMilliseconds: 1, now: () => now + (control.clockOffset ?? 0) } }), config)
     runtime = ctx.get('bailingHubAgentClient')
     session = Session.create(sessionId, history ?? [])
     agent = { id: session.id, session }
@@ -234,7 +240,13 @@ async function fixture(t, selected = 2, settings = {}) {
     const activeTargets = runtime.getSessionToolState(session.id).targets.filter(entry => entry.preparation_state === 'ready').length
     const event = session.append('turn/end', { turn: currentTurn, reason: { kind: 'completed' } })
     runtime.onSessionEvent(session, event)
-    if (activeTargets) await until(() => requests.filter(entry => entry.path.endsWith('/complete')).length >= completedBefore + activeTargets)
+    if (activeTargets) {
+      await until(() => requests.filter(entry => entry.path.endsWith('/complete')).length >= completedBefore + activeTargets)
+      await until(() => runtime.statesBySessionId.get(session.id)?.currentRun?.status === 'completed')
+      // The synthetic archive endpoint deliberately answers 404. Wait for the
+      // event-driven sync to finish so an idle-action counter excludes that POST.
+      await until(() => runtime.conversationOutbox.status(session.id).state === 'unsupported')
+    }
   }
   const search = (account, cached = false) => execute('search_business_capabilities', { query: 'Query the known synthetic product.',
     ...(selected > 1 ? { authorization_ref: refs[account.connectionKey] } : {}), ...(cached ? { tool_name: definition.name } : {}) })
@@ -243,7 +255,7 @@ async function fixture(t, selected = 2, settings = {}) {
   const nameFor = (result, account) => result.value.active_tools.find(entry => entry.original_name === definition.name &&
     entry.authorization_refs.includes(refs[account.connectionKey]))?.name
   return { get runtime() { return runtime }, get session() { return session }, accounts: selectedAccounts, requests, errors, runs, invocations, start, end, search, business, nameFor,
-    taskId, taskBinding, control, stores, execute, bind: () => runtime.setSessionTaskBinding(session, { taskId }),
+    taskId, taskBinding, control, stores, transport, execute, bind: () => runtime.setSessionTaskBinding(session, { taskId }),
     reopen: async () => { const history = structuredClone(session.events); await scope.dispose(); await ctx.fiber.dispose(); await launch(history) } }
 }
 
@@ -558,5 +570,527 @@ test('lost write acknowledgement survives full reopen and is resolved by origina
   assert.equal(requestCount(f, '/resume'), 0)
   assert.equal(f.invocations.size, 1)
   assert.equal((await f.stores.invocationStore.load(f.session.id)).entries[0].runId, record.runId)
+  assert.deepEqual(f.errors, [])
+})
+
+// Host buttons act on the same persisted operation as model recovery tools.
+// They must not fabricate a user message, an active turn or another business run.
+const hostSchema = 'bailing.agent-session-invocation-action.v1'
+const hostAction = (f, operation, id, options) => f.runtime[operation === 'inspect'
+  ? 'inspectSessionInvocation' : 'resumeSessionInvocation'](f.session, id, options)
+function assertHostReply(reply, operation, id, state = 'ready') {
+  // ready is action/receipt availability, not task activation or business success.
+  assert.equal(reply.schema, hostSchema, JSON.stringify(reply))
+  assert.equal(reply.operation, operation, JSON.stringify(reply))
+  assert.equal(reply.invocation_id, id, JSON.stringify(reply))
+  assert.equal(reply.state, state, JSON.stringify(reply))
+  assert.equal(typeof reply.resume_dispatched, 'boolean')
+  if (state !== 'ready') {
+    assert.equal(Object.hasOwn(reply, 'receipt'), false, 'a failed action must not expose an actionable receipt')
+    assert.equal(Object.hasOwn(reply, 'result'), false, 'a failed action must not expose a successful result')
+  }
+}
+async function idleOriginal(t, settings = {}) {
+  const f = await fixture(t, 2, settings)
+  await f.bind(); await f.start(1)
+  const { id } = await write(f)
+  await f.end()
+  return { f, id }
+}
+
+for (const reopen of [false, true]) test(`host idle inspect ${reopen ? 'after durable reopen' : 'without another user turn'} reads only the original approved receipt`, async t => {
+  const { f, id } = await idleOriginal(t)
+  if (reopen) await f.reopen()
+  const before = { requests: f.requests.length, turns: requestCount(f, '/turns'), events: structuredClone(f.session.events),
+    tools: structuredClone(f.runtime.getSessionToolState(f.session.id).active_tools), journal: await f.stores.invocationStore.load(f.session.id) }
+  const reply = await hostAction(f, 'inspect', id)
+  assertHostReply(reply, 'inspect', id)
+  assert.equal(reply.resume_dispatched, false)
+  assert.equal(reply.receipt.invocation_id, id)
+  assert.equal(reply.receipt.agent_run_id, before.journal.entries[0].runId)
+  assert.equal(reply.receipt.approval.status, 'approved')
+  assert.equal(reply.receipt.result.state, 'awaiting_approval')
+  assert.equal(requestCount(f, '/turns'), before.turns)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.equal(f.requests.slice(before.requests).every(request => request.method === 'GET'), true)
+  assert.deepEqual(f.session.events, before.events)
+  assert.deepEqual(f.runtime.getSessionToolState(f.session.id).active_tools, before.tools)
+  assert.equal(f.invocations.size, 1)
+  assert.equal(f.requests.some(request => request.account === 'C'), false)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host idle explicit resume inspects first, sends one original POST and subsequent actions only observe', async t => {
+  const { f, id } = await idleOriginal(t)
+  await f.reopen()
+  const offset = f.requests.length
+  const reply = await hostAction(f, 'resume', id)
+  assertHostReply(reply, 'resume', id)
+  assert.equal(reply.resume_dispatched, true)
+  assert.equal(reply.result.invocation_id, id)
+  assert.equal(reply.result.state, 'executed')
+  const actions = f.requests.slice(offset).filter(request => request.path.includes(id))
+  assert.equal(actions[0].method, 'GET')
+  assert.equal(actions.filter(request => request.method === 'POST').length, 1)
+  assert.equal(actions.find(request => request.method === 'POST').path, `/agent-api/v1/tool-invocations/${id}/resume`)
+  const observed = await hostAction(f, 'inspect', id)
+  assertHostReply(observed, 'inspect', id)
+  assert.equal(observed.receipt.result.state, 'executed')
+  const repeated = await hostAction(f, 'resume', id)
+  assertHostReply(repeated, 'resume', id)
+  assert.equal(repeated.resume_dispatched, false)
+  assert.equal(requestCount(f, '/resume'), 1)
+  assert.equal(requestCount(f, '/turns'), 1)
+  assert.equal(f.invocations.size, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+for (const dispatchState of ['attempted', 'unknown']) test(`host resume observes ${dispatchState} original dispatch without issuing another POST`, async t => {
+  const { f, id } = await idleOriginal(t)
+  f.control.dispatchState = dispatchState
+  const before = receiptCount(f)
+  for (let n = 0; n < 2; n++) {
+    const reply = await hostAction(f, 'resume', id)
+    assertHostReply(reply, 'resume', id)
+    assert.equal(reply.resume_dispatched, false)
+    assert.equal(reply.receipt.dispatch_state, dispatchState)
+  }
+  assert.equal(receiptCount(f) - before, 2)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.equal(f.invocations.size, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host inspect queued behind an explicit resume receives its own read-only response, not the resume response', async t => {
+  const { f, id } = await idleOriginal(t)
+  let release
+  f.control.lateResume = new Promise(resolve => { release = resolve })
+  const resumed = hostAction(f, 'resume', id)
+  await until(() => requestCount(f, '/resume') === 1)
+  const receipts = receiptCount(f)
+  const inspected = hostAction(f, 'inspect', id)
+  release()
+  const [resumeReply, inspectReply] = await Promise.all([resumed, inspected])
+  assertHostReply(resumeReply, 'resume', id)
+  assertHostReply(inspectReply, 'inspect', id)
+  assert.equal(resumeReply.resume_dispatched, true)
+  assert.equal(inspectReply.resume_dispatched, false)
+  assert.equal(inspectReply.receipt.result.state, 'executed')
+  assert.equal(receiptCount(f) > receipts, true)
+  assert.equal(requestCount(f, '/resume'), 1)
+  assert.deepEqual(f.errors, [])
+})
+
+for (const managed of [true, false]) for (const first of ['model', 'host']) test(`${first} then ${first === 'model' ? 'host' : 'model'} continuation of one original ${managed ? 'managed' : 'unmanaged'} operation share serialization and never POST twice`, async t => {
+  const f = await fixture(t)
+  if (managed) await f.bind()
+  else { f.control.required = false; f.control.unmanaged = true; f.control.retryDelay = 5_000 }
+  await f.start(1)
+  const { id } = await write(f)
+  if (!managed) { f.control.retryDelay = 0; f.control.clockOffset = 6_000 }
+  let release
+  f.control.lateResume = new Promise(resolve => { release = resolve })
+  let model, host
+  if (first === 'model') model = f.execute('resume_governed_tool_invocation', { invocation_id: id })
+  else host = hostAction(f, 'resume', id)
+  await until(() => requestCount(f, '/resume') === 1)
+  if (first === 'model') host = hostAction(f, 'resume', id)
+  else model = f.execute('resume_governed_tool_invocation', { invocation_id: id })
+  release()
+  const [modelReply, hostReply] = await Promise.all([model, host])
+  assert.equal(modelReply.isError, false, JSON.stringify(modelReply))
+  assertHostReply(hostReply, 'resume', id)
+  assert.equal(hostReply.resume_dispatched, first === 'host')
+  assert.equal(requestCount(f, '/resume'), 1)
+  assert.equal(f.invocations.size, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+for (const operation of ['inspect', 'resume']) test(`host ${operation} cancellation before a late receipt exposes no result or dispatch`, async t => {
+  const { f, id } = await idleOriginal(t)
+  let release
+  f.control.lateReceipt = new Promise(resolve => { release = resolve })
+  const before = receiptCount(f)
+  const controller = new AbortController()
+  const pending = hostAction(f, operation, id, { signal: controller.signal })
+  await until(() => receiptCount(f) > before)
+  controller.abort(); release()
+  const reply = await pending
+  assertHostReply(reply, operation, id, 'cancelled')
+  assert.equal(reply.resume_dispatched, false)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.equal(f.runtime.getSessionToolState(f.session.id).active_tools.length, 0)
+  assert.deepEqual(f.errors, [])
+})
+
+test('disposing a runtime during host receipt inspection cannot revive an ended turn or return success', async t => {
+  const { f, id } = await idleOriginal(t)
+  let release
+  f.control.lateReceipt = new Promise(resolve => { release = resolve })
+  const before = receiptCount(f)
+  const pending = hostAction(f, 'inspect', id)
+  await until(() => receiptCount(f) > before)
+  const disposed = f.runtime.dispose()
+  release()
+  const reply = await pending
+  await disposed
+  assertHostReply(reply, 'inspect', id, 'cancelled')
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host receipt inspection recovers offline original-member validation in the same idle runtime', async t => {
+  const { f, id } = await idleOriginal(t)
+  await f.reopen()
+  const before = { scope: await f.stores.scopeStore.load(f.session.id), journal: await f.stores.invocationStore.load(f.session.id) }
+  f.control.statusNetworkFailed = 'B'
+  for (let n = 0; n < 2; n++) assertHostReply(await hostAction(f, 'inspect', id), 'inspect', id, 'unavailable')
+  assert.deepEqual(await f.stores.scopeStore.load(f.session.id), before.scope)
+  assert.deepEqual(await f.stores.invocationStore.load(f.session.id), before.journal)
+  f.control.statusNetworkFailed = null
+  assertHostReply(await hostAction(f, 'inspect', id), 'inspect', id)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.equal(requestCount(f, '/turns'), 1)
+  assert.deepEqual(f.errors, [])
+})
+
+for (const revoked of ['A', 'B']) for (const status of [401, 403]) test(`host action rejects original ${revoked} after authoritative HTTP ${status}; it cannot fall back to the other member`, async t => {
+  const { f, id } = await idleOriginal(t)
+  f.control.statusNetworkFailed = revoked; f.control.statusFailureCode = status
+  const before = receiptCount(f)
+  assertHostReply(await hostAction(f, 'inspect', id), 'inspect', id, 'blocked')
+  assertHostReply(await hostAction(f, 'resume', id), 'resume', id, 'blocked')
+  assert.equal(receiptCount(f), before)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.equal(requestCount(f, '/turns'), 1)
+  assert.equal(f.invocations.size, 1)
+  assert.equal(f.requests.some(request => request.account === 'C'), false)
+  assert.deepEqual(f.errors, [])
+})
+
+for (const taskState of ['paused', 'cancelled']) test(`host ${taskState} task retains receipt inspection but blocks explicit continuation`, async t => {
+  const { f, id } = await idleOriginal(t)
+  f.control.state = taskState
+  const observed = await hostAction(f, 'inspect', id)
+  assertHostReply(observed, 'inspect', id)
+  const resumed = await hostAction(f, 'resume', id)
+  assertHostReply(resumed, 'resume', id, 'blocked')
+  assert.equal(resumed.feedback?.code ?? resumed.reason, `TASK_${taskState.toUpperCase()}`)
+  assert.equal(resumed.resume_dispatched, false)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.deepEqual(f.errors, [])
+})
+
+for (const failure of ['journal', 'unsaved_events', 'recovery_gap']) test(`host local ${failure} takes priority over paused task and suppresses payload`, async t => {
+  const { f, id } = await idleOriginal(t)
+  f.control.state = 'paused'
+  if (failure === 'journal') f.runtime.invocationJournal.failures.set(f.session.id, 'invocation_store_conflict')
+  else if (failure === 'unsaved_events') f.runtime.conversationOutbox.status = () => ({ state: 'storage_error', unsavedEvents: 1, pendingEvents: 1 })
+  else f.runtime.archiveStatusWithCoverage = () => ({ state: 'recovery_gap', unsavedEvents: 0, pendingEvents: 0 })
+  const state = failure === 'recovery_gap' ? 'recovery_gap' : 'storage_error'
+  const before = receiptCount(f)
+  assertHostReply(await hostAction(f, 'inspect', id), 'inspect', id, state)
+  assertHostReply(await hostAction(f, 'resume', id), 'resume', id, state)
+  assert.equal(receiptCount(f), before)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host final original-result save failure reports storage_error with dispatched status instead of success', async t => {
+  const base = createMemoryInvocationStore()
+  let fail = false
+  const invocationStore = { load: id => base.load(id), save: (...args) => {
+    if (fail) throw Object.assign(new Error('Synthetic journal save failure'), { code: 'INVOCATION_STORE_CONFLICT' })
+    return base.save(...args)
+  } }
+  const { f, id } = await idleOriginal(t, { invocationStore })
+  // The initial inspected receipt is unchanged; only the executed result needs a write.
+  fail = true
+  const reply = await hostAction(f, 'resume', id)
+  assertHostReply(reply, 'resume', id, 'storage_error')
+  assert.equal(reply.resume_dispatched, true)
+  assert.equal(requestCount(f, '/resume'), 1)
+  assert.equal(f.invocations.size, 1)
+  assert.equal((await base.load(f.session.id)).entries[0].lastKnownState, 'awaiting_approval')
+  const second = await hostAction(f, 'resume', id)
+  assertHostReply(second, 'resume', id, 'storage_error')
+  assert.equal(requestCount(f, '/resume'), 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host empty selected scope has no network request and cannot recover an arbitrary invocation', async t => {
+  const f = await fixture(t, 0)
+  const id = 'a'.repeat(64)
+  const before = f.requests.length
+  assertHostReply(await hostAction(f, 'inspect', id), 'inspect', id, 'blocked')
+  assertHostReply(await hostAction(f, 'resume', id), 'resume', id, 'blocked')
+  assert.equal(f.requests.length, before)
+  assert.equal(f.invocations.size, 0)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host legacy unmanaged journal stays unmanaged and never invents a task association', async t => {
+  const f = await fixture(t)
+  f.control.required = false; f.control.unmanaged = true; f.control.retryDelay = 5_000
+  await f.start(1)
+  const { id } = await write(f)
+  await f.end(); await f.reopen()
+  const record = await f.stores.invocationStore.load(f.session.id)
+  assert.equal(record.entries[0].taskBinding, undefined)
+  const offset = f.requests.length
+  assertHostReply(await hostAction(f, 'inspect', id), 'inspect', id)
+  assert.equal(await f.stores.taskStore.load(f.session.id), null)
+  assert.equal(f.requests.slice(offset).some(request => request.path.startsWith('/agent-api/v1/tasks/')), false)
+  assert.equal(requestCount(f, '/turns'), 1)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host without durable invocation storage returns unsupported without guessing history', async t => {
+  const { f, id } = await idleOriginal(t)
+  f.runtime.invocationJournal.store = null
+  const before = f.requests.length
+  assertHostReply(await hostAction(f, 'inspect', id), 'inspect', id, 'unsupported')
+  assertHostReply(await hostAction(f, 'resume', id), 'resume', id, 'unsupported')
+  assert.equal(f.requests.slice(before).some(request => request.method === 'POST'), false)
+  assert.equal(requestCount(f, '/turns'), 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host older SDK without receipt inspection returns unsupported and never falls through to resume', async t => {
+  const { f, id } = await idleOriginal(t)
+  delete f.transport.inspectInvocation
+  const before = receiptCount(f)
+  assertHostReply(await hostAction(f, 'inspect', id), 'inspect', id, 'unsupported')
+  assertHostReply(await hostAction(f, 'resume', id), 'resume', id, 'unsupported')
+  assert.equal(receiptCount(f), before)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.deepEqual(f.errors, [])
+})
+
+for (const changed of ['scope', 'task', 'journal']) test(`host rejects a durable ${changed} binding change while the original receipt is in flight`, async t => {
+  const { f, id } = await idleOriginal(t)
+  let release
+  f.control.lateReceipt = new Promise(resolve => { release = resolve })
+  const receipts = receiptCount(f)
+  const pending = hostAction(f, 'resume', id)
+  await until(() => receiptCount(f) > receipts)
+  const store = f.stores[`${changed === 'journal' ? 'invocation' : changed}Store`]
+  const load = store.load.bind(store)
+  store.load = async sessionId => {
+    const record = await load(sessionId)
+    if (changed === 'scope') record.revision++
+    else if (changed === 'task') record.entries[0].taskBinding.scope_hash = 'e'.repeat(64)
+    else record.entries[0].runId = uuid(998)
+    return record
+  }
+  release()
+  const reply = await pending
+  assertHostReply(reply, 'resume', id, changed === 'journal' ? 'storage_error' : 'blocked')
+  assert.equal(reply.resume_dispatched, false)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.equal(f.invocations.size, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host empty receipt remains unverified and directs inspection without dispatching', async t => {
+  const { f, id } = await idleOriginal(t)
+  f.control.noReceiptResult = true
+  for (const operation of ['inspect', 'resume']) {
+    const reply = await hostAction(f, operation, id)
+    assertHostReply(reply, operation, id)
+    assert.equal(reply.receipt.result, null)
+    assert.equal(reply.receipt.result_source, 'none')
+    assert.equal(reply.next_action, 'inspect_original')
+    assert.equal(reply.resume_dispatched, false)
+  }
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host unsaved events appearing after resume dispatch preserve uncertain dispatch feedback', async t => {
+  const { f, id } = await idleOriginal(t)
+  let release
+  f.control.lateResume = new Promise(resolve => { release = resolve })
+  const pending = hostAction(f, 'resume', id)
+  await until(() => requestCount(f, '/resume') === 1)
+  f.runtime.conversationOutbox.status = () => ({ state: 'storage_error', unsavedEvents: 1, pendingEvents: 1 })
+  release()
+  const reply = await pending
+  assertHostReply(reply, 'resume', id, 'storage_error')
+  assert.equal(reply.resume_dispatched, true)
+  assert.equal(reply.feedback.dispatch, 'unknown')
+  assert.equal(reply.feedback.original_outcome, 'unverified')
+  assert.equal(requestCount(f, '/resume'), 1)
+  assert.equal(f.invocations.size, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host task paused after dispatch retains the true original result but cannot continue again', async t => {
+  const { f, id } = await idleOriginal(t)
+  let release
+  f.control.lateResume = new Promise(resolve => { release = resolve })
+  const pending = hostAction(f, 'resume', id)
+  await until(() => requestCount(f, '/resume') === 1)
+  f.control.state = 'paused'
+  release()
+  const reply = await pending
+  assertHostReply(reply, 'resume', id)
+  assert.equal(reply.resume_dispatched, true)
+  assert.equal(reply.receipt.result.state, 'executed')
+  assert.equal(reply.result.state, 'executed')
+  assert.equal((await f.runtime.getSessionTaskState(f.session)).task_state, 'paused')
+  const repeated = await hostAction(f, 'resume', id)
+  assertHostReply(repeated, 'resume', id, 'blocked')
+  assert.equal(repeated.resume_dispatched, false)
+  assert.equal(repeated.feedback.code, 'TASK_PAUSED')
+  assert.equal(requestCount(f, '/resume'), 1)
+  assert.equal(f.invocations.size, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host cancellation after resume dispatch reports cancellation with an unverified original outcome', async t => {
+  const { f, id } = await idleOriginal(t)
+  let release
+  f.control.lateResume = new Promise(resolve => { release = resolve })
+  const controller = new AbortController()
+  const pending = hostAction(f, 'resume', id, { signal: controller.signal })
+  await until(() => requestCount(f, '/resume') === 1)
+  controller.abort(); release()
+  const reply = await pending
+  assertHostReply(reply, 'resume', id, 'cancelled')
+  assert.equal(reply.resume_dispatched, true)
+  assert.equal(reply.feedback.dispatch, 'unknown')
+  assert.equal(reply.feedback.original_outcome, 'unverified')
+  assert.equal(f.runtime.getSessionToolState(f.session.id).active_tools.length, 0)
+  assert.equal(requestCount(f, '/resume'), 1)
+  assert.equal(f.invocations.size, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host reading an old rate-limit receipt keeps the expired original retry deadline and can resume once', async t => {
+  const f = await fixture(t)
+  f.control.retryDelay = 5_000
+  await f.bind(); await f.start(1)
+  const { id } = await write(f)
+  const deadline = (await f.stores.invocationStore.load(f.session.id)).entries[0].retryAt
+  assert.ok(deadline > 0)
+  await f.end()
+  f.control.clockOffset = 6_000
+  const reply = await hostAction(f, 'resume', id)
+  assertHostReply(reply, 'resume', id)
+  assert.equal(reply.resume_dispatched, true)
+  assert.equal(reply.result.state, 'executed')
+  assert.equal(requestCount(f, '/resume'), 1)
+  assert.equal(f.invocations.size, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host lost resume acknowledgement only inspects the same operation on follow-up and does not POST again', async t => {
+  const { f, id } = await idleOriginal(t)
+  f.control.loseResumeAck = true
+  const failed = await hostAction(f, 'resume', id)
+  assertHostReply(failed, 'resume', id, 'unavailable')
+  assert.equal(failed.resume_dispatched, true)
+  assert.equal(failed.feedback.dispatch, 'unknown')
+  assert.equal(failed.feedback.next_action, 'inspect_original')
+  assert.equal(failed.feedback.original_outcome, 'unverified')
+  f.control.loseResumeAck = false
+  const observed = await hostAction(f, 'inspect', id)
+  assertHostReply(observed, 'inspect', id)
+  assert.equal(observed.receipt.result.state, 'executed')
+  const repeated = await hostAction(f, 'resume', id)
+  assertHostReply(repeated, 'resume', id)
+  assert.equal(repeated.resume_dispatched, false)
+  assert.equal(requestCount(f, '/resume'), 1)
+  assert.equal(f.invocations.size, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host old Core without receipt protocol remains unsupported rather than falling back to POST recovery', async t => {
+  const f = await fixture(t)
+  f.control.required = false; f.control.unmanaged = true; f.control.retryDelay = 5_000
+  f.control.inspectionUnsupported = true
+  await f.start(1)
+  const found = await f.search(f.accounts[0])
+  const dispatched = await f.business(f.accounts[0], f.nameFor(found, f.accounts[0]))
+  assert.equal(dispatched.isError, false, JSON.stringify(dispatched))
+  const id = [...f.invocations.keys()][0]
+  assert.ok(id)
+  await f.end()
+  assertHostReply(await hostAction(f, 'inspect', id), 'inspect', id, 'unsupported')
+  assertHostReply(await hostAction(f, 'resume', id), 'resume', id, 'unsupported')
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.equal(f.invocations.size, 1)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host missing original archive reports a recovery gap without creating or repairing an outbox', async t => {
+  const { f, id } = await idleOriginal(t)
+  await f.reopen()
+  let saves = 0
+  f.stores.archiveStore.load = async () => null
+  const save = f.stores.archiveStore.save.bind(f.stores.archiveStore)
+  f.stores.archiveStore.save = (...args) => { saves++; return save(...args) }
+  const before = f.requests.length
+  assertHostReply(await hostAction(f, 'inspect', id), 'inspect', id, 'recovery_gap')
+  assert.equal(saves, 0)
+  assert.equal(f.requests.slice(before).some(request => request.method === 'POST'), false)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host concurrent inspection of two original IDs waits for the same outbox load without reporting a false gap', async t => {
+  const f = await fixture(t)
+  await f.bind(); await f.start(1)
+  const first = await write(f)
+  const second = await write(f)
+  assert.notEqual(first.id, second.id)
+  await f.end(); await f.reopen()
+  const load = f.stores.archiveStore.load.bind(f.stores.archiveStore)
+  let release, loads = 0
+  const loaded = new Promise(resolve => { release = resolve })
+  f.stores.archiveStore.load = async id => { loads++; await loaded; return load(id) }
+  const firstAction = hostAction(f, 'inspect', first.id)
+  await until(() => loads > 0)
+  const secondAction = hostAction(f, 'inspect', second.id)
+  // Allow the independently validated second invocation to reach the same local load.
+  await new Promise(resolve => setTimeout(resolve, 40))
+  release()
+  const [firstReply, secondReply] = await Promise.all([firstAction, secondAction])
+  assertHostReply(firstReply, 'inspect', first.id)
+  assertHostReply(secondReply, 'inspect', second.id)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.equal(requestCount(f, '/turns'), 1)
+  assert.equal(f.invocations.size, 2)
+  assert.deepEqual(f.errors, [])
+})
+
+test('host concurrent original-scope validation ending in revocation blocks both original IDs', async t => {
+  const f = await fixture(t)
+  await f.bind(); await f.start(1)
+  const first = await write(f)
+  const second = await write(f)
+  await f.end(); await f.reopen()
+  const load = f.stores.archiveStore.load.bind(f.stores.archiveStore)
+  let releaseArchive, releaseIdentity, loads = 0
+  const archiveLoad = new Promise(resolve => { releaseArchive = resolve })
+  f.stores.archiveStore.load = async id => { loads++; await archiveLoad; return load(id) }
+  const firstAction = hostAction(f, 'inspect', first.id)
+  await until(() => loads > 0)
+  const identityBefore = f.requests.filter(request => request.account === 'B' && request.path === '/agent-auth/v1/session').length
+  f.control.lateStatus = { account: 'B', promise: new Promise(resolve => { releaseIdentity = resolve }) }
+  const secondAction = hostAction(f, 'inspect', second.id)
+  await until(() => f.requests.filter(request => request.account === 'B' && request.path === '/agent-auth/v1/session').length > identityBefore)
+  f.control.statusNetworkFailed = 'B'; f.control.statusFailureCode = 403
+  releaseArchive(); releaseIdentity()
+  const [firstReply, secondReply] = await Promise.all([firstAction, secondAction])
+  assertHostReply(firstReply, 'inspect', first.id, 'blocked')
+  assertHostReply(secondReply, 'inspect', second.id, 'blocked')
+  assert.equal(firstReply.resume_dispatched, false)
+  assert.equal(secondReply.resume_dispatched, false)
+  assert.equal(requestCount(f, '/resume'), 0)
+  assert.equal(f.invocations.size, 2)
+  assert.equal(f.requests.some(request => request.account === 'C'), false)
   assert.deepEqual(f.errors, [])
 })

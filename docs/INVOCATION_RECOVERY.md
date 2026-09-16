@@ -74,7 +74,9 @@ await store.load(sessionId) // null or the complete metadata record
 await store.save(sessionId, nextRecord, expectedRevision) // return saved record
 ```
 
-The record schema is `bailing.agent-invocations.v1`; its top-level fields are `schema`,
+The current record schema is `bailing.agent-invocations.v2`; original v1 records
+without task bindings remain readable and do not acquire a task implicitly.
+Its top-level fields are `schema`,
 `sessionId`, `revision`, `entries`. Revisions start at 1; missing expects `null`. Save must
 atomically compare the previous revision, persist the full record, and acknowledge only
 after durable success. A load error must not return `null`. Custom stores must retain
@@ -90,11 +92,22 @@ The runtime exposes:
 | --- | --- |
 | `getSessionInvocationStatus(sessionId)` | Verify original scope and read local journal status. |
 | `restoreSessionInvocations(sessionId)` | Verify scope and flush pending local metadata with original CAS identity. No business invocation or resume. |
+| `inspectSessionInvocation(realSession, invocationId, { signal }?)` | Read the original remote receipt without a model turn or new run. Does not continue an approved action. |
+| `resumeSessionInvocation(realSession, invocationId, { signal }?)` | Explicitly inspect, then continue an eligible original undispatched action at most once. Later observation is read-only. |
 
-Both return `state`, `entries`, `unsavedRecords`, plus `revision`/`reason` when available.
+The first two return `state`, `entries`, `unsavedRecords`, plus `revision`/`reason` when available.
 Each entry has `invocation_id`, `authorization_ref`, `tool`, `original_run_id`,
 `last_known_state`, `retry_at`, and `result_verified: false`. Treat tool names as data.
 Do not turn these entries into new calls or consider the task complete from this list.
+
+The two remote actions require the actual Session and return a
+`bailing.agent-session-invocation-action.v1` envelope. `ready` means the interface
+returned normally, not that the business action succeeded. `resume_dispatched`
+only reports whether the runtime submitted resume to the SDK, not whether the
+Hub received it or the business action ran; read the original receipt for
+business state. A missing result remains unconfirmed. Storage or coverage failures
+retain priority, and a failure after sending resume never proves no dispatch occurred.
+See the [idle-panel integration and failure contract](TASK_CONTROL.md).
 
 | State | Host action |
 | --- | --- |

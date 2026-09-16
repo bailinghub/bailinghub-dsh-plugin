@@ -38,6 +38,53 @@ await runtime.restoreSessionInvocations(session.id)
 默认插件使用 DSH_HOME 下的私有 sidecar；注入自定义 scopeStore 的宿主必须明确注入 taskStore 和 invocationStore。
 内存适配器仅用于测试，不提供跨进程持久化。存储目录 0700、文件 0600，原子写入、锁和 revision CAS 与既有 journal 一致。
 
+### 没有进行中的对话轮次，也能核对或继续原调用
+
+例如，商城商品上架正在等待审批，用户关闭客户端后重新打开会话。面板可以直接“核对结果”，
+不必伪造一条用户消息或让模型重新执行上架。用户明确点击“继续原调用”时，才考虑继续原操作。
+
+```js
+// session 必须是真实、保留原 events/unsavedEvents 的宿主 Session，不接受 ID 字符串。
+const inspected = await runtime.inspectSessionInvocation(session, originalInvocationId, { signal })
+// 仅在用户明确要求继续时调用。不要把此方法用于自动轮询。
+const continued = await runtime.resumeSessionInvocation(session, originalInvocationId, { signal })
+```
+
+仅接受原 invocation ID 和可选 AbortSignal，不接受新目标、参数、run 或 task。
+原 ID 来自受保护的持久 invocation store，不能从聊天正文补造记录。
+两种动作均重验整组选定身份、固定范围、原 journal、task 与 CAS；不创建业务 run，不注入工具，
+不改变会话范围或原审批规则。没有 task 的旧 v1 记录仍保持无 task，不能据此跳过后来生效的受管要求。
+
+| 动作 | 行为 |
+| --- | --- |
+| `inspectSessionInvocation` | 只读原服务端 receipt；即使审批已通过也不执行。暂停或取消的原任务仍可核对原结果。 |
+| `resumeSessionInvocation` | 先核对原 receipt。只有明确 `not_dispatched`、无派发 journal 且状态可继续，才发送最多一次原 resume POST。后续等待使用 GET。 |
+| 已派发、结果未知、缺少结果 | 只核对原结果，不新造调用；未知结果不能因“继续”按钮变成替代写入。 |
+| 当前任务暂停、取消或被阻断 | 核对仍按权限进行；继续受原任务门禁限制。额度与并发限制由 Core 在实际派发时权威判断。 |
+
+结果 envelope：`schema=bailing.agent-session-invocation-action.v1`，含 `operation`、`invocation_id`、
+`state`、`resume_dispatched`。`ready` 表示本次核对/继续接口正常返回，**不代表业务成功或整个任务完成**。
+读取 `receipt.result.state` 判断原业务结果；`receipt.result=null` 必须保持结果未确认。
+`resume_dispatched=true` 表示运行时已将原 resume 请求提交给 SDK，不保证 Hub 已接收或业务已执行；
+随后读取的 receipt 本身仍是只读。身份校验可能按 SDK 原规则刷新凭据，这不属于业务派发。
+成功可能含 `result`（原 POST 回应）、`receipt`（其后的核对）、`next_action` 和 `retry_after_ms`。
+未确定结果时继续用 inspect 原 ID；无隐式轮询、定时自动继续或替代 invocation。
+
+失败返回 `blocked / unavailable / unsupported / storage_error / recovery_gap / cancelled`，
+附 `reason` 与现有 `bailing.agent-feedback.v1`，不同时返回可操作的成功结果。
+本地保存失败、`unsavedEvents` 和已确认历史缺口优先；已发出请求后出现这些错误，
+`feedback.dispatch=unknown`，不能把它解释为“业务肯定没执行”。宿主显示主错误并保留原调用 ID。
+网络恢复后可在同一 runtime 重试核对；明确原身份改变仍整组阻断，不退默认目标或剩余授权。
+
+重开时只读加载原本地 outbox 以判断已保存历史，不创建归档、补原文或同步正文。
+只读 GET 中相同限流结果保留原绝对等待截止；新的 POST 限流结果可以建立新的等待窗口。
+宿主和模型对同一 Session / invocation 共享运行时串行控制；跨进程仍依赖原 journal CAS 和 Core 原 ID 幂等规则。
+面板 AbortSignal 与对话轮次分开，关闭 Session/runtime 会取消相关面板动作。迟到响应至多保存原调用事实，
+不会复活工具或恢复已取消任务。宿主应在面板操作取消时 abort，不能把旧响应写入另一个会话。
+
+旧 SDK/Core 不支持只读 receipt 时明确 `unsupported`，不会将读取降级为 resume。
+缺少持久 invocation store 不猜补原绑定。原“填写草稿 → 用户发送 → 模型工具”流程继续可用。
+
 ### 读取原任务坐标
 
 例如，同一会话已选择商城和库存系统的授权，宿主需要让管理端建立一个累计预算任务。

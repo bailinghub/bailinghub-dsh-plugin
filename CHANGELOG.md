@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Let a conversation panel inspect a pending shop listing or inventory change
+  after reopening, without starting a model turn or business run. Explicit continuation
+  first inspects the original receipt, preserves approval and task controls, and never
+  replaces an uncertain write. Panel and model actions serialize the same invocation.
+  Preserve local storage errors, cancellation and original retry deadlines. See the
+  [host integration contract](docs/TASK_CONTROL.md).
+
 - Let a host read original conversation and selected shop/inventory authorization
   coordinates through `getSessionTaskCoordinates(session)` when preparing a governed
   task. Revalidate the complete original group without locking a draft, creating a
