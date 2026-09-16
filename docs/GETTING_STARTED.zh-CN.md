@@ -1,6 +1,6 @@
-# 开始使用 0.5.0
+# 开始使用 0.6.0
 
-这份指南面向业务系统已经接入 BailingHub 的用户。管理员需要先准备 Core 0.7.0、公开的 Client
+这份指南面向业务系统已经接入 BailingHub 的用户。管理员需要先准备 Core 0.8.0、公开的 Client
 App ID、workspace 和浏览器业务授权入口。多系统时，每个目标分别授权，且属于同一中枢、同一
 审计域；已有能力无需重新声明，但每项动作必须已由相应业务系统开放。
 
@@ -10,10 +10,10 @@ App ID、workspace 和浏览器业务授权入口。多系统时，每个目标�
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
-dsh plugin --profile web add dsh-bailinghub@0.5.0
+dsh plugin --profile web add dsh-bailinghub@0.6.0
 ```
 
-插件会自动安装 SDK 0.5.0。通过插件设置填写四项公开信息，或使用对应环境变量。下面都是
+插件会自动安装 SDK 0.6.0。通过插件设置填写四项公开信息，或使用对应环境变量。下面都是
 占位值，需要替换成管理员提供的中枢地址、Client App ID 和 workspace：
 
 ```bash
@@ -101,7 +101,7 @@ B 店连接可以继续保留。
 
 ## 第四步：核对业务结果与沟通过程
 
-在业务后台核对最终结果，在 BailingHub 查看原调用轨迹。配合 Core 0.7.0，还能把可见用户消息、
+在业务后台核对最终结果，在 BailingHub 查看原调用轨迹。配合 Core 0.8.0，还能把可见用户消息、
 助手回复、轮次与相关执行记录放在同一份沟通记录里查看。多授权的各份执行记录仍分别保留自身
 调用摘要。
 

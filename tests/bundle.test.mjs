@@ -10,13 +10,13 @@ const legacyPatch = await readFile(new URL('../cordis.patch.yml', import.meta.ur
 
 test('is a publishable stable native Cordis plugin', () => {
   assert.notEqual(packageJson.private, true)
-  assert.equal(packageJson.version, '0.5.0')
+  assert.equal(packageJson.version, '0.6.0')
   assert.deepEqual(packageJson.publishConfig, { access: 'public', provenance: true })
   assert.equal(packageJson.main, 'lib/index.js')
   assert.equal(packageJson.exports, './lib/index.js')
   assert.deepEqual(packageJson.dsh, { bundle: { patch: './cordis.agent-client.patch.yml' } })
   assert.equal(packageJson.dependencies['@deepseek-ai/schemastery'], '^3.18.1')
-  assert.equal(packageJson.dependencies['bailinghub-mcp-server'], '0.5.0')
+  assert.equal(packageJson.dependencies['bailinghub-mcp-server'], '0.6.0')
   assert.equal(packageJson.peerDependencies?.['bailinghub-mcp-server'], undefined)
   assert.equal(packageJson.peerDependenciesMeta?.['bailinghub-mcp-server'], undefined)
   assert.deepEqual(packageJson.devDependencies, {
@@ -145,8 +145,8 @@ test('rejects public packages with ranged, optional-peer, optional, or local SDK
 test('keeps the current stable dependency contract valid', () => {
   const matchingLock = {
     packages: {
-      '': { dependencies: { 'bailinghub-mcp-server': '0.5.0' } },
-      'node_modules/bailinghub-mcp-server': { version: '0.5.0' },
+      '': { dependencies: { 'bailinghub-mcp-server': '0.6.0' } },
+      'node_modules/bailinghub-mcp-server': { version: '0.6.0' },
     },
   }
   assert.doesNotThrow(() => validateReleaseDependencyContract(packageJson, matchingLock))

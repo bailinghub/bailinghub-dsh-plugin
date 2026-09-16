@@ -1,5 +1,12 @@
 # BailingHub for DeepSeek Harness
 
+## 0.6.0: longer tasks, attachments and original-call recovery
+
+Retain the correct target while moving between edits and queries, reuse uploaded image URLs and inspect original calls after reopening. Task budgets survive turn changes. Pair Core 0.8.0 / SDK 0.6.0 / DSH 0.6.0; host integration is required for task binding and opt-in cross-turn reuse.
+
+[Changes](docs/RELEASE_NOTES_v0.6.0.en.md) · [Upgrade](docs/UPGRADE_v0.6.0.en.md)
+
+
 [简体中文](docs/README.zh-CN.md) | English
 
 Ask your local DeepSeek Harness Agent to work with a business system connected to BailingHub:
@@ -28,31 +35,19 @@ that record fails, it can retry after reconnecting or restarting without repeati
 This is an independent community integration, not a plugin developed, certified, endorsed, or
 recommended by DeepSeek.
 
-## Candidate: continue a conversation without discovering the same tool again
-
-A user checks a shop product, then asks “what about its stock?” in the next message.
-An opted-in host can keep recent complete tool declarations in that same living session.
-The next business step prepares current context and a new run for the selected account,
-then reuses a valid declaration without another capability-search request. A greeting
-does not start business runs. Unknown writes still recover only their original invocation.
-
-This is a **local candidate**, enabled by the host with `toolLifecycle: 'session'`;
-the published version number alone does not identify its bytes. Existing hosts keep
-their current behavior. See the [lifecycle and host integration contract](docs/SESSION_TOOL_REUSE.md)
-before installing the exact candidate and enabling it.
 
 ## Install and start
 
 You need Node.js `22.19.0+` or `24+`, pnpm, and a compatible DeepSeek Harness release. Your
 administrator must first connect the business system to BailingHub. The matched release set is
-**BailingHub Core 0.7.0 → BailingHub MCP/SDK 0.5.0 → this plugin 0.5.0**.
+**BailingHub Core 0.8.0 → BailingHub MCP/SDK 0.6.0 → this plugin 0.6.0**.
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
-dsh plugin --profile web add dsh-bailinghub@0.5.0
+dsh plugin --profile web add dsh-bailinghub@0.6.0
 ```
 
-The plugin installs its exact `bailinghub-mcp-server@0.5.0` dependency automatically.
+The plugin installs its exact `bailinghub-mcp-server@0.6.0` dependency automatically.
 For an existing installation, read the [migration steps from 0.4.0 and earlier](docs/MIGRATION_VNEXT.md).
 
 Follow the [getting started guide](docs/GETTING_STARTED.md) to enter your administrator's four
@@ -181,7 +176,7 @@ identity separately. Custom DSH hosts must implement the [scope selection and re
 and display confirmation before the first message. The native slash commands already use those
 APIs. Tool envelopes, persistence, event schemas, and recovery limits are documented in the
 [Agent Client contract](docs/AGENT_CLIENT_CONTRACT.md).
-For the unreleased Local Agent attachment space (image-first), see [host artifact integration](docs/GENERATED_ARTIFACTS.md). Register approved conversation outputs, upload them once, and use ready URLs with existing business tools.
+For the Local Agent attachment space (image-first), see [host artifact integration](docs/GENERATED_ARTIFACTS.md). Register approved conversation outputs, upload them once, and use ready URLs with existing business tools.
 
 Use Native Tool Mode. DSH Code Mode is deliberately degraded because it cannot safely present the
 current-turn dynamic schemas. See the [compatibility matrix](docs/COMPATIBILITY.md).
@@ -198,9 +193,9 @@ versions and redacted errors. Do not include tokens, private URLs, personal data
 payloads. Compatibility tests and package downloads are not evidence of production adoption.
 
 
-## Candidate: recover an original action after reopening
+## Recover an original action after reopening
 
-An unreleased candidate adds a local invocation journal for actions such as a product listing
+Version 0.6.0 adds a local invocation journal for actions such as a product listing
 awaiting approval or an inventory update whose response was lost. Reopen the same conversation
 and explicitly recover the original call without creating a second business request. Custom
 hosts must retain the new store alongside their existing Session scope. See the

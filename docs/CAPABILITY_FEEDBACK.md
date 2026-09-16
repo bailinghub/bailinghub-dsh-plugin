@@ -1,9 +1,6 @@
 # Discover capabilities and recover the right operation
 
-This additive candidate improves the information the Agent receives. Existing
-authorization, approval, fixed conversation scope and archive rules still apply.
-The package version alone does not identify this candidate: use its source commit
-and package SHA-256 from the accompanying candidate manifest.
+DSH 0.6.0 improves the information the Agent receives. Use the paired SDK 0.6.0 and Core 0.8.0 for authoritative counts and feedback. Existing authorization, approval, fixed conversation scope and archive rules still apply.
 
 ## What users should notice
 
@@ -112,7 +109,7 @@ can survive between turns in the same living runtime; they are never reused as
 authorization or old run context, and are not persisted across restarts. Archive
 events, original run links, ACK/CAS and attachment upload identities are unchanged.
 Original invocation metadata can be persisted separately by the
-[durable recovery candidate](INVOCATION_RECOVERY.md); it does not restore the old tool cache.
+[durable recovery](INVOCATION_RECOVERY.md); it does not restore the old tool cache.
 
 ## Structured failure feedback
 
@@ -199,8 +196,4 @@ carrier through its own model loop. Simply adding properties to a thrown Error i
 insufficient: the host may discard them. Older SDK/Core combinations retain their
 business flows, but may lack precise counts or authoritative error detail.
 
-This iteration changes DSH only; the accompanying manifest pins the existing SDK/Core
-without requiring a server deployment or database migration. Use the exact DSH
-candidate package and verify its installed hashes. A normal
-installation of the same numbered registry release will not fetch unpublished
-candidate changes. No credential, scope, archive or database migration is added.
+These discovery and tool-lifecycle changes require no credential, scope or archive conversion. Follow the [release upgrade guide](UPGRADE_v0.6.0.en.md) for the complete release, including Core migrations for attachments, limits and task controls.

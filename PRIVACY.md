@@ -104,7 +104,7 @@ Hidden reasoning is never uploaded by the adapter.
 
 The host checks the captured connection key, workspace, and original Agent Session id before
 transport operations without projecting those inspection fields into the model's directory.
-Invocation bindings stay host-side. The unreleased [durable recovery candidate](docs/INVOCATION_RECOVERY.md)
+Invocation bindings stay host-side. The [durable recovery journal](docs/INVOCATION_RECOVERY.md)
 adds a separate `invocation-records` store in the plugin data directory for original binding
 metadata, parameter/receipt digests, last-known state and retry deadline. It stores no raw
 arguments, receipt bodies, credentials or conversation text. Records remain until the host/operator
@@ -165,3 +165,8 @@ A later retry on the same runtime may recover a temporary network failure, but c
 confirmed revocation, replacement identity, or a storage conflict. Archive status retains known
 unsaved events and history gaps while upload is blocked. Revocation confirmed during asynchronous
 archive capability discovery or opening is rechecked before reporting availability or uploading.
+
+
+## Task records in 0.6.0
+
+A private persistent task store binds the original Session, fixed members and administrator-created task. It does not store administrative credentials or grant model task-management authority. Retain original scope, task, invocation and archive records; storage errors never downgrade to an unrestricted flow. Task enrollment persists on the original Agent Session even after cancellation. Do not downgrade an enrolled authorization to a host/Core that ignores that requirement. See [task control](docs/TASK_CONTROL.md) and [upgrade](docs/UPGRADE_v0.6.0.en.md).

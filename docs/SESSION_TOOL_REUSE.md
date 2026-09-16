@@ -1,18 +1,12 @@
 # Reuse business tools across user turns
 
-This DSH candidate lets a conversation reuse recently discovered business tool
-declarations while the same host runtime and Session remain alive. For example,
-a user can ask an Agent to find a shop product, then ask for its details in the
-next message without making the Agent search for the same tool again.
+This feature lets a conversation reuse recently discovered complete tool declarations while the same runtime and Session remain alive. For example, a user can find a shop product and ask for its details in the next message without another capability search.
 
 Reusing a declaration does not reuse an earlier execution context or operation.
 The next turn prepares current rules, context, authorization and a new run for
 the intended target before a new business operation can execute.
 
-This is an opt-in candidate, not a statement that the same-numbered registry
-release contains the feature. Install the exact package and verify its hash
-against the accompanying candidate manifest. The manifest pins the paired SDK
-and Core; this change introduces no new SDK/Core API or database migration.
+This feature is opt-in with `toolLifecycle: 'session'`; default `active_turn` behavior is unchanged. Use DSH 0.6.0 with SDK 0.6.0 and Core 0.8.0 for the complete release set.
 
 ## Enable it in the host
 

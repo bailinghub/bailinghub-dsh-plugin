@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 - 2026-09-16
+
+See [scenarios and upgrade](docs/RELEASE_NOTES_v0.6.0.md) · [English](docs/RELEASE_NOTES_v0.6.0.en.md).
+
+- Bind administrator-created tasks through persistent taskStore and public host APIs. Preserve original members, cumulative budgets, cancellation and read-only receipt inspection; models cannot create or switch tasks.
 
 - Let a conversation panel inspect a pending shop listing or inventory change
   after reopening, without starting a model turn or business run. Explicit continuation

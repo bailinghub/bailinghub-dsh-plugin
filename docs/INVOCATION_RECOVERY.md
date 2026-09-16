@@ -1,7 +1,6 @@
 # Reopen a conversation and recover its original business actions
 
-This is an **unreleased candidate**. The unchanged package version does not identify
-its source: use the exact candidate commit and package digest supplied with it.
+Available in DSH 0.6.0 with SDK 0.6.0 and Core 0.8.0. Configure a durable invocation store and preserve original Session records.
 
 A shop listing may still await approval when a user closes the Agent. An inventory
 adjustment may have reached the server even though its response was lost. Reopening
@@ -35,7 +34,7 @@ Digests support association and change detection; they are not independent tampe
 `resume` is **not a read-only status operation**: Core may continue an approved or
 otherwise resumable original operation. Unknown dispatched writes remain subject to
 Core's existing reconciliation and approval rules. Reopening alone does not do this.
-This candidate does not automatically continue a whole task, DAG or sequence of actions.
+This feature does not automatically continue a whole task, DAG or sequence of actions.
 When the user starts a new recovery turn, the existing runtime may create a current-turn
 run for the original selected target to keep the new conversation/audit association.
 That run never replaces the recovered call's original run or invocation. The startup and
@@ -146,7 +145,7 @@ this does not enable business access or discard either failure.
   or temporary network failure does not become a missing-record diagnosis.
 - Existing SDK/Core network, authorization, unsupported and reconciliation feedback
   continues unchanged. No new Core endpoint, SDK method, database migration or business
-  backend capability declaration is required for this candidate.
+  backend capability declaration is required for this feature.
 
 Whole-scope revalidation includes single-system multiple accounts. Temporary offline
 checks stay closed but can recover in the same runtime. A confirmed revoked or rebound

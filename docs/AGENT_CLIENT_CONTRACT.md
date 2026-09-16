@@ -1,6 +1,6 @@
 # Agent Client Host Adapter Contract
 
-The additive [session tool reuse candidate](SESSION_TOOL_REUSE.md) is explicitly
+The additive [session tool reuse contract](SESSION_TOOL_REUSE.md) is explicitly
 enabled with `createAgentClientPlugin({ toolLifecycle: 'session', ... })`. It uses
 lazy current-turn target preparation for one or many selected authorizations,
 and retains bounded declarations between messages. The lifecycle descriptions
@@ -145,7 +145,7 @@ same-named capabilities on earlier targets cannot permanently crowd it out.
 
 Recovery accepts only a known original invocation. When needed in a later live turn, it opens
 only that original target's run with a recovery-specific input and resumes the original invocation;
-it does not create a replacement invocation. The [durable recovery candidate](INVOCATION_RECOVERY.md)
+it does not create a replacement invocation. The [durable recovery journal](INVOCATION_RECOVERY.md)
 can restore original binding metadata after process restart; scope or archive restoration alone
 cannot. Explicit Core resume may continue the original approved operation.
 Cancellation and superseding turns cannot register tools or dispatch a new write from a late start.
@@ -251,7 +251,7 @@ authorization selector. Pending approval and unknown dispatch outcomes follow th
 exact-invocation recovery rules as the baseline. Removing or selecting another default must not
 retarget an existing invocation.
 The local invocation map survives later turns of the same live conversation. The
-[durable recovery candidate](INVOCATION_RECOVERY.md) can restore trusted original binding metadata
+[durable recovery journal](INVOCATION_RECOVERY.md) can restore trusted original binding metadata
 across process restarts, never into another conversation. Unknown IDs fail closed. This is
 original-invocation recovery, not durable automatic continuation of a whole task.
 

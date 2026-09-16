@@ -1,7 +1,6 @@
-# 宿主任务关联与只读回执候选
+# 宿主任务关联与只读回执
 
-这是本地集成候选，包版本仍为 0.5.0；同版本的公开包不代表包含本功能。
-只与候选清单固定的 Core 和 SDK 配套验证，不因此执行部署、迁移或公开发布。
+配套版本：Core 0.8.0 / SDK 0.6.0 / DSH 0.6.0。新能力需部署方升级并按宿主契约接入；业务权限、审批和原身份约束保持。
 
 ## 宿主接口
 
@@ -134,8 +133,8 @@ CAS 的 `SCOPE_STORE_CONFLICT` / `TASK_STORE_CONFLICT` 与读盘失败的 `*_STO
 `SESSION_SCOPE_CONFLICT` 表示读取期间范围变化。已知本地存储错误优先于网络及 unsupported，随后才是 recovery_gap。
 原 journal/outbox 的持久恢复仍需宿主正常调用既有恢复接口；本投影不代替恢复，也不证明尚未装载的本地存储完整。
 
-旧候选缺少此方法时，宿主只将任务坐标功能显示为 unsupported，保留普通会话，不能回退读取内部协调器。
-本增量只需替换精确 DSH 候选，沿用已验收的 SDK/Core；不需要业务后端修改、Core 迁移或部署。
+旧版本缺少此方法时，宿主只将任务坐标功能显示为 unsupported，保留普通会话，不能回退读取内部协调器。
+此宿主坐标方法本身不新增业务后端要求；完整版本按配套升级指南执行 Core、SDK 和 DSH 升级。
 它没有新增面板直接 inspect/resume 方法，现有“填入草稿→用户发送→原模型工具”流程继续有效。
 
 set 会锁定已选 scope，逐个查询所有原成员，并核对同 Hub、原 Agent Session、client、workspace、conversation、完整 member_count、scope_hash 和不可变工具集合。
@@ -171,7 +170,7 @@ set 会锁定已选 scope，逐个查询所有原成员，并核对同 Hub、原
 
 运行前备份 task、scope、invocation 和会话归档存储。包含受管任务或 v2 journal 的 Session 不应回退给不识别它们的旧宿主。
 Core 的 managed enrollment 是粘性的；回退客户端、删 sidecar 或换任务都不能用来解除服务端 task 要求。
-未受管旧 Session 不需要自动创建任务或补写旧条目。部署与数据库升级顺序由 Core 候选手册另行授权。
+未受管旧 Session 不需要自动创建任务或补写旧条目。部署与数据库升级顺序见配套升级指南。
 
 ## 合成验证
 
