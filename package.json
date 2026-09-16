@@ -53,7 +53,8 @@
     "docs/PROJECT_BOUNDARIES.md",
     "docs/GENERATED_ARTIFACTS.md",
     "docs/INVOCATION_RECOVERY.md",
-    "docs/SESSION_TOOL_REUSE.md"
+    "docs/SESSION_TOOL_REUSE.md",
+    "docs/TASK_CONTROL.md"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

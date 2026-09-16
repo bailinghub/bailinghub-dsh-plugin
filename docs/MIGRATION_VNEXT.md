@@ -251,3 +251,7 @@ Before a public 0.5 release:
 
 Do not tag or publish a future version until all gates pass, and do not describe release
 validation as public adoption.
+
+## Local task-control candidate
+
+The host-only task binding and read-only invocation inspection integration is documented in [TASK_CONTROL.md](./TASK_CONTROL.md). It requires the exact paired SDK/Core candidate. Existing journal v1 is read compatibly; subsequent writes use v2 without inferring a task for old entries. Keep scope, task and invocation stores together when reopening, and do not downgrade managed Sessions to an older host. No public package version is changed by this candidate.

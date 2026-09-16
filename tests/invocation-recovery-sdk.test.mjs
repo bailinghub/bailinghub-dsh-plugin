@@ -75,6 +75,9 @@ async function fixture(t, outcome, recovery = {}) {
       const body = bytes.length ? JSON.parse(bytes.toString()) : undefined
       const path = new URL(request.url, 'http://127.0.0.1').pathname
       requests.push({ phase, account: account.label, agentSessionId: account.sessionId, path, method: request.method, body })
+      if (path === '/agent-api/v1/task-control/capabilities') {
+        response.writeHead(404, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'not_found' })); return
+      }
       let result
       if (path === '/agent-auth/v1/session') {
         assert.equal(request.method, 'GET')

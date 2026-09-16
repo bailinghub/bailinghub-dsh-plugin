@@ -95,3 +95,42 @@ test('missing persistence is explicitly unsupported without disabling original i
   assert.equal((await journal.status(session, original().scopeHash)).state, 'unsupported')
   await assert.rejects(journal.find(session, id, original().scopeHash), { publicCode: 'invocation_store_unsupported' })
 })
+
+test('v1 journal migrates on write without guessing an old invocation task', async () => {
+  const store = createMemoryInvocationStore()
+  const old = original()
+  await store.save(session, { schema: 'bailing.agent-invocations.v1', sessionId: session, revision: 1, entries: [old] }, null)
+  const journal = new InvocationJournal(store)
+  assert.deepEqual(await journal.find(session, id, old.scopeHash), old)
+  await journal.update(session, outcome(old), old)
+  const migrated = await store.load(session)
+  assert.equal(migrated.schema, 'bailing.agent-invocations.v2')
+  assert.equal(Object.hasOwn(migrated.entries[0], 'taskBinding'), false)
+})
+
+test('journal task is immutable through reserve and outcome updates, including old unbound records', async () => {
+  const binding = { schema_version: 'bailing.agent-task-binding.v1', task_id: '123e4567-e89b-42d3-a456-000000000900', scope_hash: 'f'.repeat(64) }
+  for (const [before, changed] of [
+    [original(), { ...original(), taskBinding: binding }],
+    [{ ...original(), taskBinding: binding }, original()],
+    [{ ...original(), taskBinding: binding }, { ...original(), taskBinding: { ...binding, task_id: '123e4567-e89b-42d3-a456-000000000901' } }],
+  ]) {
+    const journal = new InvocationJournal(createMemoryInvocationStore())
+    await journal.reserve(session, before)
+    await assert.rejects(journal.reserve(session, changed), { publicCode: 'invocation_binding_conflict' })
+    await assert.rejects(journal.update(session, outcome(changed), before), { publicCode: 'invocation_binding_conflict' })
+    assert.deepEqual(await journal.find(session, id, before.scopeHash), before)
+  }
+})
+
+test('task dispatch uncertainty remains an original unknown call and never suggests rediscovery', async () => {
+  const { describeFailure } = await import('../lib/capability-feedback.js')
+  const feedback = describeFailure({ publicCode: 'TASK_DISPATCH_UNCERTAIN', feedback: {
+    schema: 'bailing.agent-feedback.v1', category: 'invocation_outcome_unknown', code: 'TASK_DISPATCH_UNCERTAIN',
+    origin: 'core', dispatch: 'unknown', next_action: 'inspect_original', retryable: false,
+  } }, { operation: 'invoke', invocationId: id })
+  assert.equal(feedback.code, 'TASK_DISPATCH_UNCERTAIN')
+  assert.equal(feedback.dispatch, 'unknown')
+  assert.equal(feedback.next_action, 'inspect_original')
+  assert.equal(feedback.retryable, false)
+})
