@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Let a host read original conversation and selected shop/inventory authorization
+  coordinates through `getSessionTaskCoordinates(session)` when preparing a governed
+  task. Revalidate the complete original group without locking a draft, creating a
+  run or exposing unselected targets. Keep persistence failures distinct from
+  retryable network failures and unsupported versions. Existing task binding and
+  execution rules remain in force; see [the host contract](docs/TASK_CONTROL.md).
+
 - Let an opted-in host retain complete shop, inventory or other business tool
   declarations across user messages in the same living Session. Prepare current
   target context once per user turn; valid exact-name lookups need no additional

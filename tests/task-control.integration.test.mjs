@@ -118,7 +118,7 @@ async function fixture(t, selected = 2, settings = {}) {
         }
       } else if (path === '/agent-auth/v1/session') {
         assert.equal(request.method, 'GET')
-        if (control.statusNetworkFailed === account.label) { response.writeHead(503, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'agent_runtime_unavailable', message: 'Synthetic identity probe unavailable.' })); return }
+        if (control.statusNetworkFailed === account.label) { response.writeHead(control.statusFailureCode ?? 503, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'agent_runtime_unavailable', message: 'Synthetic identity probe unavailable.' })); return }
         result = { session_id: account.sessionId, client_app_id: account.clientAppId, device_label: 'synthetic cross-turn fixture',
           principal: { subject: `fixture-${account.label}` }, on_behalf_of: `fixture-${account.label}`,
           allowed_routes: control.revoked === account.label ? [] : [account.route], created_at: new Date(now).toISOString(),
@@ -249,6 +249,29 @@ async function fixture(t, selected = 2, settings = {}) {
 
 
 const requestCount = (f, suffix) => f.requests.filter(value => value.path.endsWith(suffix)).length
+
+for (const statusCode of [503, 429]) test(`real Session + SDK coordinate read retries HTTP ${statusCode} without runs, business calls or scope locking`, async t => {
+  const f = await fixture(t)
+  const scopeBefore = await f.stores.scopeStore.load(f.session.id)
+  const initial = await f.runtime.getSessionTaskCoordinates(f.session)
+  assert.equal(initial.state, 'ready', JSON.stringify(initial))
+  assert.equal(initial.scopeLocked, false)
+  assert.deepEqual(initial.members.map(m => m.agentSessionId), f.accounts.map(a => a.sessionId))
+  f.control.statusNetworkFailed = 'B'; f.control.statusFailureCode = statusCode
+  const failed = await f.runtime.getSessionTaskCoordinates(f.session)
+  assert.equal(failed.state, 'unavailable', JSON.stringify(failed))
+  assert.equal(failed.reason, 'agent_transport_unavailable')
+  assert.equal(Object.hasOwn(failed, 'members'), false)
+  f.control.statusNetworkFailed = null
+  assert.deepEqual(await f.runtime.getSessionTaskCoordinates(f.session), initial)
+  assert.deepEqual(await f.stores.scopeStore.load(f.session.id), scopeBefore)
+  assert.equal(await f.stores.taskStore.load(f.session.id), null)
+  assert.equal(requestCount(f, '/turns'), 0)
+  assert.equal(f.invocations.size, 0)
+  assert.equal(f.requests.some(r => r.method !== 'GET'), false)
+  assert.deepEqual(f.errors, [])
+})
+
 const receiptCount = f => f.requests.filter(value => /^\/agent-api\/v1\/tool-invocations\/[a-f0-9]{64}\/receipt$/.test(value.path) && value.method === 'GET').length
 async function write(f, account = f.accounts[0]) {
   const found = await f.search(account)
