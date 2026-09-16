@@ -1,6 +1,16 @@
 # BailingHub for DeepSeek Harness
 
+## 0.6.0：长任务、附件与原调用恢复
+
+连续查询、编辑和核对时保留正确目标；上传获准图片后复用URL，重开后核对原调用，任务额度不因换轮重置。配套 Core 0.8.0 / SDK 0.6.0 / DSH 0.6.0；任务启用和跨轮复用需宿主按契约接入。
+
+[本次变化](RELEASE_NOTES_v0.6.0.md) · [升级指南](UPGRADE_v0.6.0.md)
+
+
 [English](../README.md) | 简体中文
+
+
+## 已公开功能
 
 让本地 DeepSeek Harness 智能体操作已经接入 BailingHub 的业务系统：查询记录、修改允许的字段，
 需要审批时继续走原有规则。BailingHub 会记录用了哪份授权、做了什么，以及业务系统返回的结果。
@@ -25,14 +35,14 @@
 ## 安装与开始使用
 
 需要 Node.js `22.19.0+` 或 `24+`、pnpm，以及兼容的 DeepSeek Harness。管理员应先完成业务系统
-接入。配套版本为 **BailingHub Core 0.7.0 → BailingHub MCP/SDK 0.5.0 → 本插件 0.5.0**。
+接入。配套版本为 **BailingHub Core 0.8.0 → BailingHub MCP/SDK 0.6.0 → 本插件 0.6.0**。
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
-dsh plugin --profile web add dsh-bailinghub@0.5.0
+dsh plugin --profile web add dsh-bailinghub@0.6.0
 ```
 
-插件会自动安装精确依赖 `bailinghub-mcp-server@0.5.0`，无需另装 SDK。
+插件会自动安装精确依赖 `bailinghub-mcp-server@0.6.0`，无需另装 SDK。
 已经使用旧版的用户请先看[从 0.4.0 及更早版本升级的步骤](MIGRATION_VNEXT.md)。
 
 按照[开始使用指南](GETTING_STARTED.zh-CN.md)填写管理员提供的四项公开连接信息，再到浏览器授权。
@@ -138,6 +148,7 @@ DSH 负责思考与工具编排；BailingHub Core 负责可信身份、治理、
 业务系统继续声明原有能力，为每个身份分别授权即可。自定义 DSH 宿主需接入[范围选择与恢复 API](AGENT_CLIENT_CONTRACT.md#host-owned-session-scope-api)，
 在首条消息前显示确认；原生斜杠命令已经使用这些 API。参数结构、持久化和恢复细节见
 [Agent Client 契约](AGENT_CLIENT_CONTRACT.md)。
+本地智能体附件空间（首期支持图片）见[宿主接入说明](GENERATED_ARTIFACTS.md)：登记当前会话的生成结果，上传保存并取得可供已有业务工具使用的地址。
 
 请使用 Native Tool Mode。DSH Code Mode 无法安全呈现本轮动态工具结构，因此明确降级。
 版本范围见[兼容矩阵](COMPATIBILITY.md)。
@@ -150,3 +161,26 @@ DSH 负责思考与工具编排；BailingHub Core 负责可信身份、治理、
 
 问题请提交到 [GitHub Issues](https://github.com/bailinghub/bailinghub-dsh-plugin/issues)，提供版本与
 脱敏错误，不附带 Token、私有地址、个人信息或生产业务数据。兼容测试与下载量不代表生产采用。
+## 能力发现与错误反馈
+
+这轮优化解决的是：查完库存后，AI 要知道商城工具是否仍然可用；上架请求没有拿到确认时，要沿原调用核对结果，不能再上架一次。
+
+- 搜索返回多少候选、当前会话加载多少工具、哪些因为共享上限没加载，分别说明；未知总数不填写为 0。
+- 先发现创建商品、再发现查询工具，查完后可以直接继续创建商品。同一轮搜索会保留仍有效的旧工具，跨系统也遵守各自授权。
+- 每次最多展示 12 个完整工具说明，本轮共享保留最多 64 种可调用工具；退出展示窗口不等于卸载。64 是工具种类数，不是商品数、调用次数或任务时长。
+- 缓存淘汰、声明变化或需要新能力时需重新发现。默认 active_turn 在轮次结束后卸载，显式 session 模式可在同一存活会话内复用；未确认的写操作始终恢复原调用。
+- 网络暂时失败、授权不可用、版本不支持和原操作结果未知，使用不同的结构化反馈。旧工具名在宿主层被拒绝，也能获得对应指引。
+- 原权限、审批、会话范围、归档和恢复约束保持。本节能力发现不新增迁移；完整版本升级仍需核对 Core 的 060–062 迁移。
+
+客户端宿主接口、字段含义和兼容要求见 [能力发现与恢复契约](CAPABILITY_FEEDBACK.md)。
+
+
+## 重开后继续核对原业务操作
+
+例如上架商品还在等审批时关闭客户端，重新打开原会话后，可以继续处理原上架调用；
+商品操作已发出但回包丢失时，也只核对原调用，不再生成一次上架请求。
+这需要宿主持久保存原会话范围和调用恢复记录。没有旧记录时会明确提示，不能从聊天正文猜回参数。
+
+这部分包含在 0.6.0 中，需宿主配置持久 invocationStore。
+接入方式、保存失败处理及兼容边界见 [调用恢复说明](INVOCATION_RECOVERY.md)。
+恢复记录本身不执行业务；显式恢复原调用可能继续已获批但尚未派发的操作。

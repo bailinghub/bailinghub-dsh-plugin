@@ -1,19 +1,29 @@
+# Current 0.6.0 pairing
+
+Use Core 0.8.0, SDK 0.6.0 and DSH 0.6.0 for attachments, original receipts and task controls. Existing unenrolled flows retain their earlier protocol minima. Task enrollment persists: older hosts cannot omit task binding. See [upgrade](UPGRADE_v0.6.0.en.md).
+
 # Compatibility
 
-## Native Agent Client 0.5.0
+## Capability feedback
+
+The additive [capability feedback contract](CAPABILITY_FEEDBACK.md) requires the paired
+Core 0.8.0 / SDK 0.6.0 / DSH 0.6.0 release set for complete counts and error detail. Older unenrolled combinations keep their existing business behavior with unknown optional metadata.
+
+
+## Native Agent Client 0.6.0
 
 | Component | Release pairing / requirement |
 | --- | --- |
 | DeepSeek Harness | `0.1.1-rc.2`; real Session and native Cordis lifecycle |
 | Node.js | `^22.19.0` or `>=24.0.0` |
 | DSH tool presentation | Native Tool Mode; Code Mode deliberately degraded |
-| Generic Agent Client SDK | Exact `bailinghub-mcp-server@0.5.0` via `./sdk` |
-| BailingHub Core | `bailinghub@0.7.0`, with outstanding migrations through 059 applied |
+| Generic Agent Client SDK | Exact `bailinghub-mcp-server@0.6.0` via `./sdk` |
+| BailingHub Core | `bailinghub@0.8.0`, with outstanding migrations through 062 applied |
 | Selected scope | Single account, same-system multiple accounts, or different Client Apps/workspaces on one Hub and audit domain |
 | Original authorization | A distinct original Agent Session for every selected target |
 | Persistence | Existing same-system v1 scope/outbox and cross-system v2 records |
 
-Install `dsh-bailinghub@0.5.0`; its ordinary dependency installs the exact SDK automatically.
+Install `dsh-bailinghub@0.6.0`; its ordinary dependency installs the exact SDK automatically.
 Core 0.6.1 and SDK/plugin 0.4.0 remain the historical same-system baseline, not an alternative
 pairing for new cross-system features. See the [upgrade steps](MIGRATION_VNEXT.md) and
 [release scenario](RELEASE_NOTES_v0.5.0.md).
@@ -68,7 +78,10 @@ New conversations need explicit scope selection before the first message. Custom
 and display selection, preserve the stable conversation id, and restore the original scope before
 sending on reopen. Missing started-session snapshots stay blocked. Saved drafts require fresh
 confirmation. Scope restoration and archive synchronization do not recover business invocations,
-approvals, or task execution after a process restart.
+approvals, or task execution after a process restart. The
+[invocation recovery journal](INVOCATION_RECOVERY.md) supplies a separate durable journal
+for explicit recovery of original calls. Custom scope-store hosts must explicitly provide
+`invocationStore`; existing calls remain available if they have not enabled that feature.
 
 Temporary network failure during reopening is retryable on the same runtime under the complete
 original scope. Confirmed revocation, replaced identity, or storage/CAS conflict stays blocked.

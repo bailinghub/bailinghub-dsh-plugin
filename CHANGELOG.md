@@ -1,5 +1,79 @@
 # Changelog
 
+## 0.6.0 - 2026-09-16
+
+See [scenarios and upgrade](docs/RELEASE_NOTES_v0.6.0.md) · [English](docs/RELEASE_NOTES_v0.6.0.en.md).
+
+- Bind administrator-created tasks through persistent taskStore and public host APIs. Preserve original members, cumulative budgets, cancellation and read-only receipt inspection; models cannot create or switch tasks.
+
+- Let a conversation panel inspect a pending shop listing or inventory change
+  after reopening, without starting a model turn or business run. Explicit continuation
+  first inspects the original receipt, preserves approval and task controls, and never
+  replaces an uncertain write. Panel and model actions serialize the same invocation.
+  Preserve local storage errors, cancellation and original retry deadlines. See the
+  [host integration contract](docs/TASK_CONTROL.md).
+
+- Let a host read original conversation and selected shop/inventory authorization
+  coordinates through `getSessionTaskCoordinates(session)` when preparing a governed
+  task. Revalidate the complete original group without locking a draft, creating a
+  run or exposing unselected targets. Keep persistence failures distinct from
+  retryable network failures and unsupported versions. Existing task binding and
+  execution rules remain in force; see [the host contract](docs/TASK_CONTROL.md).
+
+- Let an opted-in host retain complete shop, inventory or other business tool
+  declarations across user messages in the same living Session. Prepare current
+  target context once per user turn; valid exact-name lookups need no additional
+  capability-search request. Ordinary chat starts no business run.
+- Bound the session cache to 64 target-tool pairs and 2 MiB, with a 12-schema
+  presentation window. Separate cached declarations from currently prepared tools;
+  return full schemas and current context through the existing search entry point.
+- A direct unprepared cached call returns preparation only. It creates no business
+  invocation, and replaying its call ID cannot turn it into a write. Current identity,
+  declaration changes, cancellation and original-invocation recovery remain enforced.
+- Keep legacy `active_turn` behavior by default. Hosts explicitly enable
+  `toolLifecycle: 'session'` after handling preparation results. Core and SDK need
+  no additional API for this candidate. See [the integration contract](docs/SESSION_TOOL_REUSE.md).
+
+- Preserve an authoritative `invocation_not_found` response during polling and
+  direct recovery. Stop automatic retries and ask for inspection of the original
+  execution evidence, without declaring the business action unexecuted or creating
+  a replacement write. Generic network/HTTP failures retain conservative recovery.
+
+- Reopen a conversation after pending approval or a lost business response and recover
+  the original invocation through a durable, metadata-only local journal. Persist the
+  original authorization, run, invocation and parameter digest before dispatch; never
+  rebuild a business write from transcript text or substitute another account.
+- Custom hosts can supply an invocation store and inspect or restore its local status.
+  Storage failures remain explicit. Restoring metadata sends no business recovery
+  request; an explicit resume may continue the original approved operation.
+  See [reopening and original invocation recovery](docs/INVOCATION_RECOVERY.md).
+
+- Keep long tasks moving between product creation, queries and inventory checks:
+  searches merge valid tools during the active turn instead of unloading the previous
+  batch. Retain up to 64 callable tools behind a 12-schema model window; unchanged
+  registrations survive concurrent discovery and calls.
+- Invalidate only the changed authorization catalog, quarantine contradictory
+  declarations, and preserve original invocation recovery and cancellation boundaries.
+  See [long-task lifecycle and host upgrade guidance](docs/CAPABILITY_FEEDBACK.md).
+
+- Honor Hub retry delays after pre-dispatch rate limiting. Long waits retain the original invocation for later recovery; early manual resumes avoid extra requests. Shared quota details stay visible to the model.
+
+- Add an image-first Local Agent attachment space for adapted hosts: list approved conversation
+  outputs, upload 1–8 PNG/JPEG/WebP images to an explicitly selected authorization, and reuse
+  ready URLs with existing business tools. Persist original upload records for recovery.
+- See [attachment integration](docs/GENERATED_ARTIFACTS.md) for campaign artwork, charts
+  and shop examples. Host file access is explicit; upload success and business action results
+  are independent. Business limits and original-call recovery remain independent from attachment delivery.
+
+- Explain each search target’s returned candidates separately from the conversation’s
+  currently loaded tools. Keep unknown totals explicit and describe the shared loading limit.
+- Return actionable, safe failure feedback through native DSH dispatch, including retired
+  tool names rejected before the business SDK. Valid loaded tools remain directly callable.
+- Keep an unconfirmed write bound to its original invocation; discovery cannot create
+  a replacement operation. Add read-only feedback seams for custom hosts.
+- See [capability discovery and recovery](docs/CAPABILITY_FEEDBACK.md) for shop/inventory
+  examples, compatibility and exact candidate installation requirements.
+
 ## 0.5.0 - 2026-09-10
 
 ### Shop and inventory in one conversation

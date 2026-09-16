@@ -82,8 +82,10 @@ installing this plugin does not migrate or deploy the Hub.
   and multiple selected routes sharing one Agent Session are not supported.
 - Task planning and step ordering are performed by the Agent. This is not a deterministic
   dependency engine, a distributed transaction, automatic rollback, or cross-process task recovery.
-- Original invocation recovery is available in later turns of the same live runtime. Archive
-  restoration after restart does not reconstruct pending invocations or approvals.
+- Original invocation recovery is available in later turns of the same live runtime. The
+  unreleased [durable recovery candidate](INVOCATION_RECOVERY.md) adds explicit recovery after
+  restart when the host retains its invocation journal. Archive restoration alone does not
+  reconstruct pending invocations or approvals.
 - Different systems' object IDs are unrelated unless a verified business mapping establishes
   the relationship. The Agent must clarify an ambiguous mapping.
 - The runtime enforces target and capability boundaries. It does not provide automatic

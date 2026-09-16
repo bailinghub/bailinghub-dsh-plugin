@@ -1,5 +1,12 @@
 # Agent Client Host Adapter Contract
 
+The additive [session tool reuse contract](SESSION_TOOL_REUSE.md) is explicitly
+enabled with `createAgentClientPlugin({ toolLifecycle: 'session', ... })`. It uses
+lazy current-turn target preparation for one or many selected authorizations,
+and retains bounded declarations between messages. The lifecycle descriptions
+below remain the default `active_turn` behavior unless that option is enabled.
+Neither mode changes fixed scope, business approval or original-invocation recovery.
+
 ## Authorization subject display (0.5.0)
 
 The business backend may supply `subject_display: { name }` for the subject actually approved by
@@ -133,12 +140,14 @@ Each alias enumerates only its own `authorization_ref` values and wraps unchange
 snapshots and original target bindings remain fixed on replay. The SDK receives host-only
 `expectedBinding: { hubUrl, clientAppId, workspace, sessionId }` together with an explicit key
 on status and all business calls. Model arguments cannot replace these fields.
-Explicit search prioritizes that target's results inside the existing twelve-tool budget;
+Explicit search prioritizes that target's results inside the twelve-schema window while retaining up to 64 callable tools;
 same-named capabilities on earlier targets cannot permanently crowd it out.
 
 Recovery accepts only a known original invocation. When needed in a later live turn, it opens
 only that original target's run with a recovery-specific input and resumes the original invocation;
-it does not call the business action again. It does not restore invocation state after process restart.
+it does not create a replacement invocation. The [durable recovery journal](INVOCATION_RECOVERY.md)
+can restore original binding metadata after process restart; scope or archive restoration alone
+cannot. Explicit Core resume may continue the original approved operation.
 Cancellation and superseding turns cannot register tools or dispatch a new write from a late start.
 Each cross-system turn owns an AbortSignal combined with the host's signal. SDK dispatch checks
 that signal after local IO and before HTTP; an in-flight write with an unknown outcome keeps its
@@ -218,7 +227,7 @@ attribution; all injected context still shares the local Agent/model boundary de
 Business definitions with the same name, description, input schema, and governance are registered
 once.
 Conflicting declarations are not merged for execution. Availability remains specific to each
-authorization, and the conversation's total active business-tool limit remains 12. In a
+authorization, and the conversation's retained business-tool limit is 64, with at most 12 full schemas shown at once. In a
 multi-authorization session, each shared definition wraps its unchanged business schema:
 
 ```json
@@ -241,9 +250,10 @@ invocation known to this conversation and uses the original binding; it accepts 
 authorization selector. Pending approval and unknown dispatch outcomes follow the same
 exact-invocation recovery rules as the baseline. Removing or selecting another default must not
 retarget an existing invocation.
-The local invocation map survives later turns of the same live conversation. It is not persisted
-across process restarts or copied into new conversations, and unknown invocation ids fail closed.
-This increment does not provide durable task recovery across those boundaries.
+The local invocation map survives later turns of the same live conversation. The
+[durable recovery journal](INVOCATION_RECOVERY.md) can restore trusted original binding metadata
+across process restarts, never into another conversation. Unknown IDs fail closed. This is
+original-invocation recovery, not durable automatic continuation of a whole task.
 
 On multi-authorization completion, the adapter freezes one deterministic summary of each run's
 own governed calls and synchronizes that run separately. It does not send the combined visible
@@ -522,7 +532,8 @@ exactly `bailing.agent-turn-context.v1`. Its runtime result is:
 }
 ```
 
-At most 12 active tools are accepted. Each tool must use the Core tool-name grammar, an
+At most 12 active tools are accepted per Core response. Further searches can accumulate
+up to 64 retained tools in this active turn; see [discovery lifecycle](CAPABILITY_FEEDBACK.md). Each tool must use the Core tool-name grammar, an
 object-rooted input schema, and complete governance metadata (`scope`, `risk`,
 `approval_required`, `readonly`, and `idempotent`).
 Both revision fields are required lowercase 64-character SHA-256 values; shorter labels or
@@ -668,3 +679,12 @@ Missing/invalid configuration, missing SDK, failed authorization, failed Core co
 collision, or unsupported DSH Code Mode removes the Core business tools and inserts a concise
 status section. The local Agent may continue using unrelated local tools, but it is explicitly
 told not to claim a BailingHub business action was executed.
+
+
+## Original invocation recovery after reopening
+
+See [the durable recovery contract](INVOCATION_RECOVERY.md) for the additive
+`invocationStore`, `getSessionInvocationStatus(sessionId)` and
+`restoreSessionInvocations(sessionId)` host interfaces. They do not replace the fixed
+scope, original visible-event archive, or attachment store. A host using its own scope
+store must explicitly provide durable invocation storage to support full reopening.

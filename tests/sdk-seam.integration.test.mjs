@@ -62,6 +62,9 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
       const body = rawBody ? JSON.parse(rawBody) : undefined
       const path = new URL(request.url, 'http://127.0.0.1').pathname
       requests.push({ account: account.label, path, method: request.method, body })
+      if (path === '/agent-api/v1/task-control/capabilities') {
+        response.writeHead(404, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'not_found' })); return
+      }
       let result
       if (path === '/agent-auth/v1/session') {
         assert.equal(request.method, 'GET')
@@ -306,6 +309,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
   const requests = []
   const fetchImpl = async (url, init = {}) => {
     const path = new URL(url).pathname
+    if (path === '/agent-api/v1/task-control/capabilities') return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { 'content-type': 'application/json' } })
     const body = init.body === undefined ? undefined : JSON.parse(String(init.body))
     const headers = new Headers(init.headers)
     requests.push({
@@ -420,7 +424,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
   await assert.rejects(() => local.get('resume_governed_tool_invocation').execute(
     { invocation_id: 'b'.repeat(64) },
     { agent, callId: 'sdk-resume-unknown', signal: new AbortController().signal },
-  ), /not bound|unknown|original invocation/i)
+  ), (error) => error.feedback.category === 'unsupported' && error.feedback.code === 'invocation_store_unsupported' && error.feedback.dispatch === 'not_dispatched')
 
   host.emit('session/event', agent.session, {
     type: 'tool/call',

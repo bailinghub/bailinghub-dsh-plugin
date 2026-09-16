@@ -104,8 +104,12 @@ Hidden reasoning is never uploaded by the adapter.
 
 The host checks the captured connection key, workspace, and original Agent Session id before
 transport operations without projecting those inspection fields into the model's directory.
-Invocation bindings are local to the running conversation; a new conversation or process restart
-does not recover unknown invocation ids from that map.
+Invocation bindings stay host-side. The [durable recovery journal](docs/INVOCATION_RECOVERY.md)
+adds a separate `invocation-records` store in the plugin data directory for original binding
+metadata, parameter/receipt digests, last-known state and retry deadline. It stores no raw
+arguments, receipt bodies, credentials or conversation text. Records remain until the host/operator
+removes them; there is no automatic cleanup or upload of this journal. The same original Session
+can recover known calls after reopening; new conversations and unknown IDs cannot use that binding.
 
 The default file adapter saves scope schema/version, DSH session id, revision, lock/state, public
 Hub/client/workspace binding, and the selected connection keys, sanitized labels, workspace, and
@@ -123,8 +127,9 @@ loading it does not query its old authorizations or send them user input. A fail
 write can leave that draft on disk, but it still cannot reactivate automatically in a new runtime.
 Configuration or metadata history alone does not lock a never-started draft. Missing or invalid
 scope snapshots on started conversations do not adopt current registry connections.
-Restoring that scope does not recover pending business invocations, approvals, completions, or
-tasks across a process restart.
+Restoring the scope alone does not recover pending business invocations, approvals, completions,
+or tasks across a process restart. Original invocation recovery requires the separate durable
+journal and an explicit recovery request; it does not automatically resume the whole task.
 
 ## Visible conversation archive
 
@@ -151,7 +156,8 @@ Network failures preserve successfully written events for later upload. Local wr
 not prove durable capture. Reopened DSH history is checked for detectable missing visible events,
 reported as `recovery_gap`; unavailable host history is marked unverified. Previously unarchived
 messages, attachments, and hidden content are not claimed as a complete transcript. The archive
-does not restore business invocation or approval execution after restart. An older SDK reports
+does not itself restore business invocation or approval execution after restart; the separate
+invocation journal does not make an incomplete visible archive complete. An older SDK reports
 unsupported without creating an outbox, and business calls remain available.
 
 An offline reopen keeps the original frozen scope closed until every member can be revalidated.
@@ -159,3 +165,8 @@ A later retry on the same runtime may recover a temporary network failure, but c
 confirmed revocation, replacement identity, or a storage conflict. Archive status retains known
 unsaved events and history gaps while upload is blocked. Revocation confirmed during asynchronous
 archive capability discovery or opening is rechecked before reporting availability or uploading.
+
+
+## Task records in 0.6.0
+
+A private persistent task store binds the original Session, fixed members and administrator-created task. It does not store administrative credentials or grant model task-management authority. Retain original scope, task, invocation and archive records; storage errors never downgrade to an unrestricted flow. Task enrollment persists on the original Agent Session even after cancellation. Do not downgrade an enrolled authorization to a host/Core that ignores that requirement. See [task control](docs/TASK_CONTROL.md) and [upgrade](docs/UPGRADE_v0.6.0.en.md).

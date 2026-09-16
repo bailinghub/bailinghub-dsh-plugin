@@ -1,7 +1,7 @@
-# Get started with 0.5.0
+# Get started with 0.6.0
 
 This guide is for users whose business system is already connected to BailingHub. Your
-administrator must prepare Core 0.7.0, a public Client App ID, a workspace, and the business
+administrator must prepare Core 0.8.0, a public Client App ID, a workspace, and the business
 browser-authorization entry first. For multiple systems, prepare one independently authorized
 connection per target on the same Hub and audit domain. Existing business capability declarations
 remain valid; each requested action must already be exposed by its own system.
@@ -12,10 +12,10 @@ Use Node.js `22.19.0+` or `24+` and the compatible DSH version:
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
-dsh plugin --profile web add dsh-bailinghub@0.5.0
+dsh plugin --profile web add dsh-bailinghub@0.6.0
 ```
 
-The plugin installs SDK 0.5.0 automatically. Enter the four public values in DSH plugin settings,
+The plugin installs SDK 0.6.0 automatically. Enter the four public values in DSH plugin settings,
 or use their environment names. The example values below are placeholders:
 
 ```bash
@@ -115,7 +115,7 @@ connection does not change a conversation's scope.
 ## 4. Check results and the visible conversation
 
 Check the actual business result and its original invocation trail in BailingHub. With the matching
-Core 0.7.0, you can also follow visible user/assistant messages, turns, and the linked runs as one
+Core 0.8.0, you can also follow visible user/assistant messages, turns, and the linked runs as one
 conversation record. Multi-authorization runs keep their own call summaries separately.
 
 ```text

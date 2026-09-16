@@ -118,8 +118,11 @@ Each invocation binds its chosen authorization, Core run, and capability revisio
 accepts only an invocation known to this conversation and resolves its original binding; the
 model cannot provide a replacement authorization. Changing a default connection cannot retarget
 an existing call.
-This invocation map lasts only for the live conversation: later turns can recover its original
-calls, while new conversations and process restarts must reject unknown invocation ids.
+The live invocation map supports later turns of the same conversation. The unreleased
+[durable recovery journal](docs/INVOCATION_RECOVERY.md) additionally persists original
+metadata before dispatch and validates it after reopening. New conversations, missing records,
+and conflicting original identities still reject recovery. Raw parameters and credentials do
+not belong in the invocation journal; model text never reconstructs its authority.
 
 Only non-secret scope metadata belongs in the scope store. Its default file store uses SHA-256 session filenames,
 mode-0600 files and mode-0700 directories on POSIX, bounded reads, rejection of symlinks/non-regular files,
@@ -174,3 +177,8 @@ that validation. Confirmed revocation/replacement and storage/CAS conflicts rema
 blocked, with no default or subset fallback. The gate is rechecked after asynchronous archive
 capability discovery and outbox opening; a late result cannot erase a confirmed revocation.
 Known local storage errors and capture gaps remain visible even while network or scope checks block upload.
+
+
+## Task records in 0.6.0
+
+A private persistent task store binds the original Session, fixed members and administrator-created task. It does not store administrative credentials or grant model task-management authority. Retain original scope, task, invocation and archive records; storage errors never downgrade to an unrestricted flow. Task enrollment persists on the original Agent Session even after cancellation. Do not downgrade an enrolled authorization to a host/Core that ignores that requirement. See [task control](docs/TASK_CONTROL.md) and [upgrade](docs/UPGRADE_v0.6.0.en.md).

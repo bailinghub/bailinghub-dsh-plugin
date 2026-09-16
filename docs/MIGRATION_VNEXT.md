@@ -1,3 +1,7 @@
+# Migrate to 0.6.0
+
+Use [the 0.6.0 paired upgrade guide](UPGRADE_v0.6.0.en.md) / [中文](UPGRADE_v0.6.0.md). Preserve original scopes, events, journals and task bindings. Session tool reuse requires host opt-in. The following sections retain earlier upgrade history.
+
 # Migrate to 0.5.0
 
 ## From 0.4.0: add systems without replacing existing authorizations
@@ -251,3 +255,7 @@ Before a public 0.5 release:
 
 Do not tag or publish a future version until all gates pass, and do not describe release
 validation as public adoption.
+
+## Task-control migration in 0.6.0
+
+The host-only task binding and read-only invocation inspection integration is documented in [TASK_CONTROL.md](./TASK_CONTROL.md). It requires SDK 0.6.0 and Core 0.8.0. Existing journal v1 is read compatibly; subsequent writes use v2 without inferring a task for old entries. Keep scope, task and invocation stores together when reopening, and do not downgrade managed Sessions to an older host. Follow the current paired upgrade guide before enabling task enrollment.
