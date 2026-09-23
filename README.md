@@ -1,10 +1,10 @@
 # BailingHub for DeepSeek Harness
 
-## 0.6.0: longer tasks, attachments and original-call recovery
+## 0.7.0: optional model services and plan billing
 
-Retain the correct target while moving between edits and queries, reuse uploaded image URLs and inspect original calls after reopening. Task budgets survive turn changes. Pair Core 0.8.0 / SDK 0.6.0 / DSH 0.6.0; host integration is required for task binding and opt-in cross-turn reuse.
+Keep orchestration local while Core relays model requests and meters shared allowance asynchronously. Discover chat models and image tools separately; preserve business authorization, approvals and audit. Pair Core 0.9.0 / SDK 0.7.0 / DSH 0.7.0.
 
-[Changes](docs/RELEASE_NOTES_v0.6.0.en.md) · [Upgrade](docs/UPGRADE_v0.6.0.en.md)
+[Changes](docs/RELEASE_NOTES_v0.7.0.en.md) · [Upgrade](docs/UPGRADE_v0.7.0.en.md)
 
 
 [简体中文](docs/README.zh-CN.md) | English
@@ -40,14 +40,14 @@ recommended by DeepSeek.
 
 You need Node.js `22.19.0+` or `24+`, pnpm, and a compatible DeepSeek Harness release. Your
 administrator must first connect the business system to BailingHub. The matched release set is
-**BailingHub Core 0.8.0 → BailingHub MCP/SDK 0.6.0 → this plugin 0.6.0**.
+**BailingHub Core 0.9.0 → BailingHub MCP/SDK 0.7.0 → this plugin 0.7.0**.
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
-dsh plugin --profile web add dsh-bailinghub@0.6.0
+dsh plugin --profile web add dsh-bailinghub@0.7.0
 ```
 
-The plugin installs its exact `bailinghub-mcp-server@0.6.0` dependency automatically.
+The plugin installs its exact `bailinghub-mcp-server@0.7.0` dependency automatically.
 For an existing installation, read the [migration steps from 0.4.0 and earlier](docs/MIGRATION_VNEXT.md).
 
 Follow the [getting started guide](docs/GETTING_STARTED.md) to enter your administrator's four

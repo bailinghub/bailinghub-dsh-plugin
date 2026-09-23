@@ -1,10 +1,10 @@
 # BailingHub for DeepSeek Harness
 
-## 0.6.0：长任务、附件与原调用恢复
+## 0.7.0：可选模型服务与套餐计费
 
-连续查询、编辑和核对时保留正确目标；上传获准图片后复用URL，重开后核对原调用，任务额度不因换轮重置。配套 Core 0.8.0 / SDK 0.6.0 / DSH 0.6.0；任务启用和跨轮复用需宿主按契约接入。
+本地宿主继续编排，中枢提供模型转发、共享额度与异步计量。对话模型和图片工具分开下发；原业务权限、审批与审计保持。配套 Core 0.9.0 / SDK 0.7.0 / DSH 0.7.0。
 
-[本次变化](RELEASE_NOTES_v0.6.0.md) · [升级指南](UPGRADE_v0.6.0.md)
+[本次变化](RELEASE_NOTES_v0.7.0.md) · [升级指南](UPGRADE_v0.7.0.md)
 
 
 [English](../README.md) | 简体中文
@@ -35,14 +35,14 @@
 ## 安装与开始使用
 
 需要 Node.js `22.19.0+` 或 `24+`、pnpm，以及兼容的 DeepSeek Harness。管理员应先完成业务系统
-接入。配套版本为 **BailingHub Core 0.8.0 → BailingHub MCP/SDK 0.6.0 → 本插件 0.6.0**。
+接入。配套版本为 **BailingHub Core 0.9.0 → BailingHub MCP/SDK 0.7.0 → 本插件 0.7.0**。
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
-dsh plugin --profile web add dsh-bailinghub@0.6.0
+dsh plugin --profile web add dsh-bailinghub@0.7.0
 ```
 
-插件会自动安装精确依赖 `bailinghub-mcp-server@0.6.0`，无需另装 SDK。
+插件会自动安装精确依赖 `bailinghub-mcp-server@0.7.0`，无需另装 SDK。
 已经使用旧版的用户请先看[从 0.4.0 及更早版本升级的步骤](MIGRATION_VNEXT.md)。
 
 按照[开始使用指南](GETTING_STARTED.zh-CN.md)填写管理员提供的四项公开连接信息，再到浏览器授权。

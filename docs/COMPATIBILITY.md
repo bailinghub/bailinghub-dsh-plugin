@@ -1,6 +1,6 @@
-# Current 0.6.0 pairing
+# Current 0.7.0 pairing
 
-Use Core 0.8.0, SDK 0.6.0 and DSH 0.6.0 for attachments, original receipts and task controls. Existing unenrolled flows retain their earlier protocol minima. Task enrollment persists: older hosts cannot omit task binding. See [upgrade](UPGRADE_v0.6.0.en.md).
+Use Core 0.9.0, SDK 0.7.0 and DSH 0.7.0 for optional model plans and image tools. Existing business-governance APIs retain their documented minima. Host orchestration, scope, approval and audit rules remain in effect. See [upgrade](UPGRADE_v0.7.0.en.md).
 
 # Compatibility
 
@@ -10,23 +10,23 @@ The additive [capability feedback contract](CAPABILITY_FEEDBACK.md) requires the
 Core 0.8.0 / SDK 0.6.0 / DSH 0.6.0 release set for complete counts and error detail. Older unenrolled combinations keep their existing business behavior with unknown optional metadata.
 
 
-## Native Agent Client 0.6.0
+## Native Agent Client 0.7.0
 
 | Component | Release pairing / requirement |
 | --- | --- |
 | DeepSeek Harness | `0.1.1-rc.2`; real Session and native Cordis lifecycle |
 | Node.js | `^22.19.0` or `>=24.0.0` |
 | DSH tool presentation | Native Tool Mode; Code Mode deliberately degraded |
-| Generic Agent Client SDK | Exact `bailinghub-mcp-server@0.6.0` via `./sdk` |
-| BailingHub Core | `bailinghub@0.8.0`, with outstanding migrations through 062 applied |
+| Generic Agent Client SDK | Exact `bailinghub-mcp-server@0.7.0` via `./sdk` |
+| BailingHub Core | `bailinghub@0.9.0`, with outstanding migrations through 064 applied |
 | Selected scope | Single account, same-system multiple accounts, or different Client Apps/workspaces on one Hub and audit domain |
 | Original authorization | A distinct original Agent Session for every selected target |
 | Persistence | Existing same-system v1 scope/outbox and cross-system v2 records |
 
-Install `dsh-bailinghub@0.6.0`; its ordinary dependency installs the exact SDK automatically.
+Install `dsh-bailinghub@0.7.0`; its ordinary dependency installs the exact SDK automatically.
 Core 0.6.1 and SDK/plugin 0.4.0 remain the historical same-system baseline, not an alternative
 pairing for new cross-system features. See the [upgrade steps](MIGRATION_VNEXT.md) and
-[release scenario](RELEASE_NOTES_v0.5.0.md).
+[release scenarios](RELEASE_NOTES_v0.7.0.en.md).
 
 ### Authorization subject display
 

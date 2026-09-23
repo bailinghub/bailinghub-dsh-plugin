@@ -134,3 +134,33 @@ test('task dispatch uncertainty remains an original unknown call and never sugge
   assert.equal(feedback.next_action, 'inspect_original')
   assert.equal(feedback.retryable, false)
 })
+
+for (const failSave of [false, true]) {
+  test(`journal drain waits existing local save without retry: ${failSave ? 'failure' : 'success'}`, async () => {
+    const memory = createMemoryInvocationStore()
+    let gate, release, entered, saves = 0
+    const journal = new InvocationJournal({ load: id => memory.load(id), save: async (...args) => {
+      saves++
+      if (gate) { entered(); await gate; if (failSave) throw new Error('synthetic disk failure') }
+      return memory.save(...args)
+    } })
+    const before = original()
+    await journal.reserve(session, before)
+    gate = new Promise(resolve => { release = resolve })
+    const saving = new Promise(resolve => { entered = resolve })
+    const update = journal.update(session, outcome(before), before).catch(error => error)
+    let drained = false
+    const drain = journal.drain(session).then(() => { drained = true })
+    await saving
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(drained, false)
+    release()
+    await drain
+    await update
+    assert.equal(journal.pending.get(session)?.size ?? 0, failSave ? 1 : 0)
+    assert.equal(journal.failures.has(session), failSave)
+    const savesAfter = saves
+    await journal.drain(session)
+    assert.equal(saves, savesAfter)
+  })
+}
