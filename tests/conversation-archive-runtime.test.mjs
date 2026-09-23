@@ -579,3 +579,68 @@ test('archive status stays blocked when an original authorization is revoked dur
   assert.equal(callsFor(f.mock.calls, 'syncConversationArchive').length, uploadedBefore)
   assert.deepEqual(await f.archiveStore.load(f.session.id), saved)
 })
+
+for (const boundary of ['turn-stop', 'tool-boundary']) {
+  for (const failSave of [false, true]) {
+    test(`local primary barrier settles assistant capture at ${boundary}: ${failSave ? 'failed save remains blocked' : 'successful save is ready'}`, async t => {
+      const memory = createMemoryConversationArchiveStore()
+      let gate, release, entered, saveEntered, saves = 0
+      const archiveStore = { load: id => memory.load(id), save: async (...args) => {
+        saves++
+        if (gate) {
+          entered()
+          await gate
+          if (failSave) throw new Error('synthetic local save failure')
+        }
+        return memory.save(...args)
+      } }
+      const f = fixture({ archiveStore })
+      t.after(() => f.host.dispose())
+      await begin(f)
+      await f.runtime.syncSessionArchive(f.session.id)
+      gate = new Promise(resolve => { release = resolve })
+      saveEntered = new Promise(resolve => { entered = resolve })
+      assistant(f, `synthetic-${boundary}`, 'Synthetic completed reply.')
+      const callsBefore = f.mock.calls.length
+      let finished = false
+      const primary = f.runtime.waitForSessionLocalPrimaryStatus(f.session).then(value => { finished = true; return value })
+      await saveEntered
+      await new Promise(resolve => setImmediate(resolve))
+      assert.equal(finished, false, 'must not latch a still-saving event as a permanent error')
+      assert.equal(f.mock.calls.length, callsBefore)
+      release()
+      const value = await primary
+      assert.equal(value.state, failSave ? 'storage_error' : 'ready')
+      assert.equal(value.local.unsavedEvents, failSave ? 1 : 0)
+      assert.equal(value.snapshot_is_dispatch_permission, false)
+      const savesAfter = saves
+      assert.equal((await f.runtime.waitForSessionLocalPrimaryStatus(f.session)).state, value.state)
+      assert.equal(saves, savesAfter, 'barrier must not retry failed writes')
+      assert.equal(f.mock.calls.length, callsBefore, 'barrier must not request remote state or upload')
+    })
+  }
+}
+
+test('local primary barrier does not wait for remote archive acknowledgement', async t => {
+  let release, entered
+  const remote = new Promise(resolve => { release = resolve })
+  const sending = new Promise(resolve => { entered = resolve })
+  let block = false
+  const f = fixture({ transport: { syncConversationArchive: async envelope => {
+    if (block) { entered(); await remote }
+    return acknowledgement(envelope.events.at(-1)?.sequence ?? 0)
+  } } })
+  t.after(() => { release(); f.host.dispose() })
+  await begin(f)
+  await f.runtime.syncSessionArchive(f.session.id)
+  assistant(f, 'synthetic-final', 'Synthetic visible reply.')
+  block = true
+  const sync = f.runtime.syncSessionArchive(f.session.id)
+  await sending
+  const callsBefore = f.mock.calls.length
+  const status = await f.runtime.waitForSessionLocalPrimaryStatus(f.session)
+  assert.equal(status.state, 'ready')
+  assert.equal(f.mock.calls.length, callsBefore)
+  release()
+  await sync
+})

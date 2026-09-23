@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0 - 2026-09-23
+
+Optional host-orchestrated model gateway, USD plan presentation and asynchronous image tools.
+See [changes](docs/RELEASE_NOTES_v0.7.0.en.md) and [upgrade](docs/UPGRADE_v0.7.0.en.md).
+
 ## 0.6.0 - 2026-09-16
 
 See [scenarios and upgrade](docs/RELEASE_NOTES_v0.6.0.md) · [English](docs/RELEASE_NOTES_v0.6.0.en.md).
