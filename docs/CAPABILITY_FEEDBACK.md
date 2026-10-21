@@ -24,11 +24,19 @@ This change adds no stock synchronization, cross-system transaction or rollback.
 
 ## Search result meanings
 
-The default `search_business_capabilities` keeps its existing parameters. Opt-in
-session mode adds `tool_name` for exact cached declaration preparation and retrieval;
-a broad `query` without `tool_name` still discovers capabilities. Cross-system search
+`search_business_capabilities` retains `query`, `limit` and authorization selection.
+The optional `tool_name` supports exact known declarations in active-turn mode and
+cached declaration preparation in opt-in session mode. A broad `query` without
+`tool_name` still discovers capabilities. Cross-system search
 requires the original `authorization_ref` and a minimal target-specific query.
 Single-account and same-system selection continue to work.
+
+An exact known `tool_name` can also be supplied in `active_turn` mode. Add
+`include_usage_guidance=true` to explicitly fetch its bounded detail for one
+selected authorization. `description_truncated` and `usage_guidance_available`
+indicate when short descriptions are insufficient; full guidance is not appended
+to every schema or fetched by broad searches. The detail remains revision-bound
+reference evidence. See [usage guidance and preparation](SESSION_TOOL_REUSE.md).
 
 | Field | Meaning |
 | --- | --- |
@@ -118,6 +126,16 @@ Failures carry `bailing.agent-feedback.v1` with `category`, `code`, `origin`,
 original `invocation_id` when one exists. SDK-defined feedback is projected through
 a safe allowlist; raw transport messages and arbitrary extra fields are omitted.
 
+For `code=arguments_too_large` only, the projection also retains known
+`actual_bytes`, `max_bytes`, `observed_bytes` (nonnegative safe integers), and
+`limit_scope=arguments|request_body` when provided by Core/SDK. Actual bytes refer
+to the serialized UTF-8 JSON or body specified by that scope; observed bytes may
+only be the stream prefix seen before stopping. These are diagnostic scalars,
+not a second business payload. Arbitrary `details`, field paths, raw arguments,
+credentials and transport messages never pass through this projection. Origin
+and dispatch remain explicit; accepted-unknown recovery takes precedence over
+any size diagnostic and still recovers only the original invocation.
+
 `retryable` refers only to `next_action`. It never grants permission to issue a new
 business invocation. `dispatch=not_dispatched` is used only for a known stage; a
 transport failure after invoking cannot establish that the request was not sent.
@@ -189,6 +207,17 @@ the requested operation. The model must read current context and issue a new cal
 before a new business operation; replaying the preparation's call ID does not
 convert it into an operation. Do not gate these native preparation guards against
 `active_tools` alone. Read-only tool-state methods do not prepare targets.
+
+Preparation results additionally expose `result_type=capability_preparation`,
+`dispatch=not_dispatched`, a preparation reason and a controlled `next_action`.
+Do not display them as completed business operations. No invocation is fabricated
+for a preparation-only result. Common lifecycle and recovery guidance is assembled
+once in the public profile; each business definition still retains its own scope,
+risk, approval/read-only/idempotency facts, target binding and a minimal original-ID
+recovery warning. A custom host must deliver the public profile, tool declarations
+and named contexts together. Both the returned preparation context and named
+context paths remain available until there is an explicit host-consumption contract;
+this change does not silently remove either path.
 
 Tested with the public native registry `@deepseek-ai/dsh-tools@0.1.1-rc.2` and real
 Cordis/DSH Sessions. A custom host must verify the hook and preserve the feedback

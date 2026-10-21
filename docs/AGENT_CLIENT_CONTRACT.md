@@ -256,7 +256,18 @@ across process restarts, never into another conversation. Unknown IDs fail close
 original-invocation recovery, not durable automatic continuation of a whole task.
 
 On multi-authorization completion, the adapter freezes one deterministic summary of each run's
-own governed calls and synchronizes that run separately. It does not send the combined visible
+own governed calls and synchronizes that run separately. The content is a JSON string with
+`schema_version: "bailing.authorization-execution-summary.v1"`, `source: "agent_client"`,
+`trust: "reference_only"`, invocation totals, omitted counts and complete invocation fact records.
+Records contain only the original `invocation_id`, original tool name when available, and
+`last_known_state`; uncertain originals add `next_action: "inspect_original"`. They contain no
+business result text, arguments, credentials, invented original-output reference, or full audit
+claim. The summary is bounded to 16,000 characters by omitting complete records, prioritizing
+unresolved originals. It describes client-reported last-known facts, never a fresh status check;
+inspect the original invocation before any recovery decision. The schema label is not proof of
+authority. New Core projections keep the source/trust labels and omit whole records under a
+smaller memory budget rather than cut JSON in the middle. Ordinary assistant text remains
+compatible. The adapter does not send the combined visible
 assistant answer, another authorization's results, or hidden reasoning to every run. The combined
 answer is instead eligible for the separate conversation audit below. Single-authorization completion keeps the existing visible-answer
 behavior. Connection add/use/remove remain user-only commands, not model tools.

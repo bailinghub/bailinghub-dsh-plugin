@@ -127,8 +127,12 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
         assert.equal(request.method, 'POST')
         assert.equal(body.status, 'completed')
         assert.match(body.assistant_message_id, /^dsh\./u)
-        assert.match(body.content, new RegExp(`STORE_${account.label}_ONLY_RESULT`, 'u'))
-        assert.equal(body.content.includes(`STORE_${account.label === 'A' ? 'B' : 'A'}_ONLY_RESULT`), false)
+        const summary = JSON.parse(body.content)
+        assert.equal(summary.schema_version, 'bailing.authorization-execution-summary.v1')
+        assert.equal(summary.source, 'agent_client')
+        assert.equal(summary.trust, 'reference_only')
+        for (const fact of summary.invocations) assert.equal(invocations.get(fact.invocation_id), account.label)
+        assert.equal(body.content.includes('ONLY_RESULT'), false)
         assert.equal(body.content.includes('COMBINED_LOCAL_REPLY'), false)
         result = { schema: 'bailing.agent-run-completion.v1', run_id: account.runId, status: body.status }
       } else if (path === '/agent-api/v1/workspaces/demo/system-info') {
