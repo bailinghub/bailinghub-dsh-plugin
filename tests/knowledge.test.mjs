@@ -111,3 +111,19 @@ test('single-authorization turn lifecycle also supports bounded knowledge pages 
   assert.doesNotMatch(JSON.stringify(assembly), /synthetic original policy/)
   assert.equal(f.backend.invocations.size, 0)
 })
+test('large-source documents may exhaust the 128 KiB read chain without becoming invalid or a complete read', async t => {
+  const f = await fixture(t); install(f)
+  await f.execute('search_business_knowledge', { query: 'policy' })
+  const original = f.mock.transport.readKnowledge
+  const exhausted = { truncated: true, next_cursor: null, budget_exhausted: true, total_content_bytes: 262144, read_chain_max_bytes: 131072, title: '😀'.repeat(300) }
+  f.mock.transport.readKnowledge = async (...args) => ({ ...await original(...args), ...exhausted })
+  const result = await f.execute('read_business_knowledge', { ref: 'opaque-ref' })
+  assert.equal(result.isError, false); assert.equal(result.value.truncated, true)
+  assert.equal(result.value.budget_exhausted, true); assert.equal(result.value.next_cursor, null)
+  assert.equal(result.value.total_content_bytes, 262144)
+  for (const patch of [{ truncated: false }, { next_cursor: 'page-2' }, { read_chain_max_bytes: 131073 }, { total_content_bytes: -1 }, { total_content_bytes: 131072 }, { total_content_bytes: Number.MAX_SAFE_INTEGER + 1 }]) {
+    f.mock.transport.readKnowledge = async (...args) => ({ ...await original(...args), ...exhausted, ...patch })
+    assert.equal((await f.execute('read_business_knowledge', { ref: 'opaque-ref' })).isError, true)
+  }
+  assert.equal(f.backend.invocations.size, 0)
+})
