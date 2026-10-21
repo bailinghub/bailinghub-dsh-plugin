@@ -64,7 +64,8 @@
     "docs/RELEASE_NOTES_v0.7.0.en.md",
     "docs/UPGRADE_v0.7.0.md",
     "docs/UPGRADE_v0.7.0.en.md",
-    "docs/CONTEXT_DELIVERY.md"
+    "docs/CONTEXT_DELIVERY.md",
+    "docs/AGENT_KNOWLEDGE.md"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

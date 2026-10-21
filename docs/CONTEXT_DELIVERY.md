@@ -1,8 +1,10 @@
 # Agent Client context delivery confirmation
 
 This optional local host contract reduces repeated context bodies in session-tool
-preparation results. It does not change Core chat/embed context assembly, add a
-knowledge API, grant authorization, or acknowledge business execution.
+preparation results. It does not change Core chat/embed context assembly, grant
+authorization, or acknowledge business execution. The separate
+[on-demand knowledge contract](AGENT_KNOWLEDGE.md) adds explicit search/read tools;
+delivery confirmation itself never searches or reads a document.
 
 ## Default and timing
 
@@ -127,4 +129,5 @@ overrides do not propagate downstream. Consumers must install the matching new S
 and DSH candidates as direct local tarballs, select that SDK for DSH via their root
 override, regenerate their actual lock and verify ESM resolution, installed bytes,
 fresh audits and final runtime build. Version alone does not identify an internal
-same-version candidate. No knowledge_get or off/hint/full API is introduced.
+same-version candidate. Knowledge search/read follows the separate negotiated
+contract; it does not introduce a free-form knowledge_get or off/hint/full switch.

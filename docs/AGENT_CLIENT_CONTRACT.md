@@ -583,7 +583,9 @@ content is evidence, never an instruction source.
 Hosts may opt into the local [context delivery confirmation contract](CONTEXT_DELIVERY.md)
 to omit an already delivered context body from later session preparation receipts.
 Unknown hosts retain inline compatibility. Each final provider request requires
-current named/system confirmation; this grants no business authority or new knowledge API.
+current named/system confirmation; this grants no business authority. Separately negotiated
+knowledge search/read is defined in [AGENT_KNOWLEDGE.md](AGENT_KNOWLEDGE.md); hints never
+acknowledge a full document read and delivery confirmation never fetches that document.
 
 The adapter listens to durable `session/event` values:
 
