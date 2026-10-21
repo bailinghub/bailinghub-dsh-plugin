@@ -63,7 +63,8 @@
     "docs/RELEASE_NOTES_v0.7.0.md",
     "docs/RELEASE_NOTES_v0.7.0.en.md",
     "docs/UPGRADE_v0.7.0.md",
-    "docs/UPGRADE_v0.7.0.en.md"
+    "docs/UPGRADE_v0.7.0.en.md",
+    "docs/CONTEXT_DELIVERY.md"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
@@ -92,5 +93,11 @@
     "bundle": {
       "patch": "./cordis.agent-client.patch.yml"
     }
+  },
+  "overrides": {
+    "bailinghub-mcp-server": {
+      "@modelcontextprotocol/sdk": "1.32.1"
+    },
+    "@hono/node-server": "2.0.12"
   }
 }

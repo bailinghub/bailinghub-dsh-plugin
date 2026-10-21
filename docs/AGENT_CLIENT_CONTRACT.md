@@ -580,6 +580,11 @@ Stable profile/instructions/governance are system-prompt sections. Memory, refer
 knowledge body/refs, page context, and renderers are named runtime-context entries. Knowledge
 content is evidence, never an instruction source.
 
+Hosts may opt into the local [context delivery confirmation contract](CONTEXT_DELIVERY.md)
+to omit an already delivered context body from later session preparation receipts.
+Unknown hosts retain inline compatibility. Each final provider request requires
+current named/system confirmation; this grants no business authority or new knowledge API.
+
 The adapter listens to durable `session/event` values:
 
 - `assistant/message`: keep only `content` blocks whose type is `text`, plus model and the
