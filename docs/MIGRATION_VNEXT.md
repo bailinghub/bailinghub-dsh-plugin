@@ -1,8 +1,6 @@
-# Migrate to 0.6.0
+# Migrate to 0.8.0
 
-Use [the 0.6.0 paired upgrade guide](UPGRADE_v0.6.0.en.md) / [中文](UPGRADE_v0.6.0.md). Preserve original scopes, events, journals and task bindings. Session tool reuse requires host opt-in. The following sections retain earlier upgrade history.
-
-# Migrate to 0.5.0
+Use [the 0.8.0 paired upgrade guide](UPGRADE_v0.8.0.en.md) / [中文](UPGRADE_v0.8.0.md). Pair Core 0.10.0, SDK 0.8.0 and DSH 0.8.0. Preserve original scopes, events, invocation journals and task bindings. On-demand knowledge is negotiated; named-context omission requires cooperating-host confirmation. The following sections retain earlier upgrade history.
 
 ## From 0.4.0: add systems without replacing existing authorizations
 

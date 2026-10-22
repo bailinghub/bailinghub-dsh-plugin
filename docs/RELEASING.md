@@ -2,7 +2,7 @@
 
 ## Writing release notes
 
-For each release, lead with a common business scenario and explain the previous limitation, new behavior, affected roles, exact upgrade steps, observable checks and limits. Prefer shop/product/inventory examples; state which business APIs and mappings must already exist. Distinguish newly added features from existing behavior and fixes. Keep English and Chinese facts aligned. Use [the 0.5.0 release notes](RELEASE_NOTES_v0.5.0.md) as the current example, then freeze versions and package instructions only when the artifacts are ready.
+For each release, lead with a common business scenario and explain the previous limitation, new behavior, affected roles, exact upgrade steps, observable checks and limits. Prefer shop/product/inventory examples; state which business APIs and mappings must already exist. Distinguish newly added features from existing behavior and fixes. Keep English and Chinese facts aligned. Use [the 0.8.0 release notes](RELEASE_NOTES_v0.8.0.en.md) as the current example, then freeze versions and package instructions only when the artifacts are ready.
 
 ## Release units and order
 
@@ -10,13 +10,13 @@ The Agent Client spans three independently versioned release units. Publish and 
 this dependency order:
 
 ```text
-1. BailingHub Core
+1. BailingHub Core 0.10.0
    Agent Auth, Runtime Context, capability governance, invoke/resume, completion, and audit
 
-2. bailinghub-mcp-server
+2. bailinghub-mcp-server 0.8.0
    the host-neutral `./sdk` export, browser authorization, credential storage, and DTO mapping
 
-3. dsh-bailinghub
+3. dsh-bailinghub 0.8.0
    native DSH lifecycle, commands, prompt/context projection, dynamic tools, and completion sync
 ```
 
@@ -30,13 +30,13 @@ its package, or silently reinterpret its Client Token and Hub-orchestrated seman
 
 ## Public manifest gates
 
-The stable `0.5.0` manifest is publishable and must retain all of these properties:
+The stable `0.8.0` manifest is publishable and must retain all of these properties:
 
 ```text
-version: 0.5.0
+version: 0.8.0
 publishConfig.access: public
 publishConfig.provenance: true
-dependency: bailinghub-mcp-server@0.5.0 (exact ordinary dependency)
+dependency: bailinghub-mcp-server@0.8.0 (exact ordinary dependency)
 ```
 
 For every public prerelease or stable version:
@@ -45,7 +45,7 @@ For every public prerelease or stable version:
 2. Place one exact compatible `bailinghub-mcp-server` version in ordinary `dependencies`.
 3. Keep the SDK out of `peerDependencies`, `peerDependenciesMeta`, and
    `optionalDependencies`.
-4. After SDK 0.5.0 is publicly installable, regenerate `package-lock.json` from the registry; both
+4. After SDK 0.8.0 is publicly installable, regenerate `package-lock.json` from the registry; both
    its root dependency and resolved package version must equal the exact manifest value. Never
    invent registry integrity metadata or commit a local tarball dependency. Before that point, a
    local exact SDK tarball can validate source behavior, but is not the final release lock or
@@ -232,6 +232,15 @@ does not prove legacy compatibility.
 4. For a prerelease, confirm npm uses the approved non-`latest` dist-tag. Stop if the workflow would
    change `latest` unintentionally.
 5. Verify the exact npm version, `gitHead`, integrity, and provenance independently.
+   The workflow reads the official exact-version endpoint before publishing. Only a clear 404 on
+   its first Tag run permits a first publish; locked, rate-limited, unavailable or failed reads
+   cannot be treated as absence. After npm accepts the package, read-only requests wait at most ten
+   minutes for matching package name, version and `gitHead`. Each read is bounded to fifteen seconds
+   and 256 KiB. No second visibility wait runs when preflight already verified the same identity.
+   A rerun never republishes an unreadable version: it waits only for the original public metadata,
+   then skips publication. If the previous attempt's acceptance is uncertain, inspect the original
+   npm version state before recovery. This also stops conservatively when an earlier attempt failed
+   before publishing. Do not add an override, replace the version, or infer publish failure from 404.
 6. Install that exact registry version into a second clean profile and repeat dependency
    resolution plus composition checks.
 7. Create the GitHub Release from the existing tag and record only the verified compatibility

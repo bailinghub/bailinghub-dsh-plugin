@@ -65,6 +65,10 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
       if (path === '/agent-api/v1/task-control/capabilities') {
         response.writeHead(404, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'not_found' })); return
       }
+      if (path.endsWith('/knowledge/capabilities')) {
+        assert.equal(request.method, 'GET')
+        response.writeHead(404, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'not_found' })); return
+      }
       let result
       if (path === '/agent-auth/v1/session') {
         assert.equal(request.method, 'GET')
@@ -127,8 +131,12 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
         assert.equal(request.method, 'POST')
         assert.equal(body.status, 'completed')
         assert.match(body.assistant_message_id, /^dsh\./u)
-        assert.match(body.content, new RegExp(`STORE_${account.label}_ONLY_RESULT`, 'u'))
-        assert.equal(body.content.includes(`STORE_${account.label === 'A' ? 'B' : 'A'}_ONLY_RESULT`), false)
+        const summary = JSON.parse(body.content)
+        assert.equal(summary.schema_version, 'bailing.authorization-execution-summary.v1')
+        assert.equal(summary.source, 'agent_client')
+        assert.equal(summary.trust, 'reference_only')
+        for (const fact of summary.invocations) assert.equal(invocations.get(fact.invocation_id), account.label)
+        assert.equal(body.content.includes('ONLY_RESULT'), false)
         assert.equal(body.content.includes('COMBINED_LOCAL_REPLY'), false)
         result = { schema: 'bailing.agent-run-completion.v1', run_id: account.runId, status: body.status }
       } else if (path === '/agent-api/v1/workspaces/demo/system-info') {
@@ -310,6 +318,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
   const fetchImpl = async (url, init = {}) => {
     const path = new URL(url).pathname
     if (path === '/agent-api/v1/task-control/capabilities') return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { 'content-type': 'application/json' } })
+    if (path.endsWith('/knowledge/capabilities')) return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { 'content-type': 'application/json' } })
     const body = init.body === undefined ? undefined : JSON.parse(String(init.body))
     const headers = new Headers(init.headers)
     requests.push({

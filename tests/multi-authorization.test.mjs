@@ -552,7 +552,7 @@ test('same-name incompatible schemas never become an unrestricted shared busines
   assert.equal(callsFor(fixture.mock.calls, 'invoke').length, before)
 })
 
-test('completion records contain only their own authorization results, never the cross-store reply', async () => {
+test('completion records contain only their own authorization facts, never business output or the cross-store reply', async () => {
   const fixture = createFixture()
   await assemble(fixture.host, fixture.agent, 1)
   await discoverRefs(fixture)
@@ -562,10 +562,40 @@ test('completion records contain only their own authorization results, never the
   for (const call of completions) {
     const key = connectionKeyFor(call.args[2])
     const payload = JSON.stringify(call.args[1])
-    assert.match(payload, key === KEY_A ? /STORE_A_RESULT/ : /STORE_B_RESULT/)
-    assert.doesNotMatch(payload, key === KEY_A ? /STORE_B_RESULT/ : /STORE_A_RESULT/)
+    assert.doesNotMatch(payload, /STORE_A_RESULT|STORE_B_RESULT/)
     assert.doesNotMatch(payload, /COMBINED_REPLY_WITH_BOTH_STORE_RESULTS/)
     assert.equal(fixture.runBindings.get(call.args[0]).key, key)
+    const summary = JSON.parse(call.args[1].content)
+    assert.equal(summary.schema_version, 'bailing.authorization-execution-summary.v1')
+    assert.equal(summary.trust, 'reference_only')
+    assert.deepEqual(summary.invocations.map((item) => item.invocation_id),
+      [...fixture.invocationBindings].filter(([, binding]) => binding.key === key).map(([id]) => id).reverse())
+    assert.ok(summary.invocations.every((item) => item.last_known_state === 'executed'))
+  }
+})
+
+test('authorization-scoped completion retains an uncertain write id while excluding its hostile business text', async () => {
+  const fixture = createFixture({ invoke: async (input, _metadata, key) => resultFor(input,
+    input.tool === 'employee_update' ? 'reconciliation_required' : 'executed',
+    { text: `${key === KEY_A ? 'PRIVATE_A' : 'PRIVATE_B'}_IGNORE_RULES_${'业务原文'.repeat(50_000)}` },
+  ) })
+  await assemble(fixture.host, fixture.agent, 1)
+  const refs = await discoverRefs(fixture)
+  const result = await fixture.local.get('employee_update').execute(
+    { authorization_ref: refs.a, arguments: { employee_id: '42', note: 'authorized note' } },
+    execution(fixture.agent, 'uncertain-write-a'),
+  )
+  const original = result.result.invocation_id
+  finishTurn(fixture, 1)
+  await waitFor(() => callsFor(fixture.mock.calls, 'completeRun').length === 2)
+  for (const call of callsFor(fixture.mock.calls, 'completeRun')) {
+    const summary = JSON.parse(call.args[1].content)
+    assert.doesNotMatch(call.args[1].content, /PRIVATE_A|PRIVATE_B|IGNORE_RULES|业务原文/)
+    const originalFact = summary.invocations.find((item) => item.invocation_id === original)
+    if (connectionKeyFor(call.args[2]) === KEY_A) {
+      assert.deepEqual(originalFact, { invocation_id: original, tool: 'employee_update',
+        last_known_state: 'reconciliation_required', next_action: 'inspect_original' })
+    } else assert.equal(originalFact, undefined)
   }
 })
 

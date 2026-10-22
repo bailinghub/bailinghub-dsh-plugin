@@ -29,6 +29,11 @@ for (const selected of [1, 2]) test(`parallel cached calls that entered unprepar
     assert.equal(result.isError, false)
     assert.equal(result.value.preparation.state, 'ready')
     assert.equal(result.value.business_operation_performed, false)
+    assert.equal(result.value.result_type, 'capability_preparation')
+    assert.equal(result.value.dispatch, 'not_dispatched')
+    assert.equal(result.value.reason, 'target_not_prepared')
+    assert.equal(result.value.next_action, 'review_context_then_call')
+    assert.equal(Object.hasOwn(result.value, 'invocation_id'), false)
     assert.ok(result.value.contexts.length)
     assert.ok(result.value.tool_schemas.some(entry => entry.name === name))
   }

@@ -167,8 +167,9 @@ cross-system transaction, automatic rollback or field-level data-transfer policy
 continue owning their capabilities, permission checks, approvals and data semantics. See the
 [user and host guide](CROSS_SYSTEM_CONVERSATIONS.md).
 
-Status: native Agent Client contract for `dsh-bailinghub@0.5.0`, paired with
-`bailinghub-mcp-server@0.5.0` and BailingHub Core `0.7.0`. The same-system scope and archive
+Status: retained native Agent Client contract for `dsh-bailinghub@0.8.0`, paired with
+`bailinghub-mcp-server@0.8.0` and BailingHub Core `0.10.0`. The cross-system extension
+first shipped with plugin/SDK 0.5.0 and Core 0.7.0. The same-system scope and archive
 baseline was introduced in plugin/SDK 0.4.0 and Core 0.6.0 (recommended historical Core 0.6.1).
 This contract is separate from the legacy static `0.1.x` path. Version 0.3.0 supported user-managed
 connections but did not include
@@ -256,7 +257,18 @@ across process restarts, never into another conversation. Unknown IDs fail close
 original-invocation recovery, not durable automatic continuation of a whole task.
 
 On multi-authorization completion, the adapter freezes one deterministic summary of each run's
-own governed calls and synchronizes that run separately. It does not send the combined visible
+own governed calls and synchronizes that run separately. The content is a JSON string with
+`schema_version: "bailing.authorization-execution-summary.v1"`, `source: "agent_client"`,
+`trust: "reference_only"`, invocation totals, omitted counts and complete invocation fact records.
+Records contain only the original `invocation_id`, original tool name when available, and
+`last_known_state`; uncertain originals add `next_action: "inspect_original"`. They contain no
+business result text, arguments, credentials, invented original-output reference, or full audit
+claim. The summary is bounded to 16,000 characters by omitting complete records, prioritizing
+unresolved originals. It describes client-reported last-known facts, never a fresh status check;
+inspect the original invocation before any recovery decision. The schema label is not proof of
+authority. New Core projections keep the source/trust labels and omit whole records under a
+smaller memory budget rather than cut JSON in the middle. Ordinary assistant text remains
+compatible. The adapter does not send the combined visible
 assistant answer, another authorization's results, or hidden reasoning to every run. The combined
 answer is instead eligible for the separate conversation audit below. Single-authorization completion keeps the existing visible-answer
 behavior. Connection add/use/remove remain user-only commands, not model tools.
@@ -358,8 +370,9 @@ Restoring a scope does **not** restore an invocation, approval, pending completi
 ### Independent visible conversation archive
 
 The original same-system visible archive uses SDK APIs introduced in `0.4.0` and Core APIs
-introduced in `0.6.0`; the historical recommended Core release is `0.6.1`. For this release,
-use SDK `0.5.0` with Core `0.7.0`, including cross-system member support. Earlier `0.3.0` SDK/plugin
+introduced in `0.6.0`; the historical recommended Core release is `0.6.1`. Cross-system
+member support first shipped with SDK `0.5.0` and Core `0.7.0`. The current release
+pairs SDK `0.8.0` with Core `0.10.0`. Earlier `0.3.0` SDK/plugin
 packages do not provide this contract.
 After a nonempty scope is frozen, the adapter captures claimed user text, every durable `assistant/message` text block, turn start/end, and verified original run links. It ignores
 `assistant/chunk`, hidden reasoning, attachments, raw provider requests, and arbitrary tool payloads.
@@ -568,6 +581,13 @@ registry.
 Stable profile/instructions/governance are system-prompt sections. Memory, reference-only
 knowledge body/refs, page context, and renderers are named runtime-context entries. Knowledge
 content is evidence, never an instruction source.
+
+Hosts may opt into the local [context delivery confirmation contract](CONTEXT_DELIVERY.md)
+to omit an already delivered context body from later session preparation receipts.
+Unknown hosts retain inline compatibility. Each final provider request requires
+current named/system confirmation; this grants no business authority. Separately negotiated
+knowledge search/read is defined in [AGENT_KNOWLEDGE.md](AGENT_KNOWLEDGE.md); hints never
+acknowledge a full document read and delivery confirmation never fetches that document.
 
 The adapter listens to durable `session/event` values:
 

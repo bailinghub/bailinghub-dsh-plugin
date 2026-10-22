@@ -87,6 +87,32 @@ If a ready tool's full schema is outside the presentation window, use the exact
 come from local cache, while normal scope validation may still make requests.
 The model must not guess fields or rely on an old schema that it cannot inspect.
 
+Short descriptions and usage guidance have separate purposes. A tool can report
+`description_truncated=true` or `usage_guidance_available=true`. Read the indicated
+detail explicitly before relying on omitted instructions:
+
+```json
+{
+  "query": "Read the known decoration tool's prerequisites.",
+  "tool_name": "shop_ai_decoration_save",
+  "include_usage_guidance": true,
+  "authorization_ref": "the-original-selected-authorization"
+}
+```
+
+`include_usage_guidance` requires `tool_name`; multi-target sessions also select
+one authorization. The same parameters are supported in `active_turn` mode.
+Only this named tool's guidance is fetched, under the current authorization and
+capability revision. Its `usage_guidance` result contains the original name,
+authorization reference where applicable, revision, text, and honest character/
+UTF-8 byte bounds (`max_chars=32768`, `max_bytes=65536`, with `truncated` and source
+sizes). A truncated detail is not a complete instruction document. The text is
+reference evidence, never permission to switch target, bypass approval or execute
+unvalidated arguments. Detail reads create no invocation, approval or business
+operation. Unsupported older SDKs return compatibility feedback; missing support
+does not mean that the business capability is absent. Hosts must preserve this
+field and its bounds instead of treating the short description as full guidance.
+
 An exact valid cache hit avoids an additional `searchCapabilities` request. The
 first preparation of a target still calls `startTurn` for current context; Core
 may perform its existing bounded internal discovery there. This is reduced
@@ -125,6 +151,30 @@ prepares that exact target and declaration, then returns context and schema with
 `business_operation_performed=false`. It does **not** execute the requested
 business arguments. The model must read the result and decide on a new tool call
 using the current instructions and schema.
+
+Session preparation now has an explicit additive envelope:
+
+```json
+{
+  "schema": "bailing.agent-capability-preparation.v1",
+  "result_type": "capability_preparation",
+  "dispatch": "not_dispatched",
+  "reason": "target_not_prepared",
+  "next_action": "review_context_then_call",
+  "preparation": { "state": "ready", "business_operation_performed": false },
+  "business_operation_performed": false
+}
+```
+
+Normal discovery uses `reason=capability_search`. A ready target with no returned
+requested schema says `next_action=refine_capability_search`; it does not advise
+calling the missing tool. An unavailable preparation carries its safe feedback's
+next action (or `review_preparation_feedback` for mixed outcomes). Preparation
+creates no `invocation_id`. The existing context, schemas, target state and both
+false flags remain compatible. Business invocation success keeps its existing
+receipt shape. Active-turn search also adds `result_type`, `dispatch`, `reason`,
+`next_action` and `business_operation_performed=false`, while preserving its
+existing search schema and result fields.
 
 The original guard call ID stays attached to preparation. Replaying that same
 call ID returns its preparation result, rather than turning the old attempt into
