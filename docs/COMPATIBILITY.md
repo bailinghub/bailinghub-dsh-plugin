@@ -181,13 +181,18 @@ Public `dsh-bailinghub@0.1.1` remains a configuration-only bundle. It starts the
 operator-configured Hub URL, route-scoped Client Token, and route. It does not establish an Agent
 Session, receive a dynamic capability catalog, or move orchestration into local DSH.
 
-The native line must not mutate the published 0.1 package or reinterpret its configuration. A new
-BailingHub Core release is compatible only after a separate clean legacy profile proves that the
-0.1.1 `/run` and `/jobs/{job_id}` flow still works.
+The native line must not mutate the published 0.1 package or reinterpret its configuration. Evidence
+that Core supports the 0.1.1 `/run` and `/jobs/{job_id}` flow comes from the separate legacy path,
+not native installation. Repeat it when the relevant Client API or legacy behavior changes; reuse
+unchanged evidence only under the [release acceptance policy](RELEASING.md#acceptance-scope).
 
 ## Release compatibility rule
 
-Compatibility requires independent evidence for both paths:
+Compatibility claims require independent evidence for the corresponding paths below. The
+[release acceptance policy](RELEASING.md#acceptance-scope) determines which changed behaviors must
+be retested and when earlier real evidence remains applicable. New official-package identity and
+clean-registry consumption are always verified; unrelated maintenance does not imply a fresh live
+client test of every behavior in this list.
 
 1. Native 0.8: clean install of only the exact plugin package, browser authorization, workspace
    discovery, same-identity replacement, different-identity isolation, read, permitted mutation,
