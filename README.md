@@ -1,11 +1,10 @@
 # BailingHub for DeepSeek Harness
 
-## 0.7.0: optional model services and plan billing
+## 0.8.0: prepare tools once and read knowledge when needed
 
-Keep orchestration local while Core relays model requests and meters shared allowance asynchronously. Discover chat models and image tools separately; preserve business authorization, approvals and audit. Pair Core 0.9.0 / SDK 0.7.0 / DSH 0.7.0.
+A local Agent can retain complete tool declarations, read one tool's guidance and retrieve only relevant reference knowledge. A cooperating host can confirm named context delivery before omitting repeated preparation bodies. Pair Core 0.10.0 / SDK 0.8.0 / DSH 0.8.0; existing authorization, approval and original-operation recovery remain in force.
 
-[Changes](docs/RELEASE_NOTES_v0.7.0.en.md) · [Upgrade](docs/UPGRADE_v0.7.0.en.md)
-
+[Changes](docs/RELEASE_NOTES_v0.8.0.en.md) · [Upgrade](docs/UPGRADE_v0.8.0.en.md)
 
 [简体中文](docs/README.zh-CN.md) | English
 
@@ -40,14 +39,14 @@ recommended by DeepSeek.
 
 You need Node.js `22.19.0+` or `24+`, pnpm, and a compatible DeepSeek Harness release. Your
 administrator must first connect the business system to BailingHub. The matched release set is
-**BailingHub Core 0.9.0 → BailingHub MCP/SDK 0.7.0 → this plugin 0.7.0**.
+**BailingHub Core 0.10.0 → BailingHub MCP/SDK 0.8.0 → this plugin 0.8.0**.
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
-dsh plugin --profile web add dsh-bailinghub@0.7.0
+dsh plugin --profile web add dsh-bailinghub@0.8.0
 ```
 
-The plugin installs its exact `bailinghub-mcp-server@0.7.0` dependency automatically.
+The plugin installs its exact `bailinghub-mcp-server@0.8.0` dependency automatically.
 For an existing installation, read the [migration steps from 0.4.0 and earlier](docs/MIGRATION_VNEXT.md).
 
 Follow the [getting started guide](docs/GETTING_STARTED.md) to enter your administrator's four
@@ -95,7 +94,7 @@ A confirmed revocation or identity change requires a new conversation with a val
 
 ## Follow the conversation and its actions
 
-With Core 0.7.0 and SDK 0.5.0, BailingHub can show the visible user and assistant messages, turn
+With Core 0.8.0 and SDK 0.5.0, BailingHub can show the visible user and assistant messages, turn
 boundaries, and links to the original business runs as one conversation record. Each authorization
 also keeps its own business-call record; the combined reply is not copied into every account's
 memory.

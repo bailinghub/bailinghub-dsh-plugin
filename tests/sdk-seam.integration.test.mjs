@@ -65,6 +65,10 @@ test('routes multiple authorizations through the installed SDK and loopback HTTP
       if (path === '/agent-api/v1/task-control/capabilities') {
         response.writeHead(404, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'not_found' })); return
       }
+      if (path.endsWith('/knowledge/capabilities')) {
+        assert.equal(request.method, 'GET')
+        response.writeHead(404, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'not_found' })); return
+      }
       let result
       if (path === '/agent-auth/v1/session') {
         assert.equal(request.method, 'GET')
@@ -314,6 +318,7 @@ test('matches the real generic SDK facade argument and HTTP DTO contract', async
   const fetchImpl = async (url, init = {}) => {
     const path = new URL(url).pathname
     if (path === '/agent-api/v1/task-control/capabilities') return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { 'content-type': 'application/json' } })
+    if (path.endsWith('/knowledge/capabilities')) return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { 'content-type': 'application/json' } })
     const body = init.body === undefined ? undefined : JSON.parse(String(init.body))
     const headers = new Headers(init.headers)
     requests.push({

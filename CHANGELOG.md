@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0 - 2026-10-22
+
+Return explicit preparation receipts, read selected tool guidance, negotiate knowledge search/read and allow cooperating hosts to confirm named context delivery before omitting repeated bodies. Pin SDK 0.8.0 for bounded complete tool inputs and explicit model-budget helpers. Keep business authorization, approval and original-operation recovery unchanged; task continuation remains the host's responsibility.
+See [changes](docs/RELEASE_NOTES_v0.8.0.en.md) and [upgrade](docs/UPGRADE_v0.8.0.en.md).
+
 ## 0.7.0 - 2026-09-23
 
 Optional host-orchestrated model gateway, USD plan presentation and asynchronous image tools.

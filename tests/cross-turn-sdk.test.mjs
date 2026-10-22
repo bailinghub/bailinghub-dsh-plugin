@@ -62,6 +62,10 @@ async function fixture(t, selected) {
       if (path === '/agent-api/v1/task-control/capabilities') {
         response.writeHead(404, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'not_found' })); return
       }
+      if (path.endsWith('/knowledge/capabilities')) {
+        assert.equal(request.method, 'GET')
+        response.writeHead(404, { 'content-type': 'application/json' }); response.end(JSON.stringify({ error: 'not_found' })); return
+      }
       let result
       if (path === '/agent-auth/v1/session') {
         assert.equal(request.method, 'GET')

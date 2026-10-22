@@ -1,6 +1,6 @@
-# Current 0.7.0 pairing
+# Current 0.8.0 pairing
 
-Use Core 0.9.0, SDK 0.7.0 and DSH 0.7.0 for optional model plans and image tools. Existing business-governance APIs retain their documented minima. Host orchestration, scope, approval and audit rules remain in effect. See [upgrade](UPGRADE_v0.7.0.en.md).
+Use Core 0.10.0, SDK 0.8.0 and DSH 0.8.0 for larger Agent tool inputs, negotiated on-demand knowledge and cooperating-host context delivery confirmation. Existing business-governance APIs retain their documented minima. The host still owns model parameter selection and bounded task continuation. See [upgrade](UPGRADE_v0.8.0.en.md).
 
 # Compatibility
 
@@ -10,23 +10,23 @@ The additive [capability feedback contract](CAPABILITY_FEEDBACK.md) requires the
 Core 0.8.0 / SDK 0.6.0 / DSH 0.6.0 release set for complete counts and error detail. Older unenrolled combinations keep their existing business behavior with unknown optional metadata.
 
 
-## Native Agent Client 0.7.0
+## Native Agent Client 0.8.0
 
 | Component | Release pairing / requirement |
 | --- | --- |
 | DeepSeek Harness | `0.1.1-rc.2`; real Session and native Cordis lifecycle |
 | Node.js | `^22.19.0` or `>=24.0.0` |
 | DSH tool presentation | Native Tool Mode; Code Mode deliberately degraded |
-| Generic Agent Client SDK | Exact `bailinghub-mcp-server@0.7.0` via `./sdk` |
-| BailingHub Core | `bailinghub@0.9.0`, with outstanding migrations through 064 applied |
+| Generic Agent Client SDK | Exact `bailinghub-mcp-server@0.8.0` via `./sdk` |
+| BailingHub Core | `bailinghub@0.10.0`, with only its outstanding migrations applied |
 | Selected scope | Single account, same-system multiple accounts, or different Client Apps/workspaces on one Hub and audit domain |
 | Original authorization | A distinct original Agent Session for every selected target |
 | Persistence | Existing same-system v1 scope/outbox and cross-system v2 records |
 
-Install `dsh-bailinghub@0.7.0`; its ordinary dependency installs the exact SDK automatically.
+Install `dsh-bailinghub@0.8.0`; its ordinary dependency installs the exact SDK automatically.
 Core 0.6.1 and SDK/plugin 0.4.0 remain the historical same-system baseline, not an alternative
 pairing for new cross-system features. See the [upgrade steps](MIGRATION_VNEXT.md) and
-[release scenarios](RELEASE_NOTES_v0.7.0.en.md).
+[release scenarios](RELEASE_NOTES_v0.8.0.en.md).
 
 ### Authorization subject display
 
@@ -189,7 +189,7 @@ BailingHub Core release is compatible only after a separate clean legacy profile
 
 Compatibility requires independent evidence for both paths:
 
-1. Native 0.5: clean install of only the exact plugin package, browser authorization, workspace
+1. Native 0.8: clean install of only the exact plugin package, browser authorization, workspace
    discovery, same-identity replacement, different-identity isolation, read, permitted mutation,
    approval/resume, visible completion, and Hub trajectory. Additionally verify explicit single/multiple
    scope selection, full-set archive authorization, offline reopen/retry, revocation, and no business

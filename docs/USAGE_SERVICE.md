@@ -2,7 +2,7 @@
 
 A plan has a USD allowance, one multiplier, and a live selection of conversation models and model tools. The Hub relays individual requests and meters their cost. The host keeps its original planning, tool selection and AgentLoop. Business authorization, approval, session scope, task controls and conversation archives remain separate.
 
-This optional module pairs Core 0.9.0, SDK 0.7.0 and DSH 0.7.0. It is new relative to public SDK/DSH 0.6.0 and has no legacy Token-allowance aliases, silent billing fallback, balance conversion or automatic BYOK substitution. Public Core 0.8.0 upgrades add outstanding 063/064 migrations and retain existing data. Do not erase business authorizations, history or unrelated sessions; abandoned test configuration is separate maintenance, not a customer upgrade requirement.
+The current release pairs Core 0.10.0, SDK 0.8.0 and DSH 0.8.0. It has no legacy Token-allowance aliases, silent billing fallback, balance conversion or automatic BYOK substitution. The optional gateway first shipped with Core 0.9.0 and SDK/DSH 0.7.0; its original upgrade from Core 0.8.0 required outstanding migrations 063/064. For the current release, follow the Core upgrade guide and apply only outstanding migrations while retaining existing data. Do not erase business authorizations, history or unrelated sessions; abandoned test configuration is separate maintenance, not a customer upgrade requirement.
 
 ## Identity and catalog
 

@@ -1,6 +1,6 @@
-# 开始使用 0.6.0
+# 开始使用 0.8.0
 
-这份指南面向业务系统已经接入 BailingHub 的用户。管理员需要先准备 Core 0.8.0、公开的 Client
+这份指南面向业务系统已经接入 BailingHub 的用户。管理员需要先准备 Core 0.10.0、公开的 Client
 App ID、workspace 和浏览器业务授权入口。多系统时，每个目标分别授权，且属于同一中枢、同一
 审计域；已有能力无需重新声明，但每项动作必须已由相应业务系统开放。
 
@@ -10,10 +10,10 @@ App ID、workspace 和浏览器业务授权入口。多系统时，每个目标�
 
 ```bash
 npm install --global pnpm @deepseek-ai/dsh@0.1.1-rc.2
-dsh plugin --profile web add dsh-bailinghub@0.6.0
+dsh plugin --profile web add dsh-bailinghub@0.8.0
 ```
 
-插件会自动安装 SDK 0.6.0。通过插件设置填写四项公开信息，或使用对应环境变量。下面都是
+插件会自动安装 SDK 0.8.0。通过插件设置填写四项公开信息，或使用对应环境变量。下面都是
 占位值，需要替换成管理员提供的中枢地址、Client App ID 和 workspace：
 
 ```bash

@@ -167,8 +167,9 @@ cross-system transaction, automatic rollback or field-level data-transfer policy
 continue owning their capabilities, permission checks, approvals and data semantics. See the
 [user and host guide](CROSS_SYSTEM_CONVERSATIONS.md).
 
-Status: native Agent Client contract for `dsh-bailinghub@0.5.0`, paired with
-`bailinghub-mcp-server@0.5.0` and BailingHub Core `0.7.0`. The same-system scope and archive
+Status: retained native Agent Client contract for `dsh-bailinghub@0.8.0`, paired with
+`bailinghub-mcp-server@0.8.0` and BailingHub Core `0.10.0`. The cross-system extension
+first shipped with plugin/SDK 0.5.0 and Core 0.7.0. The same-system scope and archive
 baseline was introduced in plugin/SDK 0.4.0 and Core 0.6.0 (recommended historical Core 0.6.1).
 This contract is separate from the legacy static `0.1.x` path. Version 0.3.0 supported user-managed
 connections but did not include
@@ -369,8 +370,9 @@ Restoring a scope does **not** restore an invocation, approval, pending completi
 ### Independent visible conversation archive
 
 The original same-system visible archive uses SDK APIs introduced in `0.4.0` and Core APIs
-introduced in `0.6.0`; the historical recommended Core release is `0.6.1`. For this release,
-use SDK `0.5.0` with Core `0.7.0`, including cross-system member support. Earlier `0.3.0` SDK/plugin
+introduced in `0.6.0`; the historical recommended Core release is `0.6.1`. Cross-system
+member support first shipped with SDK `0.5.0` and Core `0.7.0`. The current release
+pairs SDK `0.8.0` with Core `0.10.0`. Earlier `0.3.0` SDK/plugin
 packages do not provide this contract.
 After a nonempty scope is frozen, the adapter captures claimed user text, every durable `assistant/message` text block, turn start/end, and verified original run links. It ignores
 `assistant/chunk`, hidden reasoning, attachments, raw provider requests, and arbitrary tool payloads.
