@@ -232,6 +232,15 @@ does not prove legacy compatibility.
 4. For a prerelease, confirm npm uses the approved non-`latest` dist-tag. Stop if the workflow would
    change `latest` unintentionally.
 5. Verify the exact npm version, `gitHead`, integrity, and provenance independently.
+   The workflow reads the official exact-version endpoint before publishing. Only a clear 404 on
+   its first Tag run permits a first publish; locked, rate-limited, unavailable or failed reads
+   cannot be treated as absence. After npm accepts the package, read-only requests wait at most ten
+   minutes for matching package name, version and `gitHead`. Each read is bounded to fifteen seconds
+   and 256 KiB. No second visibility wait runs when preflight already verified the same identity.
+   A rerun never republishes an unreadable version: it waits only for the original public metadata,
+   then skips publication. If the previous attempt's acceptance is uncertain, inspect the original
+   npm version state before recovery. This also stops conservatively when an earlier attempt failed
+   before publishing. Do not add an override, replace the version, or infer publish failure from 404.
 6. Install that exact registry version into a second clean profile and repeat dependency
    resolution plus composition checks.
 7. Create the GitHub Release from the existing tag and record only the verified compatibility
