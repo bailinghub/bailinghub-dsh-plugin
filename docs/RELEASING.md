@@ -136,12 +136,18 @@ complete log, pack JSON and actual archive. Do not prepend another `verify` plus
 to repeat the same checks. CI remains independently required; a dry-run or skipped lifecycle
 scripts cannot replace the final candidate archive.
 
+The checks below describe required coverage, not a request to rerun checks already recorded for
+this candidate by normal prepack or CI. Reference that coverage and add only missing applicable
+seams; actual-archive inspection and official-registry readback remain separate gates.
+
 Inspect the exact tarball inventory. It should contain the public native runtime, selected Cordis
 patch, user documentation, compatibility/security/privacy material, and package metadata. It must
 not contain tests, local profiles, credentials, real deployment values, business payloads, editor
 state, or a local tarball dependency.
 
-Re-run the repository secret and local-path guard, then inspect the tarball independently for:
+Retain this candidate's repository secret/local-path guard result. If normal prepack or CI already
+ran it, cite that result rather than repeating it; run the guard when that coverage is absent.
+Inspect the actual tarball independently for:
 
 - private keys or bearer credentials;
 - access, refresh, client, model-provider, or business-system tokens;
